@@ -3,6 +3,7 @@
 > 실시간 뉴스 API 서버 - 캡스톤 프로젝트
 
 Flutter 앱에서 뉴스 데이터를 가져오기 위한 REST API 서버입니다.
+원격 PostgreSQL 데이터베이스에 연결하여 크롤링된 뉴스 데이터를 제공합니다.
 
 ---
 
@@ -20,10 +21,6 @@ backend/
 │   └── routers/            # API 엔드포인트
 │       ├── __init__.py
 │       └── news.py         # 뉴스 관련 API
-├── scripts/                # 유틸리티 스크립트
-│   └── init_db.py          # DB 초기화 (CSV -> DB)
-├── data/                   # 데이터 저장 폴더
-│   └── news.db             # SQLite DB 파일 (자동 생성)
 ├── Dockerfile              # Docker 이미지 설정
 ├── docker-compose.yml      # Docker Compose 설정
 ├── entrypoint.sh           # 컨테이너 시작 스크립트
@@ -50,8 +47,9 @@ source venv/bin/activate  # Windows: .\venv\Scripts\activate
 # 3. 패키지 설치
 pip install -r requirements.txt
 
-# 4. DB 초기화 (CSV 데이터 로드)
-python scripts/init_db.py
+# 4. 환경 변수 설정 (.env 파일 생성)
+cp .env.example .env
+# .env 파일에서 DATABASE_URL 설정
 
 # 5. 서버 실행
 uvicorn app.main:app --reload --port 8000
@@ -63,13 +61,17 @@ uvicorn app.main:app --reload --port 8000
 # 1. Backend 폴더로 이동
 cd Backend
 
-# 2. Docker Compose로 실행
+# 2. 환경 변수 설정
+cp .env.example .env
+# .env 파일에서 DATABASE_URL 설정
+
+# 3. Docker Compose로 실행
 docker-compose up -d --build
 
-# 3. 로그 확인
+# 4. 로그 확인
 docker-compose logs -f news-api
 
-# 4. 중지
+# 5. 중지
 docker-compose down
 ```
 
@@ -175,8 +177,8 @@ GET /api/news/stats/summary
 ### 환경 변수 (.env)
 
 ```env
-# 데이터베이스 연결 정보
-DATABASE_URL=sqlite+aiosqlite:///./news.db
+# 데이터베이스 연결 정보 (PostgreSQL)
+DATABASE_URL=postgresql+asyncpg://사용자:비밀번호@서버주소:5432/DB이름
 
 # 서버 설정
 HOST=0.0.0.0
@@ -187,17 +189,16 @@ DEBUG=True
 CORS_ORIGINS=http://localhost:3000,http://localhost:51151
 ```
 
-### 실제 서버 DB 연결하기
+### 데이터베이스 연결
 
-PostgreSQL이나 MySQL에 연결하려면 `DATABASE_URL`을 변경하세요:
+이 API는 **원격 PostgreSQL 데이터베이스**에 연결하여 크롤링된 뉴스 데이터를 제공합니다.
 
 ```env
-# PostgreSQL
-DATABASE_URL=postgresql+asyncpg://사용자:비밀번호@서버주소:5432/DB이름
-
-# MySQL
-DATABASE_URL=mysql+aiomysql://사용자:비밀번호@서버주소:3306/DB이름
+# PostgreSQL 연결 예시
+DATABASE_URL=postgresql+asyncpg://data_user:password@example.com:5432/news_db
 ```
+
+> **Note**: `.env` 파일은 Git에서 제외됩니다. `.env.example`을 참고하여 설정하세요.
 
 ---
 
@@ -209,13 +210,10 @@ DATABASE_URL=mysql+aiomysql://사용자:비밀번호@서버주소:3306/DB이름
 2. `app/routers/news.py`에 엔드포인트 추가
 3. 필요시 `app/models.py`에 DB 모델 수정
 
-### DB 모델 변경 후
+### DB 모델 변경 시 주의사항
 
-```bash
-# DB 파일 삭제 후 재생성
-rm data/news.db
-python scripts/init_db.py
-```
+원격 PostgreSQL DB의 기존 테이블(`naver_news`, `crawled_news`)을 사용합니다.
+모델 변경 시 원격 DB 스키마와 일치하는지 확인하세요.
 
 ---
 
@@ -247,7 +245,8 @@ docker-compose down -v
 | FastAPI    | 고성능 비동기 웹 프레임워크 |
 | SQLAlchemy | Python ORM                  |
 | Pydantic   | 데이터 검증                 |
-| SQLite     | 경량 DB (개발용)            |
+| PostgreSQL | 프로덕션 데이터베이스       |
+| asyncpg    | PostgreSQL 비동기 드라이버  |
 | Docker     | 컨테이너화                  |
 
 ---
@@ -279,23 +278,26 @@ lsof -i :8000
 uvicorn app.main:app --port 8001
 ```
 
-### Q: DB 초기화가 안 돼요
+### Q: DB 연결이 안 돼요
 
 ```bash
-# CSV 파일 경로 확인
-ls ../App/lib/dummy_data.csv
+# .env 파일에 DATABASE_URL이 올바르게 설정되었는지 확인
+cat .env
 
-# 직접 경로 지정
-python scripts/init_db.py --csv-path /path/to/file.csv
+# asyncpg 설치 확인
+pip install asyncpg
 ```
 
-### Q: Docker에서 DB가 초기화 안 돼요
+### Q: Docker에서 DB 연결이 안 돼요
 
 ```bash
-# data 폴더 권한 확인
-chmod -R 777 data/
+# .env 파일 확인
+cat .env
 
-# 볼륨 삭제 후 재시작
-docker-compose down -v
+# 컨테이너 재빌드
+docker-compose down
 docker-compose up -d --build
+
+# 로그 확인
+docker-compose logs -f news-api
 ```
