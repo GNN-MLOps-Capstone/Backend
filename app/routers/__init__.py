@@ -24,6 +24,9 @@
         - GET /api/news/simple  -> 뉴스 목록 (앱용, 간단)
         - GET /api/news/{id}    -> 뉴스 상세
         - GET /api/news/stats/summary -> 뉴스 통계
+    - stocks.py: 주식 API
+        - GET /api/stocks/{code}/overview
+        - GET /api/stocks/{code}/series?range=1d|1w|1m
 
 ==============================================================================
 """
