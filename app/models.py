@@ -16,9 +16,10 @@
 """
 
 import enum
-from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Enum
+from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Enum, Boolean, Time
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from app.database import Base
 
@@ -127,3 +128,71 @@ class CrawledNews(Base):
     
     def __repr__(self):
         return f"<CrawledNews(crawled_news_id={self.crawled_news_id}, news_id={self.news_id})>"
+
+class User(Base):
+    """
+    유저, 설정 테이블
+    
+    유저 정보 및 개인 설정을 저장합니다.
+    """
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    google_id = Column(String, unique=True, index=True, nullable=False)
+
+    # 프로필 정보
+    email = Column(String, nullable=False)
+    nickname = Column(String)
+    profile_image = Column(Text)
+
+    # 알람 푸시설정
+    push_alarm = Column(Boolean, default=True)
+
+    # 알람 푸시 세부설정
+    risk_push_alarm = Column(Boolean, default=True)
+    positive_push_alarm = Column(Boolean, default=False)
+    interest_push_alarm = Column(Boolean, default=False)
+
+    # 야간 방해금지모드(True시 야간금지모드, False시 해제)
+    night_push_prohibit = Column(Boolean, default=False) 
+    
+    # 야간 방해금지 하는 시간
+    night_push_start = Column(Time, default="23:00:00")
+    night_push_end = Column(Time, default="07:00:00")
+
+    # 유저정보 생성시간
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self):
+        return f"<User(id={self.id}, email={self.email}, name={self.nickname})>"
+    
+class StockSummaryCache(Base):
+    __tablename__ = "stock_summary_cache"
+
+    stock_id = Column(String(20), primary_key=True, index=True)
+    stock_name = Column(String(100), unique=True)
+    latest_news_id = Column(Integer, nullable=True)
+    summary_text = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # 관계 설정
+    news_mappings = relationship("NewsStockMapping", back_populates="stock")
+
+class NewsStockMapping(Base):
+    __tablename__ = "news_stock_mapping"
+
+    mapping_id = Column(Integer, primary_key=True, index=True)
+    stock_id = Column(Integer, ForeignKey("stock_summary_cache.stock_id"), nullable=False)
+    news_id = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # 관계 설정
+    stock = relationship("StockSummaryCache", back_populates="news_mappings")
+
+class FilteredNews(Base):
+    __tablename__ = "filtered_news"
+    news_id = Column(Integer, primary_key=True, index=True)
+    summary = Column(Text, nullable=True)
+    refined_text = Column(Text, nullable=True)
+    sentiment = Column(String(20), nullable=True)

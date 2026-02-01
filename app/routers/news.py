@@ -23,10 +23,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import joinedload
 from typing import Optional
+from datetime import datetime
+from google import genai
+from google.genai import types
 
 from app.database import get_db
-from app.models import NaverNews, CrawledNews, ProcessStatus
-from app.schemas import NewsSimpleResponse, NewsListResponse, NewsDetailResponse
+from app.models import NaverNews, CrawledNews, ProcessStatus, StockSummaryCache, NewsStockMapping, FilteredNews
+from app.schemas import NewsSimpleResponse, NewsListResponse, NewsDetailResponse, StockSummaryResponse
+from app.config import get_settings
 
 
 router = APIRouter(
@@ -34,6 +38,7 @@ router = APIRouter(
     tags=["news"],
 )
 
+settings = get_settings()
 
 # =============================================================================
 # 헬퍼 함수
@@ -59,6 +64,39 @@ def decode_html_entities(text: Optional[str]) -> Optional[str]:
     if text is None:
         return None
     return html.unescape(text)
+
+# 새로운 요약문을 생성하는 함수
+async def call_gemini_summary(stock_name, num_article, text_combined):
+    GOOGLE_API_KEY = settings.gemini_api
+    client = genai.Client(api_key=GOOGLE_API_KEY)
+    summary_length = "2줄" if num_article <=5 else "3줄"
+
+    system_prompt = f"""
+    당신은 모바일 증권 앱의 AI 뉴스 요약 봇입니다. 
+    사용자가 스마트폰으로 한눈에 볼 수 있도록, 아래 제공된 {num_article}개의 기사 요약문을 **모두 하나로 통합하여** '{stock_name}'의 전체 핵심 이슈를 **단 {summary_length}**로 압축 요약하세요.
+        
+    [작성 규칙]
+    1. ⚠️ 절대 기사 요약문별로 개별 요약하지 말 것. 전체 기사 요약문을 아우르는 최종 {summary_length}만 출력할 것.
+    2. 서술형 줄글(~했습니다)은 금지하고, 뉴스 헤드라인처럼 핵심 단어(명사형) 위주로 끝맺음할 것.
+    3. 각 줄은 '- ' 기호로 시작할 것.
+    4. 한 줄의 길이는 40자를 넘지 않을 것.
+    5. 제목이나 인사말 없이 결과물만 바로 출력할 것.
+    """
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-lite",
+            contents=text_combined,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.2
+            )
+        )
+        print("<새로운 요약문 생성 완료>")
+        return response.text
+    except Exception as e:
+        print("<요약 생성 오류>")
+        return None
 
 
 # =============================================================================
@@ -210,3 +248,83 @@ async def get_news_stats(
         "total_naver_news": total,
         "total_crawled_news": crawled,
     }
+
+# =============================================================================
+# 종목의 3줄 요약 응답 API
+# =============================================================================
+#
+# URL: GET /api/news/summary/{stock_name}
+#
+@router.get("/summary/{stock_name}", response_model=StockSummaryResponse)
+async def get_stock_summary(
+    stock_name: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    종목별 3줄 요약 조회 및 생성
+    """
+
+    stmt = select(StockSummaryCache).where(StockSummaryCache.stock_name == stock_name)
+    result = await db.execute(stmt)
+    cache = result.scalar_one_or_none()
+
+    if not cache:
+        raise HTTPException(status_code=404, detail="해당 종목명은 존재하지 않습니다.")
+
+    news_stmt = (
+        select(NewsStockMapping.news_id)
+        .where(NewsStockMapping.stock_id == cache.stock_id)
+        .order_by(desc(NewsStockMapping.created_at))
+        .limit(10)
+    )
+    news_res = await db.execute(news_stmt)
+    target_news_ids = [row[0] for row in news_res.fetchall()]
+
+    if not target_news_ids:
+        return StockSummaryResponse(
+            stock_name=stock_name,
+            summary="최신 뉴스가 없습니다.",
+            last_updated=cache.created_at or datetime.now(),
+            message="관련 뉴스가 존재하지 않습니다."
+        )
+
+    latest_news_id = target_news_ids[0]
+
+    if cache.latest_news_id == latest_news_id:
+        return StockSummaryResponse(
+            stock_name=stock_name,
+            summary=cache.summary_text,
+            last_updated=cache.created_at,
+            message="기존 요약문을 가져왔습니다."
+        )
+    
+    content_stmt = select(FilteredNews.summary).where(FilteredNews.news_id.in_(target_news_ids))
+    content_res = await db.execute(content_stmt)
+    news_summaries = [row[0] for row in content_res.fetchall() if row[0]]
+
+    combined_text = "\n\n".join([f"### [기사 {i+1}]\n{s}" for i, s in enumerate(news_summaries)])
+    
+    # Gemini AI 호출
+    new_summary = await call_gemini_summary(stock_name, len(news_summaries), combined_text)
+
+    if new_summary:
+        cache.latest_news_id = latest_news_id
+        cache.summary_text = new_summary
+        cache.created_at = datetime.now() # onupdate 설정이 없다면 수동 갱신
+        
+        await db.commit()
+
+        return StockSummaryResponse(
+            stock_name=stock_name,
+            summary=new_summary,
+            last_updated=cache.created_at,
+            message="새로운 요약문을 생성했습니다."
+        )
+    
+    # 생성 실패 시 기존 데이터 반환
+    return StockSummaryResponse(
+        stock_name=stock_name,
+        summary=cache.summary_text,
+        last_updated=cache.created_at,
+        message="요약 생성에 실패하여 기존 데이터를 반환합니다."
+    )

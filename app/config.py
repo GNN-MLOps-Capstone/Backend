@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     #
     cors_origins: str = "http://localhost:3000,http://localhost:51151"
     
+    #=========================================================================
+    # 제미나이 api키 설정
+    # =========================================================================
+    gemini_api: str = "" 
+
     class Config:
         """
         Pydantic 설정 클래스

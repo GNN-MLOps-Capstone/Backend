@@ -87,3 +87,6 @@ asyncpg==0.30.0
 # pytest==8.0.0
 # pytest-asyncio==0.23.0
 # httpx==0.27.0  # FastAPI 테스트용 HTTP 클라이언트
+
+# 제미나이
+google-genai==1.56.0

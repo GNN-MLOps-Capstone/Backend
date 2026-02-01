@@ -15,8 +15,7 @@ API 스키마 정의 (schemas.py)
 
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
-
+from datetime import datetime,time
 
 class NewsSimpleResponse(BaseModel):
     """
@@ -73,5 +72,75 @@ class NewsDetailResponse(BaseModel):
     pub_date: Optional[datetime] = None
     url: Optional[str] = None
     
+    class Config:
+        from_attributes = True
+
+class StockSummaryResponse(BaseModel):
+    """
+    요약 정보 스키마
+
+    종목별 3줄 요약을 받아올 때 사용합니다.
+    """
+    stock_name: str
+    summary: str
+    last_updated: datetime
+    message: str
+
+    class Config:
+        from_attributes = True
+
+class UserLoginRequest(BaseModel):
+    """
+    유저 정보 스키마
+
+    새로운 유저가 등장해 유저 정보 저장할 때 사용합니다.
+    """
+    google_id: str
+    email: str
+    nickname: Optional[str] = None
+    profile_image: Optional[str] = None
+
+class UserUpdateRequest(BaseModel):
+    """
+    설정 값 스키마
+
+    설정 값 변경할 때 사용합니다.
+    """
+    push_alarm: Optional[bool] = None
+    risk_push_alarm: Optional[bool] = None
+    positive_push_alarm: Optional[bool] = None
+    interest_push_alarm: Optional[bool] = None
+    night_push_prohibit: Optional[bool] = None
+    night_push_start: Optional[time] = None
+    night_push_end: Optional[time] = None
+
+class UserResponse(BaseModel):
+    """
+    유저 정보 응답 스키마
+
+    유저 정보를 반환합니다.
+    """
+    google_id: str
+    email: str
+    nickname: Optional[str]
+    profile_image: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+class SettingResponse(BaseModel):
+    """
+    설정 정보 응답 스키마
+
+    설정값을 반환합니다.
+    """
+    push_alarm: bool
+    risk_push_alarm: bool
+    positive_push_alarm: bool
+    interest_push_alarm: bool
+    night_push_prohibit: bool
+    night_push_start: Optional[time]
+    night_push_end: Optional[time]
+
     class Config:
         from_attributes = True
