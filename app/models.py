@@ -20,6 +20,7 @@ from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, Fore
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from datetime import time
 
 from app.database import Base
 
@@ -158,8 +159,8 @@ class User(Base):
     night_push_prohibit = Column(Boolean, default=False) 
     
     # 야간 방해금지 하는 시간
-    night_push_start = Column(Time, default="23:00:00")
-    night_push_end = Column(Time, default="07:00:00")
+    night_push_start = Column(Time, default=time(23, 0, 0)) 
+    night_push_end = Column(Time, default=time(7, 0, 0))
 
     # 유저정보 생성시간
     created_at = Column(DateTime(timezone=True), server_default=func.now())

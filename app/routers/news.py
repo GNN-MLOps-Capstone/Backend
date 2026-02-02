@@ -283,7 +283,7 @@ async def get_stock_summary(
     if not target_news_ids:
         return StockSummaryResponse(
             stock_name=stock_name,
-            summary="최신 뉴스가 없습니다.",
+            summary=f"{stock_name} 종목에 관련된 최신 뉴스가 없습니다.",
             last_updated=cache.created_at or datetime.now(),
             message="관련 뉴스가 존재하지 않습니다."
         )
