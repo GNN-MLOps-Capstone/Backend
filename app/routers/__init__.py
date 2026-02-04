@@ -27,6 +27,7 @@
     - stocks.py: 주식 API
         - GET /api/stocks/{code}/overview
         - GET /api/stocks/{code}/series?range=1d|1w|1m
+        - WS  /api/stocks/ws/current?code={code}
 
 ==============================================================================
 """

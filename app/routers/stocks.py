@@ -31,6 +31,10 @@ ws_client = KISWSClient(settings)
 cache = TTLCache()
 
 
+async def shutdown_stocks_resources() -> None:
+    await client.aclose()
+
+
 def _raise_kis_http_error(exc: KISError) -> None:
     raise HTTPException(
         status_code=502,
@@ -76,7 +80,7 @@ async def stream_current_price(
         try:
             while True:
                 await websocket.receive()
-        except WebSocketDisconnect:
+        except (WebSocketDisconnect, RuntimeError):
             return
 
     stream_task = asyncio.create_task(ws_client.stream_current_price(code, _send))
@@ -120,7 +124,7 @@ async def get_stock_overview(
     종목 상단 카드용 현재가 요약 정보.
     """
     cache_key = f"overview:{code}"
-    cached = cache.get(cache_key)
+    cached = await cache.get(cache_key)
     if cached is not None:
         return cached
 
@@ -136,7 +140,7 @@ async def get_stock_overview(
         )
         _ensure_kis_ok(data)
         overview = transform_overview(data, code)
-        cache.set(cache_key, overview, ttl_seconds=3)
+        await cache.set(cache_key, overview, ttl_seconds=3)
         return overview
     except KISError as exc:
         _raise_kis_http_error(exc)
@@ -154,7 +158,7 @@ async def get_stock_series(
 
     if range_label == "1d":
         cache_key = f"series:{code}:{range_label}"
-        cached = cache.get(cache_key)
+        cached = await cache.get(cache_key)
         if cached is not None:
             return cached
 
@@ -176,7 +180,7 @@ async def get_stock_series(
             )
             _ensure_kis_ok(data)
             series = transform_series_time(data, code, range_label, interval_minutes=5)
-            cache.set(cache_key, series, ttl_seconds=15)
+            await cache.set(cache_key, series, ttl_seconds=15)
             return series
         except KISError as exc:
             _raise_kis_http_error(exc)
@@ -198,7 +202,7 @@ async def get_stock_series(
             raise HTTPException(status_code=400, detail="from_date must be <= to_date")
 
         cache_key = f"series:{code}:{range_label}:{from_date}:{to_date}"
-        cached = cache.get(cache_key)
+        cached = await cache.get(cache_key)
         if cached is not None:
             return cached
 
@@ -218,7 +222,7 @@ async def get_stock_series(
             )
             _ensure_kis_ok(data)
             series = transform_series_daily(data, code, range_label)
-            cache.set(cache_key, series, ttl_seconds=120)
+            await cache.set(cache_key, series, ttl_seconds=120)
             return series
         except KISError as exc:
             _raise_kis_http_error(exc)

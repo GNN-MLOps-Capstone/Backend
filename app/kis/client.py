@@ -17,6 +17,23 @@ from app.kis.token_manager import TokenManager
 class KISClient:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
+        self._http_client: httpx.AsyncClient | None = None
+        self._client_lock = asyncio.Lock()
+
+    async def _get_http_client(self) -> httpx.AsyncClient:
+        if self._http_client is not None:
+            return self._http_client
+
+        async with self._client_lock:
+            if self._http_client is None:
+                self._http_client = httpx.AsyncClient(timeout=self._settings.kis_timeout)
+            return self._http_client
+
+    async def aclose(self) -> None:
+        async with self._client_lock:
+            if self._http_client is not None:
+                await self._http_client.aclose()
+                self._http_client = None
 
     async def request(
         self,
@@ -55,14 +72,14 @@ class KISClient:
                     "tr_id": tr_id,
                     "custtype": "P",
                 }
-                async with httpx.AsyncClient(timeout=self._settings.kis_timeout) as client:
-                    resp = await client.request(
-                        method,
-                        url,
-                        headers=headers,
-                        params=params,
-                        json=json,
-                    )
+                client = await self._get_http_client()
+                resp = await client.request(
+                    method,
+                    url,
+                    headers=headers,
+                    params=params,
+                    json=json,
+                )
                 if resp.status_code >= 400:
                     raise KISError(
                         f"KIS request HTTP {resp.status_code}",

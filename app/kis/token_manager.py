@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Tuple
+import weakref
 
 import httpx
 
@@ -18,7 +19,16 @@ class TokenManager:
     # 캐시된 토큰 + 만료시각(UTC)
     _access_token: str | None = None
     _expires_at: datetime | None = None
-    _lock = asyncio.Lock()
+    _locks_by_loop: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = weakref.WeakKeyDictionary()
+
+    @classmethod
+    def _get_loop_lock(cls) -> asyncio.Lock:
+        loop = asyncio.get_running_loop()
+        lock = cls._locks_by_loop.get(loop)
+        if lock is None:
+            lock = asyncio.Lock()
+            cls._locks_by_loop[loop] = lock
+        return lock
 
     @classmethod
     async def get_access_token(cls, settings: Settings) -> str:
@@ -32,7 +42,7 @@ class TokenManager:
             if datetime.now(timezone.utc) < (cls._expires_at - timedelta(seconds=60)):
                 return cls._access_token
 
-        async with cls._lock:
+        async with cls._get_loop_lock():
             # 락 획득 후 재확인
             if cls._access_token and cls._expires_at:
                 if datetime.now(timezone.utc) < (cls._expires_at - timedelta(seconds=60)):
