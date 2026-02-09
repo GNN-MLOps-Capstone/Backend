@@ -90,3 +90,9 @@ asyncpg==0.30.0
 
 # 제미나이
 google-genai==1.56.0
+#구글 인증
+google-auth>=2.45.0
+# 구글 토큰 검증시 사용
+requests==2.32.3
+# access token발급
+python-jose[cryptography]==3.3.0

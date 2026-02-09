@@ -82,6 +82,13 @@ class Settings(BaseSettings):
     # =========================================================================
     gemini_api: str = "" 
 
+    # =============================================================================
+    # 로그인 access token용
+    # =============================================================================
+    secret_key: str = "my_secret_password_1234"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 43200
+
     class Config:
         """
         Pydantic 설정 클래스

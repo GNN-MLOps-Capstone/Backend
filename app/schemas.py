@@ -90,15 +90,10 @@ class StockSummaryResponse(BaseModel):
         from_attributes = True
 
 class UserLoginRequest(BaseModel):
-    """
-    유저 정보 스키마
-
-    새로운 유저가 등장해 유저 정보 저장할 때 사용합니다.
-    """
     google_id: str
-    email: str
-    nickname: Optional[str] = None
-    profile_image: Optional[str] = None
+    email: str     
+    nickname: str 
+    img_url: Optional[str] = None
 
 class UserUpdateRequest(BaseModel):
     """
@@ -106,13 +101,13 @@ class UserUpdateRequest(BaseModel):
 
     설정 값 변경할 때 사용합니다.
     """
-    push_alarm: Optional[bool] = None
-    risk_push_alarm: Optional[bool] = None
-    positive_push_alarm: Optional[bool] = None
-    interest_push_alarm: Optional[bool] = None
+    push: Optional[bool] = None
+    risk_only: Optional[bool] = None
+    positive_only: Optional[bool] = None
+    interest_only: Optional[bool] = None
     night_push_prohibit: Optional[bool] = None
-    night_push_start: Optional[time] = None
-    night_push_end: Optional[time] = None
+    dnd_start: Optional[time] = None
+    dnd_finish: Optional[time] = None
 
 class UserResponse(BaseModel):
     """
@@ -120,13 +115,18 @@ class UserResponse(BaseModel):
 
     유저 정보를 반환합니다.
     """
+    id: int
     google_id: str
     email: str
-    nickname: Optional[str]
-    profile_image: Optional[str]
-
+    nickname: str
+    img_url: Optional[str] = None
     class Config:
         from_attributes = True
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+    user: UserResponse
 
 class SettingResponse(BaseModel):
     """
@@ -134,13 +134,59 @@ class SettingResponse(BaseModel):
 
     설정값을 반환합니다.
     """
-    push_alarm: bool
-    risk_push_alarm: bool
-    positive_push_alarm: bool
-    interest_push_alarm: bool
+    push: bool
+    risk_only: bool
+    positive_only: bool
+    interest_only: bool
     night_push_prohibit: bool
-    night_push_start: Optional[time]
-    night_push_end: Optional[time]
+    dnd_start: Optional[time]
+    dnd_finish: Optional[time]
 
     class Config:
         from_attributes = True
+
+class NotificationCreateRequest(BaseModel):
+    """
+    N-0: 알림 저장 요청 스키마 (앱 -> 서버)
+    
+    앱이 OneSignal 발송 성공 후 서버에 저장을 요청할 때 사용합니다.
+    """
+    type: str
+    title: str
+    body: Optional[str] = None
+
+
+class NotificationResponse(BaseModel):
+    """
+    N-1: 알림 내역 응답 스키마
+    
+    알림 목록 조회 시 반환되는 형태입니다.
+    DB의 'is_read' 컬럼을 API 명세서에 맞춰 'read'로 내보냅니다.
+    """
+    id: int
+    type: str
+    title: str
+    body: Optional[str] = None
+    read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class NotificationReadRequest(BaseModel):
+    """
+    N-2: 읽음 처리 요청 스키마
+    
+    id가 있으면 해당 알림만, 없으면(null) 전체 읽음 처리합니다.
+    """
+    id: Optional[int] = None
+
+
+class NotificationCountResponse(BaseModel):
+    """
+    N-2: 읽음 처리 응답 스키마
+    
+    처리가 끝난 후 남은 '안 읽은 알림 개수'를 반환합니다.
+    """
+    unread_count: int
