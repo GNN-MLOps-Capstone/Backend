@@ -95,6 +95,18 @@ class Settings(BaseSettings):
     kis_ws_base_url: str = "ws://ops.koreainvestment.com:21000"
     kis_ws_path: str = "/tryitout"
     
+    #=========================================================================
+    # 제미나이 api키 설정
+    # =========================================================================
+    gemini_api: str = "" 
+
+    # =============================================================================
+    # 로그인 access token용
+    # =============================================================================
+    secret_key: str = ""
+    algorithm: str = ""
+    access_token_expire_minutes: int = 43200
+
     class Config:
         """
         Pydantic 설정 클래스
