@@ -16,11 +16,19 @@ backend/
 │   ├── main.py             # 서버 시작점 (FastAPI 앱)
 │   ├── config.py           # 설정 관리 (DB 주소, 포트 등)
 │   ├── database.py         # DB 연결 및 세션 관리
+│   ├── kis/                # KIS Open API 연동 모듈
+│   │   ├── __init__.py
+│   │   ├── cache.py         # TTL 캐시
+│   │   ├── client.py        # HTTP 클라이언트 래퍼
+│   │   ├── errors.py        # KIS 오류 타입
+│   │   ├── token_manager.py # 접근토큰 관리
+│   │   └── transformers.py  # 응답 변환기
 │   ├── models.py           # DB 테이블 정의
 │   ├── schemas.py          # API 요청/응답 형식 정의
 │   └── routers/            # API 엔드포인트
 │       ├── __init__.py
-│       └── news.py         # 뉴스 관련 API
+│       ├── news.py         # 뉴스 관련 API
+│       └── stocks.py       # 주식 관련 API
 ├── Dockerfile              # Docker 이미지 설정
 ├── docker-compose.yml      # Docker Compose 설정
 ├── entrypoint.sh           # 컨테이너 시작 스크립트
@@ -172,6 +180,64 @@ GET /api/news/stats/summary
 
 ---
 
+## 주식 시세 (KIS Open API)
+
+### 현재가 요약 (상단 카드)
+
+```
+GET /api/stocks/{code}/overview
+```
+
+예시:
+
+```bash
+curl http://localhost:8000/api/stocks/005930/overview
+```
+
+### 기간별 시세 (그래프용)
+
+```
+GET /api/stocks/{code}/series?range=1d|1w|1m
+```
+
+예시:
+
+```bash
+# 당일 분봉 (기본 5분 간격으로 변환)
+curl "http://localhost:8000/api/stocks/005930/series?range=1d"
+
+# 최근 1주 일봉
+curl "http://localhost:8000/api/stocks/005930/series?range=1w"
+
+# 최근 1달 일봉
+curl "http://localhost:8000/api/stocks/005930/series?range=1m"
+```
+
+### 실시간 현재가 (WebSocket)
+
+```
+GET ws://localhost:8000/api/stocks/ws/current?code=005930
+```
+
+응답 예시:
+
+```json
+{
+  "code": "005930",
+  "time": "103015",
+  "price": 152100,
+  "change": 0.0,
+  "change_rate": 0.0,
+  "open": 154900,
+  "high": 156400,
+  "low": 151500,
+  "volume": 20285661,
+  "trading_value": 3106296973350
+}
+```
+
+---
+
 ## 환경 설정
 
 ### 환경 변수 (.env)
@@ -187,7 +253,16 @@ DEBUG=True
 
 # CORS 허용 출처 (쉼표로 구분)
 CORS_ORIGINS=http://localhost:3000,http://localhost:51151
+
+# KIS Open API
+KIS_BASE_URL=https://openapi.koreainvestment.com:9443
+KIS_APP_KEY=발급받은_APP_KEY
+KIS_APP_SECRET=발급받은_APP_SECRET
+KIS_WS_BASE_URL=ws://ops.koreainvestment.com:21000
+KIS_WS_PATH=/tryitout
 ```
+
+> KIS APP_KEY/APP_SECRET은 반드시 backend/.env에서만 관리하세요. (클라이언트 노출 금지)
 
 ### 데이터베이스 연결
 

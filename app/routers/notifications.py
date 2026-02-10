@@ -59,9 +59,7 @@ async def get_notifications(
     result = await db.execute(noti_query)
     notifications = result.scalars().all()
     
-    # 3. 결과 반환
-    # (팁: response_model 덕분에 그냥 notifications 리스트를 바로 리턴해도 되지만, 
-    #  안전하게 명시적으로 변환하신 기존 코드를 유지했습니다.)
+    # 결과 반환
     response_list = []
     for noti in notifications:
         response_list.append(NotificationResponse(
@@ -86,13 +84,12 @@ async def get_notifications(
 @router.patch("/read", response_model=NotificationCountResponse)
 async def read_notification(
     payload: NotificationReadRequest, 
-    current_user: User = Depends(get_current_user), # ⭐️ 인증 적용
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     target_id = payload.id
 
     if target_id is not None:
-        # [Case 1] 단건 읽음 처리
         # 내 알림이 맞는지(user_id == current_user.google_id) 확인하고 업데이트
         await db.execute(
             update(Notification)
@@ -100,7 +97,7 @@ async def read_notification(
             .values(is_read=True)
         )
     else:
-        # [Case 2] 전체 읽음 처리
+        # 전체 읽음 처리
         await db.execute(
             update(Notification)
             .where(Notification.user_id == current_user.google_id, Notification.is_read == False)
@@ -109,7 +106,7 @@ async def read_notification(
     
     await db.commit()
 
-    # 3. 남은 안 읽은 개수 리턴
+    # 남은 안 읽은 개수 리턴
     count_query = select(func.count()).where(
         Notification.user_id == current_user.google_id,
         Notification.is_read == False
@@ -127,11 +124,11 @@ async def read_notification(
 @router.post("", status_code=201)
 async def create_notification(
     req: NotificationCreateRequest, # Body에는 내용만 있음 (user_id 없음)
-    current_user: User = Depends(get_current_user), # ⭐️ 인증 적용
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     new_noti = Notification(
-        user_id=current_user.google_id,  # 👈 토큰 주인 ID
+        user_id=current_user.google_id,
         type=req.type,
         title=req.title,
         body=req.body,
@@ -144,5 +141,5 @@ async def create_notification(
         await db.refresh(new_noti)
         return {"success": True, "id": new_noti.id}
     except Exception as e:
-        print(f"❌ 알림 저장 실패: {e}")
+        print(f"알림 저장 실패: {e}")
         raise HTTPException(status_code=400, detail="알림 저장 실패")

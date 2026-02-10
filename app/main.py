@@ -33,7 +33,10 @@ from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어
 
 from app.config import get_settings  # 설정 가져오기
 from app.database import init_db  # DB 초기화 함수
-from app.routers import news,users,notifications  # 뉴스 API 라우터
+from app.routers import news  # 뉴스 API 라우터
+from app.routers import stocks
+from app.routers import users
+from app.routers import notifications
 
 # 설정 객체 가져오기
 settings = get_settings()
@@ -79,6 +82,7 @@ async def lifespan(app: FastAPI):
     # =========================================================================
     # 서버 종료 시 실행
     # =========================================================================
+    await stocks.shutdown_stocks_resources()
     print("Shutting down...")
 
 
@@ -175,6 +179,8 @@ app.add_middleware(
 app.include_router(news.router)
 app.include_router(users.router)
 app.include_router(notifications.router)
+app.include_router(stocks.router)
+
 
 
 # =============================================================================

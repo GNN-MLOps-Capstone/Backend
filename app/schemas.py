@@ -13,9 +13,10 @@ API 스키마 정의 (schemas.py)
 ==============================================================================
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from datetime import datetime,time
+import re
 
 class NewsSimpleResponse(BaseModel):
     """
@@ -190,3 +191,58 @@ class NotificationCountResponse(BaseModel):
     처리가 끝난 후 남은 '안 읽은 알림 개수'를 반환합니다.
     """
     unread_count: int
+
+# =============================================================================
+# 주식 API 스키마
+# =============================================================================
+
+class StockOverviewResponse(BaseModel):
+    code: str
+    name: Optional[str] = None
+    last_price: Optional[int] = None
+    change: Optional[float] = None
+    change_rate: Optional[float] = None
+    open: Optional[int] = None
+    high: Optional[int] = None
+    low: Optional[int] = None
+    volume: Optional[int] = None
+    trading_value: Optional[int] = None
+    updated_at: datetime
+
+
+class StockSeriesPoint(BaseModel):
+    t: int
+    o: int
+    h: int
+    l: int
+    c: int
+    v: int
+
+
+class StockSeriesMeta(BaseModel):
+    source: str
+    interval: str
+
+
+class StockSeriesResponse(BaseModel):
+    code: str
+    range: str
+    tz: str
+    currency: str
+    points: list[StockSeriesPoint]
+    meta: StockSeriesMeta
+
+
+class StockSeriesQuery(BaseModel):
+    range: str
+    from_date: Optional[str] = None  # YYYYMMDD 형식
+    to_date: Optional[str] = None    # YYYYMMDD 형식
+
+    @field_validator("from_date", "to_date")
+    @classmethod
+    def _validate_date(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        if not re.fullmatch(r"\\d{8}", value):
+            raise ValueError("date must be in YYYYMMDD format")
+        return value

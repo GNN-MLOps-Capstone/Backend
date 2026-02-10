@@ -60,11 +60,11 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # 토큰 추출 (HTTPBearer는 객체로 감싸서 줍니다)
+    # 토큰 추출
     token = token_obj.credentials
 
     try:
-        # 4. 토큰 해독 (디코드)
+        # 토큰 해독 (디코드)
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         google_id: str = payload.get("sub")
         
@@ -84,7 +84,6 @@ async def get_current_user(
         # 토큰은 멀쩡한데 DB에 유저가 없는 경우 (탈퇴 등)
         raise credentials_exception
         
-    # 6. 유저 객체 반환 (이제 API 함수에서 이걸 바로 쓸 수 있음)
     return user
 
 # =============================================================================
@@ -126,7 +125,7 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
         await db.commit()
         await db.refresh(user)
 
-    # 3. Access Token 발급
+    # Access Token 발급
     access_token = create_access_token(data={"sub": user.google_id})
 
     return {

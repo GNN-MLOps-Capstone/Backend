@@ -76,6 +76,24 @@ class Settings(BaseSettings):
     # 쉼표로 구분하여 여러 주소를 허용할 수 있습니다.
     #
     cors_origins: str = "http://localhost:3000,http://localhost:51151"
+
+    # =========================================================================
+    # KIS Open API 설정
+    # =========================================================================
+    #
+    # KIS_BASE_URL:
+    #   - 실전: https://openapi.koreainvestment.com:9443
+    #   - 모의: https://openapivts.koreainvestment.com:29443
+    #
+    kis_base_url: str = "https://openapi.koreainvestment.com:9443"
+    kis_app_key: str = ""
+    kis_app_secret: str = ""
+    kis_timeout: float = 10.0
+    # KIS WS:
+    #   - 실전: ws://ops.koreainvestment.com:21000
+    #   - 모의: ws://ops.koreainvestment.com:31000
+    kis_ws_base_url: str = "ws://ops.koreainvestment.com:21000"
+    kis_ws_path: str = "/tryitout"
     
     #=========================================================================
     # 제미나이 api키 설정
@@ -85,8 +103,8 @@ class Settings(BaseSettings):
     # =============================================================================
     # 로그인 access token용
     # =============================================================================
-    secret_key: str = "my_secret_password_1234"
-    algorithm: str = "HS256"
+    secret_key: str = ""
+    algorithm: str = ""
     access_token_expire_minutes: int = 43200
 
     class Config:
