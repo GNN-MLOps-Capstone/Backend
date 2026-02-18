@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, WebSocket, WebSocke
 import re
 import asyncio
 import contextlib
+import logging
 
 from app.config import get_settings
 from app.kis.cache import TTLCache
@@ -29,6 +30,7 @@ settings = get_settings()
 client = KISClient(settings)
 ws_client = KISWSClient(settings)
 cache = TTLCache()
+logger = logging.getLogger(__name__)
 
 
 async def shutdown_stocks_resources() -> None:
@@ -57,6 +59,149 @@ def _ensure_kis_ok(data: dict) -> None:
 
 
 _ALNUM6_RE = re.compile(r"^[A-Za-z0-9]{6}$")
+
+
+def _normalize_hhmmss(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = str(value).strip()
+    if len(text) == 4:
+        text = f"{text}00"
+    if len(text) == 5:
+        text = f"0{text}"
+    if len(text) != 6 or not text.isdigit():
+        return None
+    return text
+
+
+def _minute_cursor_for_now() -> str:
+    """
+    KIS 주식당일분봉조회 기준시간:
+    - 장 종료 이후에는 15:30으로 고정해 미래시간 보정값(종가 반복) 유입 방지
+    - 장 시작 전에는 09:00으로 고정
+    """
+    now_hhmmss = datetime.now(tz=KST).strftime("%H%M%S")
+    if now_hhmmss > "153000":
+        return "153000"
+    if now_hhmmss < "090000":
+        return "090000"
+    return now_hhmmss
+
+
+async def _fetch_intraday_full_session(code: str) -> dict:
+    """
+    주식당일분봉조회는 1회 호출당 최대 30건이므로, 기준시간을 뒤로 이동시키며
+    여러 번 조회해 당일 장 전체 구간(개장~현재/종가)을 수집한다.
+    """
+    cursor = _minute_cursor_for_now()
+    today_kst = datetime.now(tz=KST).strftime("%Y%m%d")
+    merged_rows: list[dict] = []
+    seen_keys: set[tuple[str, str]] = set()
+    first_payload: dict | None = None
+    # 09:00~15:30(약 390분) 기준 30건 페이지면 13회 내외
+    max_calls = 14
+
+    for _ in range(max_calls):
+        try:
+            data = await client.request(
+                "GET",
+                "/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice",
+                tr_id="FHKST03010200",  # KIS: 주식당일분봉조회
+                params={
+                    "FID_COND_MRKT_DIV_CODE": "J",
+                    "FID_INPUT_ISCD": code,
+                    "FID_INPUT_HOUR_1": cursor,
+                    "FID_PW_DATA_INCU_YN": "Y",
+                    "FID_ETC_CLS_CODE": "",
+                },
+            )
+            _ensure_kis_ok(data)
+        except KISError as exc:
+            # 첫 호출이 성공했으면, 이후 페이지 실패는 당일 수집 종료로 간주한다.
+            if first_payload is not None:
+                logger.info(
+                    "intraday pagination stopped for %s at cursor=%s: %s",
+                    code,
+                    cursor,
+                    exc.message,
+                )
+                break
+            raise
+        if first_payload is None:
+            first_payload = data
+
+        output2 = data.get("output2") or []
+        if not isinstance(output2, list) or not output2:
+            break
+
+        oldest_time: str | None = None
+        crossed_prev_day = False
+        new_count = 0
+        for row in output2:
+            date_text = str(row.get("stck_bsop_date") or "")
+            time_text = _normalize_hhmmss(row.get("stck_cntg_hour"))
+            if not date_text or not time_text:
+                continue
+            if date_text != today_kst:
+                crossed_prev_day = True
+                continue
+            key = (date_text, time_text)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            merged_rows.append(row)
+            new_count += 1
+            if oldest_time is None or time_text < oldest_time:
+                oldest_time = time_text
+
+        if new_count == 0 or oldest_time is None:
+            break
+        if oldest_time <= "090000":
+            break
+        if crossed_prev_day:
+            break
+
+        try:
+            prev_second = datetime.strptime(oldest_time, "%H%M%S") - timedelta(seconds=1)
+            cursor = prev_second.strftime("%H%M%S")
+        except ValueError:
+            break
+
+    if first_payload is None:
+        return {"output2": []}
+
+    merged = dict(first_payload)
+    merged["output2"] = merged_rows
+    return merged
+
+
+async def _fetch_latest_daily_point(code: str, lookback_days: int = 20) -> dict | None:
+    now_kst = datetime.now(tz=KST).date()
+    from_date = (now_kst - timedelta(days=lookback_days)).strftime("%Y%m%d")
+    to_date = now_kst.strftime("%Y%m%d")
+    data = await client.request(
+        "GET",
+        "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
+        tr_id="FHKST03010100",
+        params={
+            "FID_COND_MRKT_DIV_CODE": "J",
+            "FID_INPUT_ISCD": code,
+            "FID_INPUT_DATE_1": from_date,
+            "FID_INPUT_DATE_2": to_date,
+            "FID_PERIOD_DIV_CODE": "D",
+            "FID_ORG_ADJ_PRC": "0",
+        },
+    )
+    _ensure_kis_ok(data)
+    daily = transform_series_daily(data, code, "1d-fallback")
+    points = daily.get("points") or []
+    if not isinstance(points, list) or not points:
+        return None
+    for p in reversed(points):
+        c = int(p.get("c") or 0)
+        if c > 0:
+            return p
+    return None
 
 
 @router.websocket("/ws/current")
@@ -140,6 +285,18 @@ async def get_stock_overview(
         )
         _ensure_kis_ok(data)
         overview = transform_overview(data, code)
+        if (overview.get("last_price") or 0) <= 0:
+            # 일부 종목(우선주/비유동 종목)에서 현재가가 0으로 내려올 때 최근 유효 일봉으로 보정
+            try:
+                latest = await _fetch_latest_daily_point(code)
+            except KISError:
+                latest = None
+            if latest is not None:
+                overview["last_price"] = int(latest.get("c") or 0)
+                overview["open"] = int(latest.get("o") or 0)
+                overview["high"] = int(latest.get("h") or 0)
+                overview["low"] = int(latest.get("l") or 0)
+                overview["volume"] = int(latest.get("v") or 0)
         await cache.set(cache_key, overview, ttl_seconds=3)
         return overview
     except KISError as exc:
@@ -162,24 +319,29 @@ async def get_stock_series(
         if cached is not None:
             return cached
 
-        now_kst = datetime.now(tz=KST)
-        fid_input_hour_1 = now_kst.strftime("%H%M%S")
-
         try:
-            data = await client.request(
-                "GET",
-                "/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice",
-                tr_id="FHKST03010200",  # KIS: 주식당일분봉조회
-                params={
-                    "FID_COND_MRKT_DIV_CODE": "J",
-                    "FID_INPUT_ISCD": code,
-                    "FID_INPUT_HOUR_1": fid_input_hour_1,
-                    "FID_PW_DATA_INCU_YN": "Y",
-                    "FID_ETC_CLS_CODE": "",
-                },
-            )
-            _ensure_kis_ok(data)
+            data = await _fetch_intraday_full_session(code)
             series = transform_series_time(data, code, range_label, interval_minutes=5)
+            points = series.get("points") or []
+            has_valid_point = any(int(p.get("c") or 0) > 0 for p in points if isinstance(p, dict))
+            if not has_valid_point:
+                # 1d 분봉이 비거나 0으로만 구성된 경우 최근 유효 일봉 1개로 보정
+                latest = await _fetch_latest_daily_point(code)
+                if latest is not None:
+                    date_dt = datetime.fromtimestamp(int(latest["t"]) / 1000, tz=KST)
+                    anchor = date_dt.replace(hour=15, minute=30, second=0, microsecond=0)
+                    anchor_ms = int(anchor.timestamp() * 1000)
+                    c = int(latest.get("c") or 0)
+                    series["points"] = [
+                        {
+                            "t": anchor_ms,
+                            "o": int(latest.get("o") or c),
+                            "h": int(latest.get("h") or c),
+                            "l": int(latest.get("l") or c),
+                            "c": c,
+                            "v": int(latest.get("v") or 0),
+                        }
+                    ]
             await cache.set(cache_key, series, ttl_seconds=15)
             return series
         except KISError as exc:
