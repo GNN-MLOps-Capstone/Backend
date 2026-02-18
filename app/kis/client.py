@@ -97,5 +97,3 @@ class KISClient:
                 if isinstance(exc, KISError):
                     raise exc
                 raise KISError(f"KIS request failed: {exc}", status_code=502) from exc
-
-        raise KISError(f"KIS request failed: {last_error}", status_code=502)
