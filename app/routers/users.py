@@ -22,13 +22,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
+from sqlalchemy.orm import selectinload
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 
 from app.database import get_db
-from app.models import User
+from app.models import User, UserSettings
 from app.schemas import UserLoginRequest, AuthResponse, UserUpdateRequest, UserResponse, SettingResponse
 from app.config import get_settings
 
@@ -76,7 +77,7 @@ async def get_current_user(
         raise credentials_exception
     
     # 해독된 google_id를 가진 유저가 진짜 DB에 있는지 확인합니다.
-    query = select(User).where(User.google_id == google_id)
+    query = select(User).options(selectinload(User.settings)).where(User.google_id == google_id)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
@@ -114,12 +115,16 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
             nickname=nickname,         
             img_url=img_url
         )
+
+        user.settings = UserSettings()
+
         db.add(user)
         await db.commit()
         await db.refresh(user)
     
     else:
         # 기존 회원
+        user.email = email
         user.nickname = nickname
         user.img_url = img_url
         await db.commit()
@@ -154,8 +159,8 @@ async def get_profile(current_user: User = Depends(get_current_user)):
 # 용도: Flutter 앱의 설정
 #
 @router.get("/settings", response_model=SettingResponse)
-async def get_settings(current_user: User = Depends(get_current_user)):
-    return current_user
+async def get_user_settings(current_user: User = Depends(get_current_user)):
+    return current_user.settings
     
 # =============================================================================
 # 설정 정보 변경 API
@@ -171,17 +176,18 @@ async def update_settings(
     db: AsyncSession = Depends(get_db)
 ):
 
-    # update_data = request.dict(exclude_unset=True) (Pydantic v1)
-    update_data = request.model_dump(exclude_unset=True) # (Pydantic v2)
+    update_data = request.model_dump(exclude_unset=True)
+
+    settings_obj = current_user.settings
 
     # 현재 로그인한 유저(current_user) 정보를 수정
     for key, value in update_data.items():
         setattr(current_user, key, value)
 
     await db.commit()
-    await db.refresh(current_user)
+    await db.refresh(settings_obj)
     
-    return current_user
+    return settings_obj
 
 # =============================================================================
 # 회원 탈퇴 API

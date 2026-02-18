@@ -20,6 +20,7 @@
 
 from pydantic_settings import BaseSettings  # 설정 관리 라이브러리
 from functools import lru_cache  # 캐싱 기능 (설정을 한 번만 읽어옴)
+from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -103,8 +104,8 @@ class Settings(BaseSettings):
     # =============================================================================
     # 로그인 access token용
     # =============================================================================
-    secret_key: str = ""
-    algorithm: str = ""
+    secret_key: str = Field(..., env="SECRET_KEY")
+    algorithm: str = Field(..., env="ALGORITHM")
     access_token_expire_minutes: int = 43200
 
     class Config:

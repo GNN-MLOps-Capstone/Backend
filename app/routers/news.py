@@ -23,9 +23,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import joinedload
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from google import genai
 from google.genai import types
+import logging
 
 from app.database import get_db
 from app.models import NaverNews, CrawledNews, ProcessStatus, StockSummaryCache, NewsStockMapping, FilteredNews
@@ -39,6 +40,8 @@ router = APIRouter(
 )
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
+gemini_client = genai.Client(api_key=settings.gemini_api)
 
 # =============================================================================
 # 헬퍼 함수
@@ -67,8 +70,6 @@ def decode_html_entities(text: Optional[str]) -> Optional[str]:
 
 # 새로운 요약문을 생성하는 함수
 async def call_gemini_summary(stock_name, num_article, text_combined):
-    GOOGLE_API_KEY = settings.gemini_api
-    client = genai.Client(api_key=GOOGLE_API_KEY)
     summary_length = "2줄" if num_article <=5 else "3줄"
 
     system_prompt = f"""
@@ -84,7 +85,7 @@ async def call_gemini_summary(stock_name, num_article, text_combined):
     """
 
     try:
-        response = client.models.generate_content(
+        response = await gemini_client.aio.models.generate_content(
             model="gemini-2.0-flash-lite",
             contents=text_combined,
             config=types.GenerateContentConfig(
@@ -92,10 +93,10 @@ async def call_gemini_summary(stock_name, num_article, text_combined):
                 temperature=0.2
             )
         )
-        print("<새로운 요약문 생성 완료>")
+        logger.info("새로운 요약문 생성 완료: %s", stock_name)
         return response.text
-    except Exception as e:
-        print("<요약 생성 오류>")
+    except Exception:
+        logger.exception("요약 생성 오류: %s", stock_name)
         return None
 
 
@@ -284,7 +285,7 @@ async def get_stock_summary(
         return StockSummaryResponse(
             stock_name=stock_name,
             summary=f"{stock_name} 종목에 관련된 최신 뉴스가 없습니다.",
-            last_updated=cache.created_at or datetime.now(),
+            last_updated=cache.created_at or datetime.now(timezone.utc),
             message="관련 뉴스가 존재하지 않습니다."
         )
 
@@ -293,7 +294,7 @@ async def get_stock_summary(
     if cache.latest_news_id == latest_news_id:
         return StockSummaryResponse(
             stock_name=stock_name,
-            summary=cache.summary_text,
+            summary=cache.summary_text or "요약 정보가 없습니다.",
             last_updated=cache.created_at,
             message="기존 요약문을 가져왔습니다."
         )
@@ -310,7 +311,7 @@ async def get_stock_summary(
     if new_summary:
         cache.latest_news_id = latest_news_id
         cache.summary_text = new_summary
-        cache.created_at = datetime.now() # onupdate 설정이 없다면 수동 갱신
+        cache.created_at = datetime.now(timezone.utc) # onupdate 설정이 없다면 수동 갱신
         
         await db.commit()
 

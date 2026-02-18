@@ -132,9 +132,9 @@ class CrawledNews(Base):
 
 class User(Base):
     """
-    유저, 설정 테이블
+    유저 테이블
     
-    유저 정보 및 개인 설정을 저장합니다.
+    유저 정보 을 저장합니다.
     """
 
     __tablename__ = "users"
@@ -147,8 +147,26 @@ class User(Base):
     nickname = Column(String)
     img_url = Column(Text)
 
-    access_token = Column(String, nullable=True)
     role = Column(String, nullable=True)
+
+    # 유저정보 생성시간
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    settings = relationship("UserSettings",back_populates="user",uselist=False,cascade="all, delete-orphan")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<User(id={self.id}, email={self.email}, name={self.nickname})>"
+    
+class UserSettings(Base):
+    """
+    사용자 알림 및 개인 설정
+    """
+
+    __tablename__ = "user_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer,ForeignKey("users.id", ondelete="CASCADE"),unique=True,nullable=False)
 
     # 알람 푸시설정
     push = Column(Boolean, default=True)
@@ -165,13 +183,11 @@ class User(Base):
     dnd_start = Column(Time, default=time(23, 0, 0)) 
     dnd_finish = Column(Time, default=time(7, 0, 0))
 
-    # 유저정보 생성시간
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="settings")
 
     def __repr__(self):
-        return f"<User(id={self.id}, email={self.email}, name={self.nickname})>"
+        return f"<UserSettings(user_id={self.user_id})>"
+
     
 class StockSummaryCache(Base):
     __tablename__ = "stock_summary_cache"
@@ -189,7 +205,7 @@ class NewsStockMapping(Base):
     __tablename__ = "news_stock_mapping"
 
     mapping_id = Column(Integer, primary_key=True, index=True)
-    stock_id = Column(Integer, ForeignKey("stock_summary_cache.stock_id"), nullable=False)
+    stock_id = Column(String(20), ForeignKey("stock_summary_cache.stock_id"), nullable=False)
     news_id = Column(Integer, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

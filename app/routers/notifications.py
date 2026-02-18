@@ -16,7 +16,7 @@ API 엔드포인트:
 ==============================================================================
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func, desc
 from typing import List
@@ -41,8 +41,8 @@ router = APIRouter(
 #
 @router.get("", response_model=List[NotificationResponse])
 async def get_notifications(
-    page: int = 1,
-    size: int = 20,
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user), 
     db: AsyncSession = Depends(get_db)
 ):
@@ -141,5 +141,5 @@ async def create_notification(
         await db.refresh(new_noti)
         return {"success": True, "id": new_noti.id}
     except Exception as e:
-        print(f"알림 저장 실패: {e}")
-        raise HTTPException(status_code=400, detail="알림 저장 실패")
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="알림 저장 실패") from e
