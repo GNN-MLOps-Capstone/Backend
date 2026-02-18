@@ -15,9 +15,8 @@ API 스키마 정의 (schemas.py)
 
 from pydantic import BaseModel, field_validator
 from typing import Optional
-from datetime import datetime
+from datetime import datetime,time
 import re
-
 
 class NewsSimpleResponse(BaseModel):
     """
@@ -77,6 +76,121 @@ class NewsDetailResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class StockSummaryResponse(BaseModel):
+    """
+    요약 정보 스키마
+
+    종목별 3줄 요약을 받아올 때 사용합니다.
+    """
+    stock_name: str
+    summary: str
+    last_updated: datetime
+    message: str
+
+    class Config:
+        from_attributes = True
+
+class UserLoginRequest(BaseModel):
+    google_id: str
+    email: str     
+    nickname: str 
+    img_url: Optional[str] = None
+
+class UserUpdateRequest(BaseModel):
+    """
+    설정 값 스키마
+
+    설정 값 변경할 때 사용합니다.
+    """
+    push: Optional[bool] = None
+    risk_only: Optional[bool] = None
+    positive_only: Optional[bool] = None
+    interest_only: Optional[bool] = None
+    night_push_prohibit: Optional[bool] = None
+    dnd_start: Optional[time] = None
+    dnd_finish: Optional[time] = None
+
+class UserResponse(BaseModel):
+    """
+    유저 정보 응답 스키마
+
+    유저 정보를 반환합니다.
+    """
+    id: int
+    google_id: str
+    email: str
+    nickname: str
+    img_url: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+    user: UserResponse
+
+class SettingResponse(BaseModel):
+    """
+    설정 정보 응답 스키마
+
+    설정값을 반환합니다.
+    """
+    push: bool
+    risk_only: bool
+    positive_only: bool
+    interest_only: bool
+    night_push_prohibit: bool
+    dnd_start: Optional[time]
+    dnd_finish: Optional[time]
+
+    class Config:
+        from_attributes = True
+
+class NotificationCreateRequest(BaseModel):
+    """
+    N-0: 알림 저장 요청 스키마 (앱 -> 서버)
+    
+    앱이 OneSignal 발송 성공 후 서버에 저장을 요청할 때 사용합니다.
+    """
+    type: str
+    title: str
+    body: Optional[str] = None
+
+
+class NotificationResponse(BaseModel):
+    """
+    N-1: 알림 내역 응답 스키마
+    
+    알림 목록 조회 시 반환되는 형태입니다.
+    DB의 'is_read' 컬럼을 API 명세서에 맞춰 'read'로 내보냅니다.
+    """
+    id: int
+    type: str
+    title: str
+    body: Optional[str] = None
+    read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class NotificationReadRequest(BaseModel):
+    """
+    N-2: 읽음 처리 요청 스키마
+    
+    id가 있으면 해당 알림만, 없으면(null) 전체 읽음 처리합니다.
+    """
+    id: Optional[int] = None
+
+
+class NotificationCountResponse(BaseModel):
+    """
+    N-2: 읽음 처리 응답 스키마
+    
+    처리가 끝난 후 남은 '안 읽은 알림 개수'를 반환합니다.
+    """
+    unread_count: int
 
 # =============================================================================
 # 주식 API 스키마

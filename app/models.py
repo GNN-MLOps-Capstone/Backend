@@ -16,9 +16,11 @@
 """
 
 import enum
-from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Enum
+from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Enum, Boolean, Time
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from datetime import time
 
 from app.database import Base
 
@@ -127,3 +129,117 @@ class CrawledNews(Base):
     
     def __repr__(self):
         return f"<CrawledNews(crawled_news_id={self.crawled_news_id}, news_id={self.news_id})>"
+
+class User(Base):
+    """
+    유저 테이블
+    
+    유저 정보 을 저장합니다.
+    """
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    google_id = Column(String, unique=True, index=True, nullable=False)
+
+    # 프로필 정보
+    email = Column(String, nullable=False)
+    nickname = Column(String)
+    img_url = Column(Text)
+
+    role = Column(String, nullable=True)
+
+    # 유저정보 생성시간
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    settings = relationship("UserSettings",back_populates="user",uselist=False,cascade="all, delete-orphan")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<User(id={self.id}, email={self.email}, name={self.nickname})>"
+    
+class UserSettings(Base):
+    """
+    사용자 알림 및 개인 설정
+    """
+
+    __tablename__ = "user_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer,ForeignKey("users.id", ondelete="CASCADE"),unique=True,nullable=False)
+
+    # 알람 푸시설정
+    push = Column(Boolean, default=True)
+
+    # 알람 푸시 세부설정
+    risk_only = Column(Boolean, default=True)
+    positive_only = Column(Boolean, default=False)
+    interest_only = Column(Boolean, default=False)
+
+    # 야간 방해금지모드(True시 야간금지모드, False시 해제)
+    night_push_prohibit = Column(Boolean, default=False) 
+    
+    # 야간 방해금지 하는 시간
+    dnd_start = Column(Time, default=time(23, 0, 0)) 
+    dnd_finish = Column(Time, default=time(7, 0, 0))
+
+    user = relationship("User", back_populates="settings")
+
+    def __repr__(self):
+        return f"<UserSettings(user_id={self.user_id})>"
+
+    
+class StockSummaryCache(Base):
+    __tablename__ = "stock_summary_cache"
+
+    stock_id = Column(String(20), primary_key=True, index=True)
+    stock_name = Column(String(100), unique=True)
+    latest_news_id = Column(Integer, nullable=True)
+    summary_text = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # 관계 설정
+    news_mappings = relationship("NewsStockMapping", back_populates="stock")
+
+class NewsStockMapping(Base):
+    __tablename__ = "news_stock_mapping"
+
+    mapping_id = Column(Integer, primary_key=True, index=True)
+    stock_id = Column(String(20), ForeignKey("stock_summary_cache.stock_id"), nullable=False)
+    news_id = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # 관계 설정
+    stock = relationship("StockSummaryCache", back_populates="news_mappings")
+
+class FilteredNews(Base):
+    __tablename__ = "filtered_news"
+    news_id = Column(Integer, primary_key=True, index=True)
+    summary = Column(Text, nullable=True)
+    refined_text = Column(Text, nullable=True)
+    sentiment = Column(String(20), nullable=True)
+
+class Notification(Base):
+    """
+    알림 테이블 (notifications)
+    
+    앱에서 보낸 알림 이력과 읽음 상태를 저장합니다.
+    """
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.google_id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    type = Column(String(50), nullable=False)
+    title = Column(String(255), nullable=False)
+    body = Column(Text, nullable=True)
+    is_read = Column(Boolean, default=False)
+    
+    # 생성 시간 (자동 입력)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # 관계 설정: User 모델과 양방향 연결
+    user = relationship("User", back_populates="notifications")
+
+    def __repr__(self):
+        return f"<Notification(id={self.id}, type={self.type}, title={self.title})>"
