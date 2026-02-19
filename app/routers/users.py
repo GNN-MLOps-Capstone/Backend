@@ -101,6 +101,7 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
     email = req.email
     nickname = req.nickname
     img_url = req.img_url
+    onesignal_id = req.onesignal_id
 
     # DB 조회 및 저장
     query = select(User).where(User.google_id == google_id)
@@ -113,7 +114,8 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
             google_id=google_id,
             email=email,
             nickname=nickname,         
-            img_url=img_url
+            img_url=img_url,
+            onesignal_id=onesignal_id
         )
 
         user.settings = UserSettings()
@@ -127,6 +129,10 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
         user.email = email
         user.nickname = nickname
         user.img_url = img_url
+        if req.onesignal_id is not None:
+            user.onesignal_id = req.onesignal_id
+            print(f"DEBUG: User {user.nickname}의 OneSignal ID 업데이트 시도: {user.onesignal_id}")
+        
         await db.commit()
         await db.refresh(user)
 
