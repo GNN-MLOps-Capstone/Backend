@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Path, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, WebSocket, WebSocketDisconnect, Query, Request
 import re
 import asyncio
 import contextlib
@@ -88,20 +88,32 @@ def _minute_cursor_for_now() -> str:
     return now_hhmmss
 
 
-async def _fetch_intraday_full_session(code: str) -> dict:
+def _previous_minute_cursor(hhmmss: str) -> str:
     """
-    주식당일분봉조회는 1회 호출당 최대 30건이므로, 기준시간을 뒤로 이동시키며
-    여러 번 조회해 당일 장 전체 구간(개장~현재/종가)을 수집한다.
+    HHMMSS 커서를 이전 1분으로 이동한다.
+    장 시작(09:00) 이전으로는 내려가지 않도록 고정한다.
     """
-    cursor = _minute_cursor_for_now()
-    today_kst = datetime.now(tz=KST).strftime("%Y%m%d")
-    merged_rows: list[dict] = []
-    seen_keys: set[tuple[str, str]] = set()
-    first_payload: dict | None = None
-    # 09:00~15:30(약 390분) 기준 30건 페이지면 13회 내외
-    max_calls = 14
+    normalized = _normalize_hhmmss(hhmmss)
+    if normalized is None or normalized <= "090000":
+        return "090000"
+    try:
+        prev = datetime.strptime(normalized, "%H%M%S") - timedelta(minutes=1)
+        prev_text = prev.strftime("%H%M%S")
+    except ValueError:
+        return "090000"
+    if prev_text < "090000":
+        return "090000"
+    return prev_text
 
-    for _ in range(max_calls):
+
+async def _fetch_intraday_page(code: str, cursor: str) -> dict:
+    """
+    단일 분봉 페이지를 조회한다.
+    KIS 응답(rt_cd) 오류가 간헐적으로 발생하는 경우를 대비해 짧게 재시도한다.
+    """
+    max_attempts = 3
+    last_exc: KISError | None = None
+    for attempt in range(max_attempts):
         try:
             data = await client.request(
                 "GET",
@@ -114,8 +126,37 @@ async def _fetch_intraday_full_session(code: str) -> dict:
                     "FID_PW_DATA_INCU_YN": "Y",
                     "FID_ETC_CLS_CODE": "",
                 },
+                retries=1,
             )
             _ensure_kis_ok(data)
+            return data
+        except KISError as exc:
+            last_exc = exc
+            if attempt < max_attempts - 1:
+                await asyncio.sleep(0.15 * (attempt + 1))
+                continue
+            raise
+    if last_exc is not None:
+        raise last_exc
+    return {"output2": []}
+
+
+async def _fetch_intraday_full_session(code: str) -> dict:
+    """
+    주식당일분봉조회는 1회 호출당 최대 30건이므로, 기준시간을 뒤로 이동시키며
+    여러 번 조회해 당일 장 전체 구간(개장~현재/종가)을 수집한다.
+    """
+    cursor = _minute_cursor_for_now()
+    today_kst = datetime.now(tz=KST).strftime("%Y%m%d")
+    merged_rows: list[dict] = []
+    seen_keys: set[tuple[str, str]] = set()
+    first_payload: dict | None = None
+    # 09:00~15:30(약 390분) 기준 30건 페이지면 13회 내외
+    max_calls = 20
+
+    for _ in range(max_calls):
+        try:
+            data = await _fetch_intraday_page(code, cursor)
         except KISError as exc:
             # 첫 호출이 성공했으면, 이후 페이지 실패는 당일 수집 종료로 간주한다.
             if first_payload is not None:
@@ -135,6 +176,7 @@ async def _fetch_intraday_full_session(code: str) -> dict:
             break
 
         oldest_time: str | None = None
+        page_oldest_time: str | None = None
         crossed_prev_day = False
         new_count = 0
         for row in output2:
@@ -142,6 +184,8 @@ async def _fetch_intraday_full_session(code: str) -> dict:
             time_text = _normalize_hhmmss(row.get("stck_cntg_hour"))
             if not date_text or not time_text:
                 continue
+            if page_oldest_time is None or time_text < page_oldest_time:
+                page_oldest_time = time_text
             if date_text != today_kst:
                 crossed_prev_day = True
                 continue
@@ -154,18 +198,27 @@ async def _fetch_intraday_full_session(code: str) -> dict:
             if oldest_time is None or time_text < oldest_time:
                 oldest_time = time_text
 
-        if new_count == 0 or oldest_time is None:
+        if page_oldest_time is None:
+            break
+        if new_count == 0:
+            next_cursor = _previous_minute_cursor(page_oldest_time)
+            if next_cursor == cursor:
+                break
+            cursor = next_cursor
+            await asyncio.sleep(0.05)
+            continue
+        if oldest_time is None:
             break
         if oldest_time <= "090000":
             break
         if crossed_prev_day:
             break
 
-        try:
-            prev_second = datetime.strptime(oldest_time, "%H%M%S") - timedelta(seconds=1)
-            cursor = prev_second.strftime("%H%M%S")
-        except ValueError:
+        next_cursor = _previous_minute_cursor(oldest_time)
+        if next_cursor == cursor:
             break
+        cursor = next_cursor
+        await asyncio.sleep(0.05)
 
     if first_payload is None:
         return {"output2": []}
@@ -305,6 +358,7 @@ async def get_stock_overview(
 
 @router.get("/{code}/series", response_model=StockSeriesResponse)
 async def get_stock_series(
+    request: Request,
     query: StockSeriesQuery = Depends(),
     code: str = Path(..., pattern=r"^[A-Za-z0-9]{6}$", description="종목코드 (6자리)"),
 ):
@@ -312,12 +366,14 @@ async def get_stock_series(
     기간별 시세 (1d/1w/1m).
     """
     range_label = (query.range or "").lower()
+    bypass_cache = "_ts" in request.query_params
 
     if range_label == "1d":
         cache_key = f"series:{code}:{range_label}"
-        cached = await cache.get(cache_key)
-        if cached is not None:
-            return cached
+        if not bypass_cache:
+            cached = await cache.get(cache_key)
+            if cached is not None:
+                return cached
 
         try:
             data = await _fetch_intraday_full_session(code)
@@ -342,7 +398,8 @@ async def get_stock_series(
                             "v": int(latest.get("v") or 0),
                         }
                     ]
-            await cache.set(cache_key, series, ttl_seconds=15)
+            if not bypass_cache:
+                await cache.set(cache_key, series, ttl_seconds=15)
             return series
         except KISError as exc:
             _raise_kis_http_error(exc)
@@ -364,9 +421,10 @@ async def get_stock_series(
             raise HTTPException(status_code=400, detail="from_date must be <= to_date")
 
         cache_key = f"series:{code}:{range_label}:{from_date}:{to_date}"
-        cached = await cache.get(cache_key)
-        if cached is not None:
-            return cached
+        if not bypass_cache:
+            cached = await cache.get(cache_key)
+            if cached is not None:
+                return cached
 
         try:
             data = await client.request(
@@ -384,7 +442,8 @@ async def get_stock_series(
             )
             _ensure_kis_ok(data)
             series = transform_series_daily(data, code, range_label)
-            await cache.set(cache_key, series, ttl_seconds=120)
+            if not bypass_cache:
+                await cache.set(cache_key, series, ttl_seconds=120)
             return series
         except KISError as exc:
             _raise_kis_http_error(exc)
