@@ -114,6 +114,91 @@ async def read_notification(
     result = await db.execute(count_query)
     
     return {"unread_count": result.scalar()}
+
+# 중요 토글 API
+# =============================================================================
+#
+# URL: PATCH /api/notifications/important
+# 용도: 알림 중요 표시/해제 토글
+#
+@router.patch("/important")
+async def toggle_notification_important(
+    payload: NotificationReadRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    target_id = payload.id
+
+    if target_id is None:
+        raise HTTPException(status_code=400, detail="알림 id 필요")
+
+    # 현재 상태 조회
+    result = await db.execute(
+        select(Notification.star).where(
+            Notification.id == target_id,
+            Notification.user_id == current_user.google_id
+        )
+    )
+    current_value = result.scalar()
+
+    if current_value is None:
+        raise HTTPException(status_code=404, detail="알림 없음")
+
+    # 토글
+    new_value = not current_value
+
+    await db.execute(
+        update(Notification)
+        .where(
+            Notification.id == target_id,
+            Notification.user_id == current_user.google_id
+        )
+        .values(star=new_value)
+    )
+
+    await db.commit()
+
+    return {
+        "id": target_id,
+        "star": new_value
+    }
+
+# =============================================================================
+# 알림 삭제 API
+# =============================================================================
+#
+# URL: DELETE /api/notifications/{id}
+# 용도: 특정 알림 삭제
+#
+@router.delete("/{notification_id}")
+async def delete_notification(
+    notification_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # 내 알림인지 확인
+    result = await db.execute(
+        select(Notification.id).where(
+            Notification.id == notification_id,
+            Notification.user_id == current_user.google_id
+        )
+    )
+    noti_id = result.scalar()
+
+    if noti_id is None:
+        raise HTTPException(status_code=404, detail="알림 없음")
+
+    await db.execute(
+        Notification.__table__.delete().where(
+            Notification.id == notification_id,
+            Notification.user_id == current_user.google_id
+        )
+    )
+
+    await db.commit()
+
+    return {"success": True, "id": notification_id}
+
 # =============================================================================
 # 알림 저장 API
 # =============================================================================
@@ -121,20 +206,29 @@ async def read_notification(
 # URL: POST /api/notifications
 # 용도: 앱이 OneSignal 발송 성공 후, DB에 이력을 남기기 위해 호출
 #
-@router.post("", status_code=201)
+@router.post("", status_code=201, openapi_extra={"security": []})
 async def create_notification(
     req: NotificationCreateRequest, # Body에는 내용만 있음 (user_id 없음)
-    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    result = await db.execute(
+        select(User).where(User.onesignal_id == req.onesignal_id)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다")
+    
     new_noti = Notification(
-        user_id=current_user.google_id,
+        user_id=user.google_id,
         type=req.type,
         title=req.title,
+        stock_name=req.stock_name,
+        sentiment_score=req.sentiment_score,
         body=req.body,
-        is_read=False
+        is_read=False,
+        star=False
     )
-    
     try:
         db.add(new_noti)
         await db.commit()

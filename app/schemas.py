@@ -14,7 +14,7 @@ API 스키마 정의 (schemas.py)
 """
 
 from pydantic import BaseModel, field_validator
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime,time
 import re
 
@@ -95,6 +95,7 @@ class UserLoginRequest(BaseModel):
     email: str     
     nickname: str 
     img_url: Optional[str] = None
+    onesignal_id: Optional[str] = None
 
 class UserUpdateRequest(BaseModel):
     """
@@ -152,9 +153,12 @@ class NotificationCreateRequest(BaseModel):
     
     앱이 OneSignal 발송 성공 후 서버에 저장을 요청할 때 사용합니다.
     """
+    onesignal_id: str
     type: str
     title: str
     body: Optional[str] = None
+    stock_name: Optional[str] = None     
+    sentiment_score: Optional[float] = None
 
 
 class NotificationResponse(BaseModel):
@@ -246,3 +250,13 @@ class StockSeriesQuery(BaseModel):
         if not re.fullmatch(r"\\d{8}", value):
             raise ValueError("date must be in YYYYMMDD format")
         return value
+
+
+class IssueStock(BaseModel):
+    stock_name: str
+    recent_24h_news_count: int
+    abs_recent_sentiment: float
+    issue_index: float
+
+class IssueRankingResponse(BaseModel):
+    top_issues: List[IssueStock]
