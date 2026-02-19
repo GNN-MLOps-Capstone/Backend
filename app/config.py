@@ -89,6 +89,7 @@ class Settings(BaseSettings):
     kis_app_key: str = ""
     kis_app_secret: str = ""
     kis_timeout: float = 10.0
+    series_cache_bypass_cooldown_seconds: float = 30.0
     # KIS WS:
     #   - 실전: ws://ops.koreainvestment.com:21000
     #   - 모의: ws://ops.koreainvestment.com:31000
