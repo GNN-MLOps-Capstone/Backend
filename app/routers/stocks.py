@@ -68,8 +68,13 @@ def _normalize_hhmmss(value: str | None) -> str | None:
     if len(text) == 4:
         text = f"{text}00"
     if len(text) == 5:
-        text = f"0{text}"
+        return None
     if len(text) != 6 or not text.isdigit():
+        return None
+    hour = int(text[:2])
+    minute = int(text[2:4])
+    second = int(text[4:6])
+    if not (0 <= hour <= 23 and 0 <= minute <= 59 and 0 <= second <= 59):
         return None
     return text
 
@@ -106,13 +111,57 @@ def _previous_minute_cursor(hhmmss: str) -> str:
     return prev_text
 
 
+def _series_bypass_client_id(request: Request) -> str:
+    user_id = (request.headers.get("x-user-id") or "").strip()
+    if user_id:
+        return f"user:{user_id[:64]}"
+    forwarded_for = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    if forwarded_for:
+        return f"ip:{forwarded_for}"
+    if request.client and request.client.host:
+        return f"ip:{request.client.host}"
+    return "ip:unknown"
+
+
+async def _resolve_series_bypass_cache(
+    request: Request,
+    code: str,
+    range_label: str,
+    cache_key: str,
+    bypass_requested: bool,
+) -> bool:
+    if not bypass_requested:
+        return False
+
+    cooldown_seconds = max(float(settings.series_cache_bypass_cooldown_seconds), 0.0)
+    if cooldown_seconds <= 0:
+        return True
+
+    client_id = _series_bypass_client_id(request)
+    bypass_key = f"bypass:{client_id}:{code}"
+    last_honored_at = await cache.get(bypass_key)
+    if last_honored_at is not None:
+        logger.info(
+            "series bypass throttled; using cached response (client_id=%s code=%s range=%s cache_key=%s cooldown=%.1fs)",
+            client_id,
+            code,
+            range_label,
+            cache_key,
+            cooldown_seconds,
+        )
+        return False
+
+    honored_at = datetime.now(tz=KST).isoformat(timespec="seconds")
+    await cache.set(bypass_key, honored_at, ttl_seconds=cooldown_seconds)
+    return True
+
+
 async def _fetch_intraday_page(code: str, cursor: str) -> dict:
     """
     단일 분봉 페이지를 조회한다.
     KIS 응답(rt_cd) 오류가 간헐적으로 발생하는 경우를 대비해 짧게 재시도한다.
     """
     max_attempts = 3
-    last_exc: KISError | None = None
     for attempt in range(max_attempts):
         try:
             data = await client.request(
@@ -126,19 +175,15 @@ async def _fetch_intraday_page(code: str, cursor: str) -> dict:
                     "FID_PW_DATA_INCU_YN": "Y",
                     "FID_ETC_CLS_CODE": "",
                 },
-                retries=1,
+                retries=0,
             )
             _ensure_kis_ok(data)
             return data
         except KISError as exc:
-            last_exc = exc
             if attempt < max_attempts - 1:
                 await asyncio.sleep(0.15 * (attempt + 1))
                 continue
             raise
-    if last_exc is not None:
-        raise last_exc
-    return {"output2": []}
 
 
 async def _fetch_intraday_full_session(code: str) -> dict:
@@ -366,10 +411,17 @@ async def get_stock_series(
     기간별 시세 (1d/1w/1m).
     """
     range_label = (query.range or "").lower()
-    bypass_cache = "_ts" in request.query_params
+    bypass_requested = "_ts" in request.query_params
 
     if range_label == "1d":
         cache_key = f"series:{code}:{range_label}"
+        bypass_cache = await _resolve_series_bypass_cache(
+            request=request,
+            code=code,
+            range_label=range_label,
+            cache_key=cache_key,
+            bypass_requested=bypass_requested,
+        )
         if not bypass_cache:
             cached = await cache.get(cache_key)
             if cached is not None:
@@ -421,6 +473,13 @@ async def get_stock_series(
             raise HTTPException(status_code=400, detail="from_date must be <= to_date")
 
         cache_key = f"series:{code}:{range_label}:{from_date}:{to_date}"
+        bypass_cache = await _resolve_series_bypass_cache(
+            request=request,
+            code=code,
+            range_label=range_label,
+            cache_key=cache_key,
+            bypass_requested=bypass_requested,
+        )
         if not bypass_cache:
             cached = await cache.get(cache_key)
             if cached is not None:
