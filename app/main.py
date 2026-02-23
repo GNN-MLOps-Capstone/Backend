@@ -34,11 +34,6 @@ import logging
 
 from app.config import get_settings  # 설정 가져오기
 from app.database import init_db  # DB 초기화 함수
-from app.routers import news  # 뉴스 API 라우터
-from app.routers import stocks
-from app.routers import users
-from app.routers import notifications
-from app.routers import watchlist
 
 # 설정 객체 가져오기
 settings = get_settings()

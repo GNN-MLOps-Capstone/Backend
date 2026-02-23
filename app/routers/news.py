@@ -104,7 +104,7 @@ async def call_gemini_summary(stock_name, num_article, text_combined):
 
         logger.info("새로운 요약문 생성 완료 [%s]:\n%s", stock_name, final_summary)
 
-        return response.final_summary
+        return final_summary
     except Exception:
         logger.exception("요약 생성 오류: %s", stock_name)
         return None
