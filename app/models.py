@@ -219,6 +219,46 @@ class FilteredNews(Base):
     refined_text = Column(Text, nullable=True)
     sentiment = Column(String(20), nullable=True)
 
+class Stock(Base):
+    """
+    종목 정보 테이블
+
+    종목명, 업종, AI 요약 등 종목 메타데이터를 저장합니다.
+    """
+    __tablename__ = "stocks"
+
+    stock_id = Column(String(20), primary_key=True, index=True)
+    stock_name = Column(String(200), nullable=True)
+    industry = Column(String(200), nullable=True)
+    summary_text = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    watchlist_items = relationship("Watchlist", back_populates="stock")
+
+    def __repr__(self):
+        return f"<Stock(stock_id={self.stock_id}, stock_name={self.stock_name})>"
+
+
+class Watchlist(Base):
+    """
+    관심종목 테이블
+
+    사용자별 관심종목 목록을 저장합니다.
+    """
+    __tablename__ = "watchlist"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.google_id", ondelete="CASCADE"), nullable=True, index=True)
+    stock_id = Column(String(20), ForeignKey("stocks.stock_id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    stock = relationship("Stock", back_populates="watchlist_items")
+
+    def __repr__(self):
+        return f"<Watchlist(id={self.id}, user_id={self.user_id}, stock_id={self.stock_id})>"
+
+
 class Notification(Base):
     """
     알림 테이블 (notifications)

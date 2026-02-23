@@ -196,6 +196,42 @@ class NotificationCountResponse(BaseModel):
 # 주식 API 스키마
 # =============================================================================
 
+# =============================================================================
+# 관심종목 API 스키마
+# =============================================================================
+
+class WatchlistAddRequest(BaseModel):
+    """관심종목 추가 요청 스키마"""
+    code: str
+
+
+class WatchlistStockResponse(BaseModel):
+    """
+    관심종목 종목 정보 응답 스키마
+
+    Flutter 앱의 WatchlistStock 모델과 필드명을 맞춥니다.
+    """
+    code: str
+    name: str
+    weather: str        # SUNNY | CLOUDY | RAINY
+    price: int
+    changeRate: float
+    keyword: str
+    aiSummary: str
+
+    class Config:
+        from_attributes = True
+
+
+class WatchlistBriefingResponse(BaseModel):
+    """관심종목 AI 브리핑 응답 스키마"""
+    text: str
+    topIssues: list[str]
+
+    class Config:
+        from_attributes = True
+
+
 class StockOverviewResponse(BaseModel):
     code: str
     name: Optional[str] = None

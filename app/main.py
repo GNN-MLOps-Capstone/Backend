@@ -37,6 +37,7 @@ from app.routers import news  # 뉴스 API 라우터
 from app.routers import stocks
 from app.routers import users
 from app.routers import notifications
+from app.routers import watchlist
 
 # 설정 객체 가져오기
 settings = get_settings()
@@ -180,6 +181,7 @@ app.include_router(news.router)
 app.include_router(users.router)
 app.include_router(notifications.router)
 app.include_router(stocks.router)
+app.include_router(watchlist.router)
 
 
 
