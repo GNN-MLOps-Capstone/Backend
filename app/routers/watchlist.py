@@ -3,16 +3,16 @@
 """
 
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 from google.genai import types
 from google import genai
 
 from app.database import get_db
-from app.models import FilteredNews, NewsStockMapping, Stock
+from app.models import FilteredNews, NewsStockMapping, Stock, StockSummaryCache
 from app.schemas import IssueStock, IssueRankingResponse
 from app.config import get_settings
 from app.routers.news import get_stock_summary
@@ -24,17 +24,12 @@ router = APIRouter(
 )
 
 settings = get_settings()
-logging.getLogger().handlers.clear()
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)s: %(name)s: %(message)s"
-)
 logger = logging.getLogger(__name__)
 gemini_client = genai.Client(api_key=settings.gemini_api)
 
 _briefing_cache = {
     "data": None,
-    "expires_at": datetime.min # 초기값은 과거 시간으로 설정하여 무조건 1번은 실행되게 함
+    "expires_at": datetime.min.replace(tzinfo=timezone.utc) # 초기값은 과거 시간으로 설정하여 무조건 1번은 실행되게 함
 }
 CACHE_TTL_MINUTES = 60
 
@@ -42,7 +37,7 @@ async def _get_top_issues(db: AsyncSession, top_n: int = 3) -> list[IssueStock]:
     """
     특정 기간 동안의 뉴스를 분석하여 이슈지수가 높은 Top N 종목을 반환하는 내부 함수.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     recent_vol_stats = []
 
     for search_days in [1, 2, 3, 4, 5, 6, 7]:
@@ -53,6 +48,7 @@ async def _get_top_issues(db: AsyncSession, top_n: int = 3) -> list[IssueStock]:
                 Stock.stock_name,
                 func.count(FilteredNews.news_id).label('recent_news_count')
             )
+            .select_from(Stock)
             .join(NewsStockMapping, Stock.stock_id == NewsStockMapping.stock_id)
             .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
             .where(
@@ -91,7 +87,9 @@ async def _get_top_issues(db: AsyncSession, top_n: int = 3) -> list[IssueStock]:
             Stock.stock_name,
             func.avg(sentiment_score_expr).label('avg_sentiment')
         )
-        .join(NewsStockMapping, Stock.stock_id == NewsStockMapping.stock_id)
+        .select_from(Stock)
+        .join(StockSummaryCache, Stock.stock_id == StockSummaryCache.stock_id)
+        .join(NewsStockMapping, StockSummaryCache.stock_id == NewsStockMapping.stock_id)
         .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
         .where(
             Stock.stock_name.in_(issue_stocks),
@@ -121,7 +119,7 @@ async def _get_top_issues(db: AsyncSession, top_n: int = 3) -> list[IssueStock]:
         
         # 감성점수 가져오기 및 절대값 처리
         raw_sentiment = sentiment_dict.get(stock_name)
-        abs_sentiment = abs(raw_sentiment) if raw_sentiment else 0.0
+        abs_sentiment = abs(raw_sentiment) if raw_sentiment is not None else 0.0
 
         # 뉴스량 Min-Max 정규화 (0.0 ~ 1.0)
         if max_count == min_count:
@@ -191,7 +189,7 @@ async def get_watchlist_briefing(db: AsyncSession = Depends(get_db)):
     # 1. Top 3 이슈 종목 선정 (이전에 만든 내부 함수 호출)
     # _get_top_issues 함수는 이전 답변에서 작성한 로직을 그대로 사용하시면 됩니다.
     global _briefing_cache
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     if _briefing_cache["data"] and now < _briefing_cache["expires_at"]:
         logger.info("캐시된 AI 브리핑 데이터를 반환합니다. (속도 0.01초!)")
@@ -209,14 +207,14 @@ async def get_watchlist_briefing(db: AsyncSession = Depends(get_db)):
     
     for issue in top_issues:
         stock_name = issue.stock_name
-        
-        # news.py에 있는 요약 함수 호출 (db 세션과 종목명을 넘겨서 가져온다고 가정)
-        stock_summary_response = await get_stock_summary(stock_name=stock_name, db=db)
-
-        single_summary_text = stock_summary_response.summary 
-
-        if single_summary_text:
-            summaries_text_list.append(f"[{stock_name} 요약]\n{single_summary_text}")
+        try:
+            stock_summary_response = await get_stock_summary(stock_name=stock_name, db=db)
+            single_summary_text = stock_summary_response.summary
+            if single_summary_text:
+                summaries_text_list.append(f"[{stock_name} 요약]\n{single_summary_text}")
+        except HTTPException:
+            logger.warning("종목 요약 캐시 없음, 건너뜀: %s", stock_name)
+            continue
 
     # 3. 3개의 요약문을 하나의 긴 텍스트로 합치기
     combined_summaries = "\n\n".join(summaries_text_list)
