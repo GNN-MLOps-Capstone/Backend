@@ -89,6 +89,10 @@ class Settings(BaseSettings):
     kis_app_key: str = ""
     kis_app_secret: str = ""
     kis_timeout: float = 10.0
+    kis_max_requests_per_second: int = 5
+    kis_intraday_page_interval_seconds: float = 0.2
+    kis_intraday_rate_limit_retry_count: int = 2
+    kis_intraday_rate_limit_backoff_seconds: float = 0.8
     series_cache_bypass_cooldown_seconds: float = 30.0
     # KIS WS:
     #   - 실전: ws://ops.koreainvestment.com:21000
