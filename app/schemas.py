@@ -173,6 +173,9 @@ class NotificationResponse(BaseModel):
     title: str
     body: Optional[str] = None
     read: bool
+    star: bool = False
+    stock_name: Optional[str] = None
+    sentiment_score: Optional[float] = None
     created_at: datetime
 
     class Config:
@@ -254,9 +257,10 @@ class StockSeriesQuery(BaseModel):
 
 class IssueStock(BaseModel):
     stock_name: str
-    recent_24h_news_count: int
+    recent_news_count: int
     abs_recent_sentiment: float
     issue_index: float
 
 class IssueRankingResponse(BaseModel):
+    text: str
     top_issues: List[IssueStock]

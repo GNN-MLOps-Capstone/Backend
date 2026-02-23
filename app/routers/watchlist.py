@@ -13,10 +13,9 @@ from google import genai
 
 from app.database import get_db
 from app.models import FilteredNews, NewsStockMapping, Stock
-from app.schemas import IssueStock
+from app.schemas import IssueStock, IssueRankingResponse
 from app.config import get_settings
 from app.routers.news import get_stock_summary
-from app.config import get_settings
 
 
 router = APIRouter(
@@ -25,6 +24,11 @@ router = APIRouter(
 )
 
 settings = get_settings()
+logging.getLogger().handlers.clear()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s: %(name)s: %(message)s"
+)
 logger = logging.getLogger(__name__)
 gemini_client = genai.Client(api_key=settings.gemini_api)
 
@@ -34,32 +38,36 @@ _briefing_cache = {
 }
 CACHE_TTL_MINUTES = 60
 
-async def _get_top_issues(db: AsyncSession, top_n: int = 5, days: int = 7) -> list[IssueStock]:
+async def _get_top_issues(db: AsyncSession, top_n: int = 3) -> list[IssueStock]:
     """
-    주어진 기간(days) 동안의 뉴스를 분석하여 이슈지수가 높은 Top N 종목을 반환하는 내부 함수.
+    특정 기간 동안의 뉴스를 분석하여 이슈지수가 높은 Top N 종목을 반환하는 내부 함수.
     """
     now = datetime.utcnow()
-    past_days = now - timedelta(days=days)
+    recent_vol_stats = []
 
-    # ---------------------------------------------------------
-    # 1. 지정된 기간(days)의 뉴스 발생량 조회
-    # ---------------------------------------------------------
-    query_vol = (
-        select(
-            Stock.stock_name,
-            func.count(FilteredNews.news_id).label('recent_news_count')
+    for search_days in [1, 2, 3, 4, 5, 6, 7]:
+        past_days_vol = now - timedelta(days=search_days)
+        
+        query_vol = (
+            select(
+                Stock.stock_name,
+                func.count(FilteredNews.news_id).label('recent_news_count')
+            )
+            .join(NewsStockMapping, Stock.stock_id == NewsStockMapping.stock_id)
+            .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
+            .where(
+                FilteredNews.created_at >= past_days_vol,
+                FilteredNews.created_at <= now
+            )
+            .group_by(Stock.stock_name)
         )
-        .join(NewsStockMapping, Stock.stock_id == NewsStockMapping.stock_id)
-        .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
-        .where(
-            FilteredNews.created_at >= past_days,
-            FilteredNews.created_at <= now
-        )
-        .group_by(Stock.stock_name)
-    )
     
-    result_vol = await db.execute(query_vol)
-    recent_vol_stats = result_vol.all()
+        result_vol = await db.execute(query_vol)
+        recent_vol_stats = result_vol.all()
+
+        if len(recent_vol_stats) >= top_n:
+            logger.info(f"동적 탐색: {search_days}일치 데이터에서 {len(recent_vol_stats)}개의 이슈 종목을 찾았습니다.")
+            break
 
     # 뉴스가 하나도 없으면 빈 리스트 반환
     if not recent_vol_stats:
@@ -69,8 +77,9 @@ async def _get_top_issues(db: AsyncSession, top_n: int = 5, days: int = 7) -> li
     issue_stocks = [stat.stock_name for stat in recent_vol_stats]
 
     # ---------------------------------------------------------
-    # 2. 해당 종목들의 평균 감성점수 계산
+    # 해당 종목들의 평균 감성점수 계산(7일간)
     # ---------------------------------------------------------
+    past_7_days = now - timedelta(days=7)
     sentiment_score_expr = case(
         (FilteredNews.sentiment == '긍정', 1.0),
         (FilteredNews.sentiment == '부정', -1.0),
@@ -86,7 +95,7 @@ async def _get_top_issues(db: AsyncSession, top_n: int = 5, days: int = 7) -> li
         .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
         .where(
             Stock.stock_name.in_(issue_stocks),
-            FilteredNews.created_at >= past_days,
+            FilteredNews.created_at >= past_7_days,
             FilteredNews.created_at <= now
         )
         .group_by(Stock.stock_name) 
@@ -126,7 +135,7 @@ async def _get_top_issues(db: AsyncSession, top_n: int = 5, days: int = 7) -> li
         # IssueStock Pydantic 모델로 생성하여 리스트에 추가
         processed_stocks.append(IssueStock(
             stock_name=stock_name,
-            recent_24h_news_count=recent_count,
+            recent_news_count=recent_count,
             abs_recent_sentiment=round(abs_sentiment, 4),
             issue_index=round(issue_index, 4)
         ))
@@ -166,12 +175,18 @@ async def call_gemini_overall_briefing(combined_summaries: str):
             )
         )
         logger.info("최종 AI 브리핑 멘트 생성 완료")
-        return response.text.strip()
+        text = response.text
+        if not text:
+            logger.warning("Gemini 응답이 비어 있습니다.")
+            return "현재 시장 이슈 요약을 생성할 수 없습니다. 잠시 후 다시 시도해주세요."
+        final_text = text.strip()
+        logger.info(f"생성된 브리핑 결과 :  {final_text}")
+        return final_text
     except Exception:
         logger.exception("최종 브리핑 생성 오류")
         return "현재 시장 이슈를 분석하는데 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
     
-@router.get("/briefing")
+@router.get("/briefing", response_model=IssueRankingResponse)
 async def get_watchlist_briefing(db: AsyncSession = Depends(get_db)):
     # 1. Top 3 이슈 종목 선정 (이전에 만든 내부 함수 호출)
     # _get_top_issues 함수는 이전 답변에서 작성한 로직을 그대로 사용하시면 됩니다.
@@ -184,7 +199,7 @@ async def get_watchlist_briefing(db: AsyncSession = Depends(get_db)):
     
     logger.info("새로운 AI 브리핑 데이터를 생성합니다. (API 호출)")
 
-    top_issues = await _get_top_issues(db, top_n=3, days=7)
+    top_issues = await _get_top_issues(db, top_n=3)
     
     if not top_issues:
         return {"text": "현재 시장에 뚜렷한 이슈 종목이 없습니다.", "top_issues": []}
@@ -195,7 +210,7 @@ async def get_watchlist_briefing(db: AsyncSession = Depends(get_db)):
     for issue in top_issues:
         stock_name = issue.stock_name
         
-        # 💡 news.py에 있는 요약 함수 호출 (db 세션과 종목명을 넘겨서 가져온다고 가정)
+        # news.py에 있는 요약 함수 호출 (db 세션과 종목명을 넘겨서 가져온다고 가정)
         stock_summary_response = await get_stock_summary(stock_name=stock_name, db=db)
 
         single_summary_text = stock_summary_response.summary 

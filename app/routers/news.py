@@ -40,6 +40,11 @@ router = APIRouter(
 )
 
 settings = get_settings()
+logging.getLogger().handlers.clear()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s: %(name)s: %(message)s"
+)
 logger = logging.getLogger(__name__)
 gemini_client = genai.Client(api_key=settings.gemini_api)
 
@@ -93,7 +98,17 @@ async def call_gemini_summary(stock_name, num_article, text_combined):
                 temperature=0.2
             )
         )
-        logger.info("새로운 요약문 생성 완료: %s", stock_name)
+
+        text = response.text
+
+        if not text:
+            logger.warning("Gemini 응답이 비어 있습니다: %s", stock_name)
+            return None
+        
+        final_summary = text.strip()
+
+        logger.info("새로운 요약문 생성 완료 [%s]:\n%s", stock_name, final_summary)
+
         return response.text
     except Exception:
         logger.exception("요약 생성 오류: %s", stock_name)
