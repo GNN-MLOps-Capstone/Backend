@@ -16,7 +16,7 @@
 """
 
 import enum
-from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Enum, Boolean, Time
+from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Float, Boolean, Time
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -148,7 +148,7 @@ class User(Base):
     img_url = Column(Text)
 
     role = Column(String, nullable=True)
-
+    onesignal_id = Column(String(255), nullable=True, default=None)
     # 유저정보 생성시간
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -218,6 +218,7 @@ class FilteredNews(Base):
     summary = Column(Text, nullable=True)
     refined_text = Column(Text, nullable=True)
     sentiment = Column(String(20), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Notification(Base):
     """
@@ -234,6 +235,9 @@ class Notification(Base):
     title = Column(String(255), nullable=False)
     body = Column(Text, nullable=True)
     is_read = Column(Boolean, default=False)
+    star = Column(Boolean, default=False)
+    stock_name = Column(String(255), nullable=True)
+    sentiment_score = Column(Float, nullable=True)
     
     # 생성 시간 (자동 입력)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -243,3 +247,18 @@ class Notification(Base):
 
     def __repr__(self):
         return f"<Notification(id={self.id}, type={self.type}, title={self.title})>"
+    
+class Stock(Base):
+    """
+    주식 종목 테이블 (stocks)
+    
+    종목 코드(또는 ID)와 종목명을 저장합니다.
+    """
+    __tablename__ = "stocks"
+
+    # 만약 stock_id가 '005930' 같은 문자열 종목코드라면 String(20) 등으로 변경하세요.
+    stock_id = Column(String(20), primary_key=True, index=True) 
+    stock_name = Column(String(100), nullable=False, unique=True, index=True)
+
+    def __repr__(self):
+        return f"<Stock(stock_id={self.stock_id}, stock_name={self.stock_name})>"

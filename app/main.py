@@ -30,17 +30,24 @@ FastAPI 메인 애플리케이션 (main.py)
 from contextlib import asynccontextmanager  # 비동기 컨텍스트 매니저
 from fastapi import FastAPI  # 웹 프레임워크
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어
+import logging
 
 from app.config import get_settings  # 설정 가져오기
 from app.database import init_db  # DB 초기화 함수
-from app.routers import news  # 뉴스 API 라우터
-from app.routers import stocks
-from app.routers import users
-from app.routers import notifications
 
 # 설정 객체 가져오기
 settings = get_settings()
 
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:     %(name)s - %(message)s",
+)
+
+from app.routers import news, stocks, users, notifications, watchlist
+
+logger = logging.getLogger(__name__)
+logger.info("Server configuration loaded.")
 
 # =============================================================================
 # 애플리케이션 생명주기 관리
@@ -180,7 +187,7 @@ app.include_router(news.router)
 app.include_router(users.router)
 app.include_router(notifications.router)
 app.include_router(stocks.router)
-
+app.include_router(watchlist.router)
 
 
 # =============================================================================
