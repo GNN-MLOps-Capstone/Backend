@@ -33,7 +33,7 @@ from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어
 import logging
 
 from app.config import get_settings  # 설정 가져오기
-from app.database import init_db  # DB 초기화 함수
+from app.database import init_db, ensure_interaction_tables  # DB 초기화 함수
 
 # 설정 객체 가져오기
 settings = get_settings()
@@ -44,7 +44,7 @@ logging.basicConfig(
     format="%(levelname)s:     %(name)s - %(message)s",
 )
 
-from app.routers import news, stocks, users, notifications, watchlist
+from app.routers import news, stocks, users, notifications, watchlist, interactions
 
 logger = logging.getLogger(__name__)
 logger.info("Server configuration loaded.")
@@ -81,6 +81,7 @@ async def lifespan(app: FastAPI):
     
     # DB 테이블 초기화 (없는 테이블만 생성)
     await init_db()
+    await ensure_interaction_tables()
     print("Database initialized")
     
     # yield: 여기서 서버가 실행되고 요청을 처리함
@@ -188,6 +189,7 @@ app.include_router(users.router)
 app.include_router(notifications.router)
 app.include_router(stocks.router)
 app.include_router(watchlist.router)
+app.include_router(interactions.router)
 
 
 # =============================================================================

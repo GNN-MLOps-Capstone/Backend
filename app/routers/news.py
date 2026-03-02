@@ -18,6 +18,7 @@ API 엔드포인트:
 """
 
 import html
+from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
@@ -29,9 +30,27 @@ from google.genai import types
 import logging
 
 from app.database import get_db
-from app.models import NaverNews, CrawledNews, ProcessStatus, StockSummaryCache, NewsStockMapping, FilteredNews
-from app.schemas import NewsSimpleResponse, NewsListResponse, NewsDetailResponse, StockSummaryResponse
+from app.models import (
+    NaverNews,
+    CrawledNews,
+    ProcessStatus,
+    StockSummaryCache,
+    NewsStockMapping,
+    FilteredNews,
+    RecommendationServe,
+    RecommendationServeItem,
+)
+from app.schemas import (
+    NewsSimpleResponse,
+    NewsListResponse,
+    NewsDetailResponse,
+    StockSummaryResponse,
+    NewsRecommendationItem,
+    NewsRecommendationResponse,
+)
 from app.config import get_settings
+from app.kis.errors import KISError
+from app.recommender.client import RecommendationClient, RecommendationCandidate
 
 
 router = APIRouter(
@@ -42,6 +61,7 @@ router = APIRouter(
 settings = get_settings()
 logger = logging.getLogger(__name__)
 gemini_client = genai.Client(api_key=settings.gemini_api)
+recommendation_client = RecommendationClient(settings)
 
 # =============================================================================
 # 헬퍼 함수
@@ -181,6 +201,200 @@ async def get_news_simple_list(
         )
     
     return response_list
+
+
+async def _load_news_by_ids(
+    db: AsyncSession,
+    candidates: list[RecommendationCandidate],
+) -> list[NewsRecommendationItem]:
+    """
+    추천 서버가 반환한 news_id 목록을 DB에서 조회해 프론트 응답 형태로 변환합니다.
+    """
+    if not candidates:
+        return []
+
+    candidate_map = {candidate.news_id: candidate for candidate in candidates}
+    news_ids = list(candidate_map.keys())
+
+    query = (
+        select(NaverNews)
+        .options(joinedload(NaverNews.crawled_news))
+        .where(NaverNews.news_id.in_(news_ids))
+    )
+    result = await db.execute(query)
+    rows = result.scalars().unique().all()
+    row_map = {row.news_id: row for row in rows}
+
+    response_items: list[NewsRecommendationItem] = []
+    for news_id in news_ids:
+        news = row_map.get(news_id)
+        if not news:
+            continue
+
+        summary = decode_html_entities(news.crawled_news.text) if news.crawled_news else None
+        candidate = candidate_map[news_id]
+        response_items.append(
+            NewsRecommendationItem(
+                news_id=news.news_id,
+                title=decode_html_entities(news.title),
+                summary=summary,
+                pub_date=news.pub_date,
+                score=candidate.score,
+                reason=candidate.reason,
+            )
+        )
+
+    return response_items
+
+
+async def _mock_candidates_from_db(db: AsyncSession, limit: int) -> list[RecommendationCandidate]:
+    """
+    추천 서버가 준비되지 않은 동안 사용할 DB 기반 목업 추천 결과입니다.
+    """
+    return await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=0)
+
+
+async def _mock_candidates_from_db_with_offset(
+    db: AsyncSession,
+    limit: int,
+    offset: int,
+) -> list[RecommendationCandidate]:
+    """
+    무한 스크롤 구현을 위해 offset 기반 목업 추천 결과를 반환합니다.
+    """
+    query = (
+        select(NaverNews.news_id)
+        .where(NaverNews.crawl_status == ProcessStatus.crawl_success)
+        .order_by(desc(NaverNews.pub_date))
+        .offset(offset)
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    rows = result.scalars().all()
+    return [RecommendationCandidate(news_id=int(news_id)) for news_id in rows]
+
+
+async def _log_recommendation_serve(
+    db: AsyncSession,
+    user_id: str,
+    request_id: str,
+    page: int,
+    limit: int,
+    screen_session_id: str | None,
+    app_session_id: str | None,
+    source: str,
+    candidates: list[RecommendationCandidate],
+) -> bool:
+    """
+    추천 목록 응답(요청 단위 + 아이템 목록)을 저장합니다.
+    같은 request_id/page 조합은 중복 저장하지 않습니다.
+    """
+    exists = await db.execute(
+        select(RecommendationServe.id).where(
+            RecommendationServe.request_id == request_id,
+            RecommendationServe.page == page,
+        )
+    )
+    if exists.scalar_one_or_none() is not None:
+        return False
+
+    serve = RecommendationServe(
+        request_id=request_id,
+        user_id=user_id,
+        screen_session_id=screen_session_id,
+        app_session_id=app_session_id,
+        source=source,
+        page=page,
+        limit=limit,
+        served_count=len(candidates),
+        is_mock=source.startswith("mock"),
+    )
+    db.add(serve)
+    await db.flush()
+
+    base_position = (page - 1) * limit
+    for idx, candidate in enumerate(candidates, start=1):
+        db.add(
+            RecommendationServeItem(
+                serve_id=serve.id,
+                request_id=request_id,
+                page=page,
+                news_id=candidate.news_id,
+                position=base_position + idx,
+                score=candidate.score,
+                reason=candidate.reason,
+            )
+        )
+
+    await db.commit()
+    return True
+
+
+@router.get("/recommendations", response_model=NewsRecommendationResponse)
+async def get_news_recommendations(
+    user_id: str = Query(..., min_length=1, description="추천 대상 사용자 ID"),
+    limit: int = Query(20, ge=1, le=100, description="가져올 추천 뉴스 개수"),
+    page: int = Query(1, ge=1, le=1000, description="무한 스크롤 페이지 (1부터 시작)"),
+    request_id: Optional[str] = Query(None, description="추천 요청 추적 ID (미전달 시 서버 생성)"),
+    screen_session_id: Optional[str] = Query(None, description="추천 화면 세션 ID"),
+    app_session_id: Optional[str] = Query(None, description="앱 세션 ID"),
+    log_served: bool = Query(True, description="추천 응답을 DB 로깅할지 여부"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    추천 시스템 서버와 연동해 사용자 맞춤 뉴스 추천 목록을 반환합니다.
+
+    - RECOMMENDER_MOCK_MODE=true: 외부 서버 대신 DB 기반 mock 추천 사용
+    - RECOMMENDER_MOCK_MODE=false: 외부 추천 서버 호출
+    - page > 1: 아직 추천 서버 페이지네이션 연동이 없어 mock 오프셋으로 동작
+    """
+    resolved_request_id = request_id or f"req-{uuid4().hex}"
+    offset = (page - 1) * limit
+    source = "recommender"
+    candidates: list[RecommendationCandidate] = []
+
+    if settings.recommender_mock_mode:
+        source = "mock"
+        candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
+    elif page > 1:
+        # 추천 서버 페이지네이션 미연결 상태에서 무한 스크롤을 목업으로 지원
+        source = "mock_page"
+        candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
+    else:
+        try:
+            candidates = await recommendation_client.get_news_candidates(user_id=user_id, limit=limit)
+        except KISError as exc:
+            logger.warning("추천 서버 호출 실패: %s", exc)
+            candidates = []
+
+        if not candidates:
+            source = "mock_fallback"
+            candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
+
+    items = await _load_news_by_ids(db, candidates)
+    logged = False
+    if log_served:
+        logged = await _log_recommendation_serve(
+            db=db,
+            user_id=user_id,
+            request_id=resolved_request_id,
+            page=page,
+            limit=limit,
+            screen_session_id=screen_session_id,
+            app_session_id=app_session_id,
+            source=source,
+            candidates=candidates,
+        )
+
+    return NewsRecommendationResponse(
+        user_id=user_id,
+        request_id=resolved_request_id,
+        source=source,
+        page=page,
+        served_count=len(items),
+        logged=logged,
+        items=items,
+    )
 
 
 # =============================================================================
