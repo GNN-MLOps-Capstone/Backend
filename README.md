@@ -59,7 +59,10 @@ pip install -r requirements.txt
 cp .env.example .env
 # .env 파일에서 DATABASE_URL 설정
 
-# 5. 서버 실행
+# 5. 마이그레이션 적용
+alembic -c alembic.ini upgrade head
+
+# 6. 서버 실행
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -74,13 +77,29 @@ cp .env.example .env
 # .env 파일에서 DATABASE_URL 설정
 
 # 3. Docker Compose로 실행
-docker-compose up -d --build
+docker compose up -d --build
 
-# 4. 로그 확인
-docker-compose logs -f news-api
+# 4. 마이그레이션 적용
+docker compose exec news-api alembic -c alembic.ini upgrade head
 
-# 5. 중지
-docker-compose down
+# 5. 로그 확인
+docker compose logs -f news-api
+
+# 6. 중지
+docker compose down
+```
+
+### Alembic 마이그레이션 명령어
+
+```bash
+# 최신 스키마로 업그레이드
+alembic -c alembic.ini upgrade head
+
+# 현재 리비전 확인
+alembic -c alembic.ini current
+
+# 신규 리비전 생성(자동감지)
+alembic -c alembic.ini revision --autogenerate -m "describe-change"
 ```
 
 ---

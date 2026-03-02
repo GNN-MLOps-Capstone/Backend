@@ -38,6 +38,9 @@ uvicorn[standard]==0.34.0
 # 공식 문서: https://www.sqlalchemy.org/
 sqlalchemy==2.0.36
 
+# Alembic - DB 마이그레이션 도구
+alembic==1.14.1
+
 # aiosqlite - 비동기 SQLite 드라이버
 # SQLite를 async/await로 사용 가능하게 해줌
 # 공식 문서: https://aiosqlite.omnilib.dev/

@@ -154,28 +154,6 @@ async def init_db():
 
 async def ensure_interaction_tables():
     """
-    상호작용 로그 관련 테이블을 없을 때만 생성합니다.
+    (Deprecated) Alembic 도입 이후 런타임 create_all 사용을 중단합니다.
     """
-    from app.models import (
-        InteractionEvent,
-        ScreenSession,
-        ContentSession,
-        RecommendationServe,
-        RecommendationServeItem,
-        RecommendationFeedback,
-    )
-
-    async with engine.begin() as conn:
-        await conn.run_sync(
-            lambda sync_conn: Base.metadata.create_all(
-                sync_conn,
-                tables=[
-                    InteractionEvent.__table__,
-                    ScreenSession.__table__,
-                    ContentSession.__table__,
-                    RecommendationServe.__table__,
-                    RecommendationServeItem.__table__,
-                    RecommendationFeedback.__table__,
-                ],
-            )
-        )
+    return None
