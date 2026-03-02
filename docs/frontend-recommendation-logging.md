@@ -170,7 +170,7 @@
 {
   "events": [
     {
-      "event_id": "evt-001",
+      "event_id": "8f3c1a96-0b2a-4d7a-b9d4-2f2d4f5db3a1",
       "user_id": "user-1",
       "event_type": "screen_view",
       "app_session_id": "app-s1",
@@ -179,7 +179,7 @@
       "event_ts_client": "2026-03-02T10:00:00Z"
     },
     {
-      "event_id": "evt-002",
+      "event_id": "9c7f0c1d-9a1b-4f6d-8c95-1bb132ec4b27",
       "user_id": "user-1",
       "event_type": "recommendation_request",
       "app_session_id": "app-s1",
@@ -188,7 +188,7 @@
       "page": 1
     },
     {
-      "event_id": "evt-003",
+      "event_id": "f1c2e7ab-2f6e-4b33-a78f-7dfb6f8f41c9",
       "user_id": "user-1",
       "event_type": "recommendation_response",
       "app_session_id": "app-s1",
@@ -197,7 +197,7 @@
       "page": 1
     },
     {
-      "event_id": "evt-004",
+      "event_id": "2b6d62de-c42f-4e3f-bb7a-b6b0d460e3af",
       "user_id": "user-1",
       "event_type": "recommendation_impression",
       "app_session_id": "app-s1",
@@ -208,7 +208,7 @@
       "page": 1
     },
     {
-      "event_id": "evt-005",
+      "event_id": "14d8f23a-7ad0-4aa7-95d4-6f8d5c93227a",
       "user_id": "user-1",
       "event_type": "scroll_depth",
       "app_session_id": "app-s1",
@@ -218,7 +218,7 @@
       "scroll_depth": 62.5
     },
     {
-      "event_id": "evt-006",
+      "event_id": "a61039e4-fd34-4e6f-ac03-fd63327ecbe2",
       "user_id": "user-1",
       "event_type": "content_open",
       "app_session_id": "app-s1",
@@ -229,14 +229,14 @@
       "position": 1
     },
     {
-      "event_id": "evt-007",
+      "event_id": "5b0038e3-9eb2-41f0-b249-8898a596d931",
       "user_id": "user-1",
       "event_type": "content_leave",
       "app_session_id": "app-s1",
       "content_session_id": "content-c1"
     },
     {
-      "event_id": "evt-008",
+      "event_id": "e24d9f65-4a2e-4ba9-9f4c-364a1d8a90b9",
       "user_id": "user-1",
       "event_type": "screen_leave",
       "app_session_id": "app-s1",

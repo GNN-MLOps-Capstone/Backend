@@ -37,7 +37,7 @@
 {
   "events": [
     {
-      "event_id": "evt-1",
+      "event_id": "8f3c1a96-0b2a-4d7a-b9d4-2f2d4f5db3a1",
       "user_id": "test-user",
       "event_type": "screen_view",
       "app_session_id": "app-s1",
@@ -45,7 +45,7 @@
       "request_id": "req-s1"
     },
     {
-      "event_id": "evt-2",
+      "event_id": "9c7f0c1d-9a1b-4f6d-8c95-1bb132ec4b27",
       "user_id": "test-user",
       "event_type": "content_open",
       "app_session_id": "app-s1",
@@ -56,14 +56,14 @@
       "position": 1
     },
     {
-      "event_id": "evt-3",
+      "event_id": "f1c2e7ab-2f6e-4b33-a78f-7dfb6f8f41c9",
       "user_id": "test-user",
       "event_type": "content_leave",
       "app_session_id": "app-s1",
       "content_session_id": "content-c1"
     },
     {
-      "event_id": "evt-4",
+      "event_id": "2b6d62de-c42f-4e3f-bb7a-b6b0d460e3af",
       "user_id": "test-user",
       "event_type": "screen_leave",
       "app_session_id": "app-s1",

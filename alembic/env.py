@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import os
 from logging.config import fileConfig
 
 from alembic import context
+from dotenv import load_dotenv
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app.config import get_settings
 from app.database import Base
 
 # 모델 import를 통해 metadata에 모든 테이블을 로드
@@ -14,8 +15,22 @@ import app.models  # noqa: F401
 
 
 config = context.config
-settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+
+
+def _resolve_database_url() -> str:
+    """
+    Alembic 실행 시 필요한 최소 환경변수만 로드합니다.
+    """
+    load_dotenv()
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise RuntimeError(
+            "DATABASE_URL is required for Alembic. Set it in env or .env before running migrations."
+        )
+    return database_url
+
+
+config.set_main_option("sqlalchemy.url", _resolve_database_url())
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
