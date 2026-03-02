@@ -162,6 +162,141 @@ curl http://localhost:8000/api/news/1
 
 ---
 
+### 개인화 뉴스 추천 목록
+
+```
+GET /api/news/recommendations
+```
+
+| 파라미터 | 타입    | 설명                                 | 기본값 |
+| -------- | ------- | ------------------------------------ | ------ |
+| user_id  | string  | 추천 대상 사용자 ID                  | -      |
+| limit    | int     | 가져올 추천 뉴스 개수                 | 20     |
+| page     | int     | 무한 스크롤 페이지(1부터 시작)        | 1      |
+| request_id | string | 추천 요청 추적 ID(없으면 서버 생성)   | -      |
+| screen_session_id | string | 추천 탭 세션 ID(로깅 연계용) | -      |
+| app_session_id | string | 앱 세션 ID(선택)                 | -      |
+| log_served | bool  | 추천 응답 DB 로깅 여부                | true   |
+
+예시:
+
+```bash
+curl "http://localhost:8000/api/news/recommendations?user_id=test-user&limit=10&page=1&screen_session_id=screen-s1"
+```
+
+응답 예시:
+
+```json
+{
+  "user_id": "test-user",
+  "request_id": "req-5f8b0d...",
+  "source": "mock",
+  "page": 1,
+  "served_count": 1,
+  "logged": true,
+  "items": [
+    {
+      "news_id": 1,
+      "title": "기사 제목",
+      "summary": "기사 요약",
+      "pub_date": "2026-02-25T12:34:56",
+      "score": null,
+      "reason": null
+    }
+  ]
+}
+```
+
+---
+
+### 추천 로그 수집 (탭/뉴스 체류시간)
+
+```
+POST /api/interactions/events
+POST /api/interactions/finalize-timeouts
+```
+
+- `events`에는 아래 `event_type`을 사용합니다.
+- 추천 탭: `screen_view`, `screen_heartbeat`, `screen_leave`
+- 뉴스 상세: `content_open`, `content_heartbeat`, `content_leave`
+- 추천 요청/응답: `recommendation_request`, `recommendation_response`
+- 추천 노출/스크롤: `recommendation_impression`, `scroll_depth`
+
+예시:
+
+```bash
+curl -X POST "http://localhost:8000/api/interactions/events" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events": [
+      {
+        "event_id": "evt-1",
+        "user_id": "user-1",
+        "event_type": "screen_view",
+        "screen_session_id": "screen-s1",
+        "request_id": "req-1"
+      },
+      {
+        "event_id": "evt-2",
+        "user_id": "user-1",
+        "event_type": "recommendation_impression",
+        "screen_session_id": "screen-s1",
+        "request_id": "req-1",
+        "news_id": 101,
+        "position": 1,
+        "page": 1
+      },
+      {
+        "event_id": "evt-2-1",
+        "user_id": "user-1",
+        "event_type": "scroll_depth",
+        "screen_session_id": "screen-s1",
+        "request_id": "req-1",
+        "scroll_depth": 62.5,
+        "page": 1
+      },
+      {
+        "event_id": "evt-3",
+        "user_id": "user-1",
+        "event_type": "content_open",
+        "screen_session_id": "screen-s1",
+        "content_session_id": "content-c1",
+        "news_id": 101,
+        "position": 3
+      },
+      {
+        "event_id": "evt-4",
+        "user_id": "user-1",
+        "event_type": "content_leave",
+        "content_session_id": "content-c1"
+      },
+      {
+        "event_id": "evt-5",
+        "user_id": "user-1",
+        "event_type": "screen_leave",
+        "screen_session_id": "screen-s1"
+      }
+    ]
+  }'
+```
+
+추천 목록 로깅은 `GET /api/news/recommendations`의 `log_served=true`(기본값)로도 자동 저장됩니다.
+저장 테이블:
+- `recommendation_serves`: 요청 단위(요청 ID, 페이지, source, served_count)
+- `recommendation_serve_items`: 응답된 뉴스 ID/position 목록
+- `recommendation_feedback`: 추천 학습용 하이브리드 피드백(노출/클릭/체류)
+
+`POST /api/interactions/events` 응답 필드:
+- `feedback_updated`: 하이브리드 피드백 upsert 건수
+
+타임아웃 세션 종료 처리 예시:
+
+```bash
+curl -X POST "http://localhost:8000/api/interactions/finalize-timeouts?grace_seconds=30"
+```
+
+---
+
 ### 뉴스 통계
 
 ```
