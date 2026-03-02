@@ -9,6 +9,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
 from app.models import InteractionEvent, ScreenSession, ContentSession, RecommendationFeedback
@@ -346,36 +347,45 @@ async def ingest_interaction_events(
             if item.scroll_depth is None:
                 raise HTTPException(status_code=400, detail=f"{item.event_type} requires scroll_depth")
 
-        exists = await db.execute(
-            select(InteractionEvent.event_id).where(InteractionEvent.event_id == item.event_id)
-        )
-        if exists.scalar_one_or_none() is not None:
-            duplicated += 1
-            continue
+        try:
+            async with db.begin_nested():
+                exists = await db.execute(
+                    select(InteractionEvent.event_id).where(InteractionEvent.event_id == item.event_id)
+                )
+                if exists.scalar_one_or_none() is not None:
+                    duplicated += 1
+                    continue
 
-        event_at = _as_utc(item.event_ts_client)
-        event_row = InteractionEvent(
-            event_id=item.event_id,
-            user_id=item.user_id,
-            event_type=item.event_type,
-            device_id=item.device_id,
-            app_session_id=item.app_session_id,
-            screen_session_id=item.screen_session_id,
-            content_session_id=item.content_session_id,
-            news_id=item.news_id,
-            request_id=item.request_id,
-            position=item.position,
-            page=item.page,
-            scroll_depth=item.scroll_depth,
-            event_ts_client=event_at,
-        )
-        db.add(event_row)
+                event_at = _as_utc(item.event_ts_client)
+                event_row = InteractionEvent(
+                    event_id=item.event_id,
+                    user_id=item.user_id,
+                    event_type=item.event_type,
+                    device_id=item.device_id,
+                    app_session_id=item.app_session_id,
+                    screen_session_id=item.screen_session_id,
+                    content_session_id=item.content_session_id,
+                    news_id=item.news_id,
+                    request_id=item.request_id,
+                    position=item.position,
+                    page=item.page,
+                    scroll_depth=item.scroll_depth,
+                    event_ts_client=event_at,
+                )
+                db.add(event_row)
+                await db.flush()
 
-        screen_updated += await _upsert_screen_session(db, event_row, event_at)
-        content_updated += await _upsert_content_session(db, event_row, event_at)
-        feedback_updated += await _upsert_recommendation_feedback(db, event_row, event_at)
+                screen_updated += await _upsert_screen_session(db, event_row, event_at)
+                content_updated += await _upsert_content_session(db, event_row, event_at)
+                feedback_updated += await _upsert_recommendation_feedback(db, event_row, event_at)
 
-        accepted += 1
+                accepted += 1
+        except IntegrityError as exc:
+            error_text = str(getattr(exc, "orig", exc))
+            if "interaction_events" in error_text and "event_id" in error_text:
+                duplicated += 1
+                continue
+            raise
 
     await db.commit()
 

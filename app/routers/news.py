@@ -23,6 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import IntegrityError
 from typing import Optional
 from datetime import datetime, timezone
 from google import genai
@@ -289,15 +290,6 @@ async def _log_recommendation_serve(
     추천 목록 응답(요청 단위 + 아이템 목록)을 저장합니다.
     같은 request_id/page 조합은 중복 저장하지 않습니다.
     """
-    exists = await db.execute(
-        select(RecommendationServe.id).where(
-            RecommendationServe.request_id == request_id,
-            RecommendationServe.page == page,
-        )
-    )
-    if exists.scalar_one_or_none() is not None:
-        return False
-
     serve = RecommendationServe(
         request_id=request_id,
         user_id=user_id,
@@ -310,24 +302,34 @@ async def _log_recommendation_serve(
         is_mock=source.startswith("mock"),
     )
     db.add(serve)
-    await db.flush()
+    try:
+        await db.flush()
 
-    base_position = (page - 1) * limit
-    for idx, candidate in enumerate(candidates, start=1):
-        db.add(
-            RecommendationServeItem(
-                serve_id=serve.id,
-                request_id=request_id,
-                page=page,
-                news_id=candidate.news_id,
-                position=base_position + idx,
-                score=candidate.score,
-                reason=candidate.reason,
+        base_position = (page - 1) * limit
+        for idx, candidate in enumerate(candidates, start=1):
+            db.add(
+                RecommendationServeItem(
+                    serve_id=serve.id,
+                    request_id=request_id,
+                    page=page,
+                    news_id=candidate.news_id,
+                    position=base_position + idx,
+                    score=candidate.score,
+                    reason=candidate.reason,
+                )
             )
-        )
 
-    await db.commit()
-    return True
+        await db.commit()
+        return True
+    except IntegrityError as exc:
+        await db.rollback()
+        logger.info(
+            "recommendation serve duplicate skipped: request_id=%s page=%s err=%s",
+            request_id,
+            page,
+            exc,
+        )
+        return False
 
 
 @router.get("/recommendations", response_model=NewsRecommendationResponse)
