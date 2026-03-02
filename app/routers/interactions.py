@@ -36,6 +36,10 @@ _RECOMMEND_REQUEST = {"recommendation_request"}
 _RECOMMEND_RESPONSE = {"recommendation_response"}
 _RECOMMEND_IMPRESSION = {"recommendation_impression"}
 _SCROLL = {"scroll_depth"}
+# 이벤트 타입 그룹별 후속 처리 요약
+# - screen_*: screen_sessions 갱신
+# - content_*: content_sessions 갱신
+# - recommendation_impression/content_*: recommendation_feedback 보정
 _ALLOWED_TYPES = (
     _SCREEN_START
     | _SCREEN_HEARTBEAT
@@ -61,7 +65,7 @@ def _as_utc(dt: datetime | None) -> datetime:
 
 def _dwell_ms(started_at: datetime, ended_at: datetime) -> int:
     delta_ms = int((ended_at - started_at).total_seconds() * 1000)
-    # 하한 0초, 상한 10분
+    # 비정상 타임스탬프/장시간 방치 이벤트로 과대 집계되지 않도록 10분으로 상한 제한
     return max(0, min(delta_ms, 10 * 60 * 1000))
 
 
@@ -175,7 +179,7 @@ async def _upsert_recommendation_feedback(db: AsyncSession, event: InteractionEv
         started_at = row.clicked_at or row.last_impression_at or row.first_impression_at or event_at
         row.exited_at = event_at
         row.dwell_ms = _dwell_ms(started_at, event_at)
-        # 15초 이상 체류 시 의미 있는 읽기로 간주
+        # 학습용 지표 단순화를 위해 15초 이상 체류를 completed_read 기준으로 사용
         row.completed_read = row.dwell_ms >= 15_000
         return 1
 
@@ -214,7 +218,7 @@ async def _upsert_screen_session(db: AsyncSession, event: InteractionEvent, even
         return 0
 
     if session is None:
-        # 순서가 꼬인 이벤트도 최소 세션은 만들고 반영
+        # 모바일 배치 전송 특성상 heartbeat/leave가 먼저 도착할 수 있어 세션을 보정 생성
         session = ScreenSession(
             screen_session_id=event.screen_session_id,
             user_id=event.user_id,
@@ -281,7 +285,7 @@ async def _upsert_content_session(db: AsyncSession, event: InteractionEvent, eve
         return 0
 
     if session is None:
-        # 순서가 꼬인 이벤트 보정: news_id 없으면 집계 불가
+        # content_open 누락 상황 보정: content_session_id는 있으나 news_id 없으면 집계 불가
         if event.news_id is None:
             return 0
         session = ContentSession(
@@ -349,6 +353,7 @@ async def ingest_interaction_events(
 
         try:
             async with db.begin_nested():
+                # event_id 기준 사전 중복 체크로 대부분의 재전송 이벤트를 빠르게 스킵
                 exists = await db.execute(
                     select(InteractionEvent.event_id).where(InteractionEvent.event_id == item.event_id)
                 )
@@ -381,6 +386,7 @@ async def ingest_interaction_events(
 
                 accepted += 1
         except IntegrityError as exc:
+            # 동시 요청 경합 시 unique 제약이 최종 방어선 역할을 하며, 중복은 정상 케이스로 처리
             error_text = str(getattr(exc, "orig", exc))
             if "interaction_events" in error_text and "event_id" in error_text:
                 duplicated += 1

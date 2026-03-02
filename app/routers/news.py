@@ -355,6 +355,11 @@ async def get_news_recommendations(
     source = "recommender"
     candidates: list[RecommendationCandidate] = []
 
+    # source 값은 추천 결과의 출처를 분석/디버깅할 때 그대로 사용됩니다.
+    # - mock: 강제 목업 모드
+    # - mock_page: 외부 추천은 1페이지만 사용하고 2페이지 이상은 DB 오프셋 목업
+    # - mock_fallback: 외부 추천 실패/빈 결과 시 자동 대체
+    # - recommender: 외부 추천 서버 정상 결과
     if settings.recommender_mock_mode:
         source = "mock"
         candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
