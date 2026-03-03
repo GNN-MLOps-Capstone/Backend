@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import (
     AsyncSession,           # 비동기 세션 클래스
     async_sessionmaker,     # 비동기 세션 생성기
 )
+import sqlalchemy as sa
 from sqlalchemy.orm import DeclarativeBase  # 모델의 기본 클래스
 
 from app.config import get_settings  # 설정 가져오기
@@ -47,6 +48,8 @@ settings = get_settings()
 engine = create_async_engine(
     settings.database_url,  # DB 주소 (config.py에서 가져옴)
     echo=settings.debug,    # 디버그 모드면 SQL 출력
+    pool_pre_ping=True,     # 죽은 커넥션 자동 감지/재연결
+    pool_recycle=1800,      # 장시간 idle 커넥션 재사용 방지(초)
 )
 
 
@@ -148,3 +151,30 @@ async def init_db():
     # async with engine.begin() as conn:
     #     await conn.run_sync(Base.metadata.create_all)
     pass
+
+
+async def ensure_interaction_tables():
+    """
+    상호작용/추천 로깅 테이블의 마이그레이션 적용 여부를 확인합니다.
+    """
+    required_tables = {
+        "interaction_events",
+        "screen_sessions",
+        "content_sessions",
+        "recommendation_serves",
+        "recommendation_serve_items",
+        "recommendation_feedback",
+    }
+
+    async with engine.connect() as conn:
+        existing_tables = await conn.run_sync(
+            lambda sync_conn: set(sa.inspect(sync_conn).get_table_names())
+        )
+
+    missing_tables = sorted(required_tables - existing_tables)
+    if missing_tables:
+        raise RuntimeError(
+            "Missing migration-managed tables: "
+            f"{', '.join(missing_tables)}. "
+            "Run `alembic -c alembic.ini upgrade head` before startup."
+        )

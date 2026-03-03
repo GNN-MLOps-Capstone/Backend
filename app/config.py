@@ -95,6 +95,15 @@ class Settings(BaseSettings):
     #   - 모의: ws://ops.koreainvestment.com:31000
     kis_ws_base_url: str = "ws://ops.koreainvestment.com:21000"
     kis_ws_path: str = "/tryitout"
+
+    # =========================================================================
+    # Recommendation API 설정
+    # =========================================================================
+    recommender_base_url: str = ""
+    recommender_news_path: str = "/recommend/news"
+    recommender_timeout: float = 5.0
+    recommender_api_key: str = ""
+    recommender_mock_mode: bool = True
     
     #=========================================================================
     # 제미나이 api키 설정

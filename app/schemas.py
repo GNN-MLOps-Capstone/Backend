@@ -13,7 +13,7 @@ API 스키마 정의 (schemas.py)
 ==============================================================================
 """
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime,time
 import re
@@ -75,6 +75,25 @@ class NewsDetailResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class NewsRecommendationItem(BaseModel):
+    news_id: int
+    title: str
+    summary: Optional[str] = None
+    pub_date: Optional[datetime] = None
+    score: Optional[float] = None
+    reason: Optional[str] = None
+
+
+class NewsRecommendationResponse(BaseModel):
+    user_id: str
+    request_id: str
+    source: str
+    page: int
+    served_count: int
+    logged: bool
+    items: List[NewsRecommendationItem]
+
 
 class StockSummaryResponse(BaseModel):
     """
@@ -198,6 +217,39 @@ class NotificationCountResponse(BaseModel):
     처리가 끝난 후 남은 '안 읽은 알림 개수'를 반환합니다.
     """
     unread_count: int
+
+
+class InteractionEventIn(BaseModel):
+    event_id: str = Field(..., min_length=1, max_length=64)
+    user_id: str = Field(..., min_length=1, max_length=255)
+    event_type: str = Field(..., min_length=1, max_length=50)  # screen/content/recommendation/scroll 이벤트 타입
+    device_id: Optional[str] = Field(None, max_length=255)
+    app_session_id: Optional[str] = Field(None, max_length=255)
+    screen_session_id: Optional[str] = Field(None, max_length=64)
+    content_session_id: Optional[str] = Field(None, max_length=64)
+    news_id: Optional[int] = None
+    request_id: Optional[str] = Field(None, max_length=128)
+    position: Optional[int] = None
+    page: Optional[int] = None
+    scroll_depth: Optional[float] = None
+    event_ts_client: Optional[datetime] = None
+
+
+class InteractionEventBatchRequest(BaseModel):
+    events: List[InteractionEventIn]
+
+
+class InteractionIngestResponse(BaseModel):
+    accepted: int
+    duplicated: int
+    screen_updated: int
+    content_updated: int
+    feedback_updated: int
+
+
+class SessionFinalizeResponse(BaseModel):
+    screen_finalized: int
+    content_finalized: int
 
 # =============================================================================
 # 주식 API 스키마

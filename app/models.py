@@ -16,7 +16,19 @@
 """
 
 import enum
-from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Float, Boolean, Time
+from sqlalchemy import (
+    Column,
+    BigInteger,
+    String,
+    Text,
+    DateTime,
+    Integer,
+    ForeignKey,
+    Float,
+    Boolean,
+    Time,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -262,3 +274,158 @@ class Stock(Base):
 
     def __repr__(self):
         return f"<Stock(stock_id={self.stock_id}, stock_name={self.stock_name})>"
+
+
+class InteractionEvent(Base):
+    """
+    추천/콘텐츠 상호작용 원본 이벤트 로그 (append-only)
+    """
+
+    __tablename__ = "interaction_events"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    event_id = Column(String(64), unique=True, index=True, nullable=False)
+    user_id = Column(String(255), index=True, nullable=False)
+    device_id = Column(String(255), nullable=True)
+    app_session_id = Column(String(255), nullable=True, index=True)
+    event_type = Column(String(50), nullable=False, index=True)
+    screen_session_id = Column(String(64), nullable=True, index=True)
+    content_session_id = Column(String(64), nullable=True, index=True)
+    news_id = Column(BigInteger, nullable=True, index=True)
+    request_id = Column(String(128), nullable=True, index=True)
+    position = Column(Integer, nullable=True)
+    page = Column(Integer, nullable=True)
+    scroll_depth = Column(Float, nullable=True)
+    event_ts_client = Column(DateTime(timezone=True), nullable=True)
+    event_ts_server = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ScreenSession(Base):
+    """
+    추천 탭 체류 세션 집계
+    """
+
+    __tablename__ = "screen_sessions"
+
+    screen_session_id = Column(String(64), primary_key=True, index=True)
+    user_id = Column(String(255), index=True, nullable=False)
+    app_session_id = Column(String(255), nullable=True, index=True)
+    request_id = Column(String(128), nullable=True, index=True)
+    source = Column(String(50), nullable=False, default="recommendations")
+    started_at = Column(DateTime(timezone=True), nullable=False)
+    last_heartbeat_at = Column(DateTime(timezone=True), nullable=True)
+    ended_at = Column(DateTime(timezone=True), nullable=True)
+    dwell_ms = Column(Integer, nullable=True)
+    status = Column(String(20), nullable=False, default="active", index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class ContentSession(Base):
+    """
+    뉴스 상세 체류 세션 집계
+    """
+
+    __tablename__ = "content_sessions"
+
+    content_session_id = Column(String(64), primary_key=True, index=True)
+    user_id = Column(String(255), index=True, nullable=False)
+    app_session_id = Column(String(255), nullable=True, index=True)
+    screen_session_id = Column(String(64), nullable=True, index=True)
+    news_id = Column(BigInteger, nullable=False, index=True)
+    started_at = Column(DateTime(timezone=True), nullable=False)
+    last_heartbeat_at = Column(DateTime(timezone=True), nullable=True)
+    ended_at = Column(DateTime(timezone=True), nullable=True)
+    dwell_ms = Column(Integer, nullable=True)
+    status = Column(String(20), nullable=False, default="active", index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class RecommendationServe(Base):
+    """
+    추천 목록 응답 단위 로그
+    """
+
+    __tablename__ = "recommendation_serves"
+    __table_args__ = (
+        UniqueConstraint("request_id", "page", name="uq_recommendation_serves_request_page"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(String(128), nullable=False, index=True)
+    user_id = Column(String(255), nullable=False, index=True)
+    screen_session_id = Column(String(64), nullable=True, index=True)
+    app_session_id = Column(String(255), nullable=True, index=True)
+    source = Column(String(50), nullable=False)
+    page = Column(Integer, nullable=False, default=1)
+    limit = Column(Integer, nullable=False)
+    served_count = Column(Integer, nullable=False, default=0)
+    is_mock = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class RecommendationServeItem(Base):
+    """
+    추천 목록에 포함되어 노출된 아이템 로그
+    """
+
+    __tablename__ = "recommendation_serve_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "request_id",
+            "page",
+            "news_id",
+            "position",
+            name="uq_recommendation_serve_items_request_page_position",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    serve_id = Column(Integer, ForeignKey("recommendation_serves.id", ondelete="CASCADE"), nullable=False, index=True)
+    request_id = Column(String(128), nullable=False, index=True)
+    page = Column(Integer, nullable=False, index=True)
+    news_id = Column(BigInteger, nullable=False, index=True)
+    position = Column(Integer, nullable=False)
+    score = Column(Float, nullable=True)
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class RecommendationFeedback(Base):
+    """
+    추천 학습/분석용 하이브리드 피드백 집계
+    """
+
+    __tablename__ = "recommendation_feedback"
+    __table_args__ = (
+        UniqueConstraint(
+            "request_id",
+            "user_id",
+            "page",
+            "news_id",
+            "position",
+            name="uq_recommendation_feedback_request_user_item",
+        ),
+    )
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    request_id = Column(String(128), nullable=False, index=True)
+    user_id = Column(String(255), nullable=False, index=True)
+    app_session_id = Column(String(255), nullable=True, index=True)
+    screen_session_id = Column(String(64), nullable=True, index=True)
+    content_session_id = Column(String(64), nullable=True, index=True)
+    source = Column(String(50), nullable=False, default="recommendations")
+    page = Column(Integer, nullable=False, default=1, index=True)
+    news_id = Column(BigInteger, nullable=False, index=True)
+    position = Column(Integer, nullable=True)
+    impression_count = Column(Integer, nullable=False, default=0)
+    first_impression_at = Column(DateTime(timezone=True), nullable=True)
+    last_impression_at = Column(DateTime(timezone=True), nullable=True)
+    clicked = Column(Boolean, nullable=False, default=False, index=True)
+    clicked_at = Column(DateTime(timezone=True), nullable=True)
+    exited_at = Column(DateTime(timezone=True), nullable=True)
+    dwell_ms = Column(Integer, nullable=True)
+    completed_read = Column(Boolean, nullable=False, default=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

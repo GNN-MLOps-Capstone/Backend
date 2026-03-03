@@ -44,7 +44,7 @@ logging.basicConfig(
     format="%(levelname)s:     %(name)s - %(message)s",
 )
 
-from app.routers import news, stocks, users, notifications, watchlist
+from app.routers import news, stocks, users, notifications, watchlist, interactions
 
 logger = logging.getLogger(__name__)
 logger.info("Server configuration loaded.")
@@ -188,6 +188,7 @@ app.include_router(users.router)
 app.include_router(notifications.router)
 app.include_router(stocks.router)
 app.include_router(watchlist.router)
+app.include_router(interactions.router)
 
 
 # =============================================================================
