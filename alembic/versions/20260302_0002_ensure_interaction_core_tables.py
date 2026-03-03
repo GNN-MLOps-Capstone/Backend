@@ -150,21 +150,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # 안전한 롤백을 위해 본 리비전에서 생성한 신규 테이블만 제거
-    # 주의: interaction_events는 기존 환경에 이미 존재할 수 있어 데이터 손실 방지를 위해 drop 대상에서 제외
-    if _has_table("content_sessions"):
-        op.drop_index("ix_content_sessions_status", table_name="content_sessions")
-        op.drop_index("ix_content_sessions_news_id", table_name="content_sessions")
-        op.drop_index("ix_content_sessions_screen_session_id", table_name="content_sessions")
-        op.drop_index("ix_content_sessions_app_session_id", table_name="content_sessions")
-        op.drop_index("ix_content_sessions_user_id", table_name="content_sessions")
-        op.drop_index("ix_content_sessions_content_session_id", table_name="content_sessions")
-        op.drop_table("content_sessions")
-
-    if _has_table("screen_sessions"):
-        op.drop_index("ix_screen_sessions_status", table_name="screen_sessions")
-        op.drop_index("ix_screen_sessions_request_id", table_name="screen_sessions")
-        op.drop_index("ix_screen_sessions_app_session_id", table_name="screen_sessions")
-        op.drop_index("ix_screen_sessions_user_id", table_name="screen_sessions")
-        op.drop_index("ix_screen_sessions_screen_session_id", table_name="screen_sessions")
-        op.drop_table("screen_sessions")
+    # 비파괴 롤백 정책:
+    # 기존 운영 환경에서 동일 테이블이 선행 존재할 수 있어, 본 리비전 downgrade에서는
+    # 데이터 손실 가능성이 있는 drop 작업을 수행하지 않습니다.
+    # (필요 시 테이블 소유권 정책 확정 후 별도 안전 마이그레이션으로 처리)
+    return None
