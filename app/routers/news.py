@@ -324,7 +324,18 @@ async def _log_recommendation_serve(
     except IntegrityError as exc:
         await db.rollback()
         error_text = str(getattr(exc, "orig", exc)).lower()
-        if "unique" in error_text or "duplicate" in error_text:
+        is_request_page_duplicate = (
+            ("unique" in error_text or "duplicate" in error_text)
+            and (
+                "uq_recommendation_serves_request_page" in error_text
+                or (
+                    "recommendation_serves" in error_text
+                    and "request_id" in error_text
+                    and "page" in error_text
+                )
+            )
+        )
+        if is_request_page_duplicate:
             logger.info(
                 "recommendation serve duplicate skipped: request_id=%s page=%s err=%s",
                 request_id,
@@ -382,9 +393,9 @@ async def get_news_recommendations(
             candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
 
     items = await _load_news_by_ids(db, candidates)
-    candidate_by_id: dict[int, RecommendationCandidate] = {}
-    for candidate in candidates:
-        candidate_by_id.setdefault(candidate.news_id, candidate)
+    candidate_by_id: dict[int, RecommendationCandidate] = {
+        candidate.news_id: candidate for candidate in candidates
+    }
     served_candidates = [
         candidate_by_id[item.news_id]
         for item in items
