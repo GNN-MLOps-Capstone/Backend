@@ -323,13 +323,16 @@ async def _log_recommendation_serve(
         return True
     except IntegrityError as exc:
         await db.rollback()
-        logger.info(
-            "recommendation serve duplicate skipped: request_id=%s page=%s err=%s",
-            request_id,
-            page,
-            exc,
-        )
-        return False
+        error_text = str(getattr(exc, "orig", exc)).lower()
+        if "unique" in error_text or "duplicate" in error_text:
+            logger.info(
+                "recommendation serve duplicate skipped: request_id=%s page=%s err=%s",
+                request_id,
+                page,
+                exc,
+            )
+            return False
+        raise
 
 
 @router.get("/recommendations", response_model=NewsRecommendationResponse)
@@ -379,6 +382,8 @@ async def get_news_recommendations(
             candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
 
     items = await _load_news_by_ids(db, candidates)
+    served_ids = {item.news_id for item in items}
+    served_candidates = [candidate for candidate in candidates if candidate.news_id in served_ids]
     logged = False
     if log_served:
         logged = await _log_recommendation_serve(
@@ -390,7 +395,7 @@ async def get_news_recommendations(
             screen_session_id=screen_session_id,
             app_session_id=app_session_id,
             source=source,
-            candidates=candidates,
+            candidates=served_candidates,
         )
 
     return NewsRecommendationResponse(

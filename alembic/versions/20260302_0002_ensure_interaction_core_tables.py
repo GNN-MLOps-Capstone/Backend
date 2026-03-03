@@ -151,6 +151,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # 안전한 롤백을 위해 본 리비전에서 생성한 신규 테이블만 제거
+    # 주의: interaction_events는 기존 환경에 이미 존재할 수 있어 데이터 손실 방지를 위해 drop 대상에서 제외
     if _has_table("content_sessions"):
         op.drop_index("ix_content_sessions_status", table_name="content_sessions")
         op.drop_index("ix_content_sessions_news_id", table_name="content_sessions")

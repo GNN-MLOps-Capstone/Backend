@@ -36,6 +36,7 @@ _RECOMMEND_REQUEST = {"recommendation_request"}
 _RECOMMEND_RESPONSE = {"recommendation_response"}
 _RECOMMEND_IMPRESSION = {"recommendation_impression"}
 _SCROLL = {"scroll_depth"}
+_MAX_BATCH_SIZE = 500
 # 이벤트 타입 그룹별 후속 처리 요약
 # - screen_*: screen_sessions 갱신
 # - content_*: content_sessions 갱신
@@ -119,15 +120,17 @@ async def _upsert_recommendation_feedback(db: AsyncSession, event: InteractionEv
     if event.event_type in _CONTENT_START:
         if not event.request_id or event.news_id is None:
             return 0
+        stmt = select(RecommendationFeedback).where(
+            RecommendationFeedback.request_id == event.request_id,
+            RecommendationFeedback.user_id == event.user_id,
+            RecommendationFeedback.news_id == event.news_id,
+        )
+        if event.page is not None:
+            stmt = stmt.where(RecommendationFeedback.page == event.page)
+        if event.position is not None:
+            stmt = stmt.where(RecommendationFeedback.position == event.position)
         result = await db.execute(
-            select(RecommendationFeedback)
-            .where(
-                RecommendationFeedback.request_id == event.request_id,
-                RecommendationFeedback.user_id == event.user_id,
-                RecommendationFeedback.news_id == event.news_id,
-            )
-            .order_by(RecommendationFeedback.updated_at.desc())
-            .limit(1)
+            stmt.order_by(RecommendationFeedback.updated_at.desc()).limit(1)
         )
         row = result.scalar_one_or_none()
         if row is None:
@@ -322,6 +325,12 @@ async def ingest_interaction_events(
     payload: InteractionEventBatchRequest,
     db: AsyncSession = Depends(get_db),
 ):
+    if len(payload.events) > _MAX_BATCH_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"events batch too large (max {_MAX_BATCH_SIZE})",
+        )
+
     accepted = 0
     duplicated = 0
     screen_updated = 0
@@ -385,10 +394,11 @@ async def ingest_interaction_events(
                 feedback_updated += await _upsert_recommendation_feedback(db, event_row, event_at)
 
                 accepted += 1
-        except IntegrityError as exc:
-            # 동시 요청 경합 시 unique 제약이 최종 방어선 역할을 하며, 중복은 정상 케이스로 처리
-            error_text = str(getattr(exc, "orig", exc))
-            if "interaction_events" in error_text and "event_id" in error_text:
+        except IntegrityError:
+            exists_after = await db.execute(
+                select(InteractionEvent.event_id).where(InteractionEvent.event_id == item.event_id)
+            )
+            if exists_after.scalar_one_or_none() is not None:
                 duplicated += 1
                 continue
             raise
