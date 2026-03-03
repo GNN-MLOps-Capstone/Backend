@@ -337,12 +337,12 @@ async def _log_recommendation_serve(
 
 @router.get("/recommendations", response_model=NewsRecommendationResponse)
 async def get_news_recommendations(
-    user_id: str = Query(..., min_length=1, description="추천 대상 사용자 ID"),
+    user_id: str = Query(..., min_length=1, max_length=255, description="추천 대상 사용자 ID"),
     limit: int = Query(20, ge=1, le=100, description="가져올 추천 뉴스 개수"),
     page: int = Query(1, ge=1, le=1000, description="무한 스크롤 페이지 (1부터 시작)"),
-    request_id: Optional[str] = Query(None, description="추천 요청 추적 ID (미전달 시 서버 생성)"),
-    screen_session_id: Optional[str] = Query(None, description="추천 화면 세션 ID"),
-    app_session_id: Optional[str] = Query(None, description="앱 세션 ID"),
+    request_id: Optional[str] = Query(None, max_length=128, description="추천 요청 추적 ID (미전달 시 서버 생성)"),
+    screen_session_id: Optional[str] = Query(None, max_length=64, description="추천 화면 세션 ID"),
+    app_session_id: Optional[str] = Query(None, max_length=255, description="앱 세션 ID"),
     log_served: bool = Query(True, description="추천 응답을 DB 로깅할지 여부"),
     db: AsyncSession = Depends(get_db),
 ):
@@ -382,8 +382,14 @@ async def get_news_recommendations(
             candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
 
     items = await _load_news_by_ids(db, candidates)
-    served_ids = {item.news_id for item in items}
-    served_candidates = [candidate for candidate in candidates if candidate.news_id in served_ids]
+    candidate_by_id: dict[int, RecommendationCandidate] = {}
+    for candidate in candidates:
+        candidate_by_id.setdefault(candidate.news_id, candidate)
+    served_candidates = [
+        candidate_by_id[item.news_id]
+        for item in items
+        if item.news_id in candidate_by_id
+    ]
     logged = False
     if log_served:
         logged = await _log_recommendation_serve(
