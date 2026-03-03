@@ -13,7 +13,7 @@ API 스키마 정의 (schemas.py)
 ==============================================================================
 """
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime,time
 import re
@@ -220,15 +220,15 @@ class NotificationCountResponse(BaseModel):
 
 
 class InteractionEventIn(BaseModel):
-    event_id: str
-    user_id: str
-    event_type: str  # screen/content/recommendation/scroll 이벤트 타입
-    device_id: Optional[str] = None
-    app_session_id: Optional[str] = None
-    screen_session_id: Optional[str] = None
-    content_session_id: Optional[str] = None
+    event_id: str = Field(..., min_length=1, max_length=64)
+    user_id: str = Field(..., min_length=1, max_length=255)
+    event_type: str = Field(..., min_length=1, max_length=50)  # screen/content/recommendation/scroll 이벤트 타입
+    device_id: Optional[str] = Field(None, max_length=255)
+    app_session_id: Optional[str] = Field(None, max_length=255)
+    screen_session_id: Optional[str] = Field(None, max_length=64)
+    content_session_id: Optional[str] = Field(None, max_length=64)
     news_id: Optional[int] = None
-    request_id: Optional[str] = None
+    request_id: Optional[str] = Field(None, max_length=128)
     position: Optional[int] = None
     page: Optional[int] = None
     scroll_depth: Optional[float] = None
