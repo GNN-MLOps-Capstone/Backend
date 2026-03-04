@@ -16,10 +16,10 @@ API 엔드포인트:
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
-from typing import Optional
 
 from app.database import get_db
-from app.models import Watchlist, Stock, StockSummaryCache
+from app.models import Watchlist, Stock, StockSummaryCache, User
+from app.routers.users import get_current_user
 from app.schemas import (
     WatchlistAddRequest,
     WatchlistStockResponse,
@@ -40,23 +40,21 @@ router = APIRouter(
 
 @router.get("/watchlist", response_model=list[WatchlistStockResponse])
 async def get_watchlist(
-    user_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     관심종목 목록 조회
 
-    Parameters:
-        user_id: 사용자 ID (선택, 없으면 전체)
-
     Returns:
         list[WatchlistStockResponse]: 관심종목 목록
     """
     # watchlist 조회
-    query = select(Watchlist)
-    if user_id:
-        query = query.where(Watchlist.user_id == user_id)
-    query = query.order_by(Watchlist.created_at.desc())
+    query = (
+        select(Watchlist)
+        .where(Watchlist.user_id == current_user.google_id)
+        .order_by(Watchlist.created_at.desc())
+    )
 
     result = await db.execute(query)
     watchlist_items = result.scalars().all()
@@ -122,7 +120,7 @@ async def get_watchlist(
 @router.post("/watchlist", response_model=dict)
 async def add_watchlist(
     request: WatchlistAddRequest,
-    user_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -130,7 +128,6 @@ async def add_watchlist(
 
     Parameters:
         request: { code: "종목코드" }
-        user_id: 사용자 ID (선택)
 
     Returns:
         성공 메시지
@@ -143,11 +140,10 @@ async def add_watchlist(
         raise HTTPException(status_code=404, detail="존재하지 않는 종목입니다")
 
     # 이미 추가된 종목인지 확인
-    query = select(Watchlist).where(Watchlist.stock_id == request.code)
-    if user_id:
-        query = query.where(Watchlist.user_id == user_id)
-
-    result = await db.execute(query)
+    result = await db.execute(
+        select(Watchlist)
+        .where(Watchlist.stock_id == request.code, Watchlist.user_id == current_user.google_id)
+    )
     existing = result.scalar_one_or_none()
 
     if existing:
@@ -155,7 +151,7 @@ async def add_watchlist(
 
     # 새 관심종목 추가
     new_item = Watchlist(
-        user_id=user_id,
+        user_id=current_user.google_id,
         stock_id=request.code,
     )
     db.add(new_item)
@@ -171,7 +167,7 @@ async def add_watchlist(
 @router.delete("/watchlist/{code}", response_model=dict)
 async def delete_watchlist(
     code: str,
-    user_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -179,16 +175,14 @@ async def delete_watchlist(
 
     Parameters:
         code: 종목 코드
-        user_id: 사용자 ID (선택)
 
     Returns:
         성공 메시지
     """
-    query = delete(Watchlist).where(Watchlist.stock_id == code)
-    if user_id:
-        query = query.where(Watchlist.user_id == user_id)
-
-    await db.execute(query)
+    await db.execute(
+        delete(Watchlist)
+        .where(Watchlist.stock_id == code, Watchlist.user_id == current_user.google_id)
+    )
     await db.commit()
 
     return {"message": "관심종목 삭제 완료", "code": code}
@@ -200,7 +194,7 @@ async def delete_watchlist(
 
 @router.get("/watchlist/briefing", response_model=WatchlistBriefingResponse)
 async def get_watchlist_briefing(
-    user_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -210,9 +204,7 @@ async def get_watchlist_briefing(
         WatchlistBriefingResponse: AI 브리핑
     """
     # watchlist 조회
-    query = select(Watchlist)
-    if user_id:
-        query = query.where(Watchlist.user_id == user_id)
+    query = select(Watchlist).where(Watchlist.user_id == current_user.google_id)
 
     result = await db.execute(query)
     watchlist_items = result.scalars().all()
