@@ -40,7 +40,7 @@ router = APIRouter(
 
 @router.get("/watchlist", response_model=list[WatchlistStockResponse])
 async def get_watchlist(
-    user_id: Optional[int] = None,
+    user_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -121,7 +121,7 @@ async def get_watchlist(
 @router.post("/watchlist", response_model=dict)
 async def add_watchlist(
     request: WatchlistAddRequest,
-    user_id: Optional[int] = None,
+    user_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -163,7 +163,7 @@ async def add_watchlist(
 @router.delete("/watchlist/{code}", response_model=dict)
 async def delete_watchlist(
     code: str,
-    user_id: Optional[int] = None,
+    user_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -192,7 +192,7 @@ async def delete_watchlist(
 
 @router.get("/watchlist/briefing", response_model=WatchlistBriefingResponse)
 async def get_watchlist_briefing(
-    user_id: Optional[int] = None,
+    user_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """
