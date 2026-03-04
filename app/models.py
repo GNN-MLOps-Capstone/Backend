@@ -16,7 +16,7 @@
 """
 
 import enum
-from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Float, Boolean, Time
+from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Float, Boolean, Time, UniqueConstrain
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -220,6 +220,26 @@ class FilteredNews(Base):
     sentiment = Column(String(20), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+class Stock(Base):
+    """
+    종목 정보 테이블
+
+    종목명, 업종, AI 요약 등 종목 메타데이터를 저장합니다.
+    """
+    __tablename__ = "stocks"
+
+    stock_id = Column(String(20), primary_key=True, index=True)
+    stock_name = Column(String(200), nullable=True)
+    industry = Column(String(200), nullable=True)
+    summary_text = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    watchlist_items = relationship("Watchlist", back_populates="stock")
+
+    def __repr__(self):
+        return f"<Stock(stock_id={self.stock_id}, stock_name={self.stock_name})>"
+
 class Notification(Base):
     """
     알림 테이블 (notifications)
@@ -232,12 +252,13 @@ class Notification(Base):
     user_id = Column(String, ForeignKey("users.google_id", ondelete="CASCADE"), nullable=False, index=True)
     
     type = Column(String(50), nullable=False)
-    title = Column(String(255), nullable=False)
+    title = Column(String(255), nullab
+                   le=False)
     body = Column(Text, nullable=True)
     is_read = Column(Boolean, default=False)
     star = Column(Boolean, default=False)
     stock_name = Column(String(255), nullable=True)
-    sentiment_score = Column(Float, nullable=True)
+    sentiment_score = Column(Float, nullable=True
     
     # 생성 시간 (자동 입력)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
