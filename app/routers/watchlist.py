@@ -4,11 +4,11 @@
 ==============================================================================
 
 API 엔드포인트:
-    GET    /api/watchlist          -> 관심종목 목록
-    POST   /api/watchlist          -> 종목 추가
-    DELETE /api/watchlist/{code}   -> 종목 삭제
-    GET    /api/watchlist/briefing -> AI 브리핑
-    GET    /api/stocks/{code}      -> 종목 상세
+    GET    /api/watchlist              -> 관심종목 목록
+    POST   /api/watchlist              -> 종목 추가
+    DELETE /api/watchlist/{code}       -> 종목 삭제
+    GET    /api/watchlist/briefing     -> AI 브리핑 (Gemini, 시장 Top3 이슈)
+    GET    /api/stocks/{code}          -> 종목 상세
 
 ==============================================================================
 """
@@ -16,16 +16,23 @@ API 엔드포인트:
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func, case
+from datetime import datetime, timedelta, timezone
+import logging
+from google.genai import types
+from google import genai
 
 from app.database import get_db
-from app.models import Watchlist, Stock, StockSummaryCache, User
+from app.models import Watchlist, Stock, StockSummaryCache, User, FilteredNews, NewsStockMapping
 from app.routers.users import get_current_user
+from app.routers.news import get_stock_summary
 from app.schemas import (
     WatchlistAddRequest,
     WatchlistStockResponse,
-    WatchlistBriefingResponse,
+    IssueStock,
+    IssueRankingResponse,
 )
+from app.config import get_settings
 from app.services.kis_service import kis_service
 
 
@@ -33,6 +40,16 @@ router = APIRouter(
     prefix="/api",
     tags=["watchlist"],
 )
+
+settings = get_settings()
+logger = logging.getLogger(__name__)
+gemini_client = genai.Client(api_key=settings.gemini_api)
+
+_briefing_cache = {
+    "data": None,
+    "expires_at": datetime.min.replace(tzinfo=timezone.utc)
+}
+CACHE_TTL_MINUTES = 60
 
 
 # =============================================================================
@@ -44,32 +61,22 @@ async def get_watchlist(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    관심종목 목록 조회
-
-    Returns:
-        list[WatchlistStockResponse]: 관심종목 목록
-    """
-    # watchlist 조회
+    """관심종목 목록 조회"""
     query = (
         select(Watchlist)
         .where(Watchlist.user_id == current_user.google_id)
         .order_by(Watchlist.created_at.desc())
     )
-
     result = await db.execute(query)
     watchlist_items = result.scalars().all()
 
     if not watchlist_items:
         return []
 
-    # 종목 코드 리스트 추출
     stock_codes = [item.stock_id for item in watchlist_items]
 
-    # 한국투자증권 API로 실시간 가격 조회
     prices = await kis_service.get_multiple_prices(stock_codes)
 
-    # Stock 및 StockSummaryCache 일괄 조회
     stock_result = await db.execute(
         select(Stock).where(Stock.stock_id.in_(stock_codes))
     )
@@ -80,18 +87,15 @@ async def get_watchlist(
     )
     summary_map = {row.stock_id: row.summary_text for row in cache_result.scalars().all()}
 
-    # 종목 정보 조회 및 응답 구성
     response_list = []
     for item in watchlist_items:
         stock = stock_map.get(item.stock_id)
         stock_name = stock.stock_name if stock else item.stock_id
 
-        # 실시간 가격 정보
         price_info = prices.get(item.stock_id, {})
         price = price_info.get("price", 0)
         change_rate = price_info.get("change_rate", 0.0)
 
-        # 등락률에 따른 날씨 결정
         if change_rate >= 2.0:
             weather = "SUNNY"
         elif change_rate <= -2.0:
@@ -124,23 +128,13 @@ async def add_watchlist(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    관심종목 추가
-
-    Parameters:
-        request: { code: "종목코드" }
-
-    Returns:
-        성공 메시지
-    """
-    # 종목 존재 여부 확인 (FK 제약조건 위반 방지)
+    """관심종목 추가"""
     stock_result = await db.execute(
         select(Stock).where(Stock.stock_id == request.code)
     )
     if not stock_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="존재하지 않는 종목입니다")
 
-    # 새 관심종목 추가 (UNIQUE 제약으로 중복 방지, 경쟁 상태 안전)
     try:
         db.add(Watchlist(user_id=current_user.google_id, stock_id=request.code))
         await db.commit()
@@ -161,15 +155,7 @@ async def delete_watchlist(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    관심종목 삭제
-
-    Parameters:
-        code: 종목 코드
-
-    Returns:
-        성공 메시지
-    """
+    """관심종목 삭제"""
     await db.execute(
         delete(Watchlist)
         .where(Watchlist.stock_id == code, Watchlist.user_id == current_user.google_id)
@@ -180,82 +166,155 @@ async def delete_watchlist(
 
 
 # =============================================================================
-# AI 브리핑
+# AI 브리핑 (Gemini - 시장 Top3 이슈 종목)
 # =============================================================================
 
-@router.get("/watchlist/briefing", response_model=WatchlistBriefingResponse)
-async def get_watchlist_briefing(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    관심종목 AI 브리핑
+async def _get_top_issues(db: AsyncSession, top_n: int = 3) -> list[IssueStock]:
+    """특정 기간 동안의 뉴스를 분석하여 이슈지수가 높은 Top N 종목을 반환."""
+    now = datetime.now(timezone.utc)
+    recent_vol_stats = []
 
-    Returns:
-        WatchlistBriefingResponse: AI 브리핑
-    """
-    # watchlist 조회
-    query = select(Watchlist).where(Watchlist.user_id == current_user.google_id)
-
-    result = await db.execute(query)
-    watchlist_items = result.scalars().all()
-
-    if not watchlist_items:
-        return WatchlistBriefingResponse(
-            text="관심종목을 추가해주세요.",
-            topIssues=[],
+    for search_days in [1, 2, 3, 4, 5, 6, 7]:
+        past_days_vol = now - timedelta(days=search_days)
+        query_vol = (
+            select(
+                Stock.stock_name,
+                func.count(FilteredNews.news_id).label('recent_news_count')
+            )
+            .select_from(Stock)
+            .join(NewsStockMapping, Stock.stock_id == NewsStockMapping.stock_id)
+            .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
+            .where(
+                FilteredNews.created_at >= past_days_vol,
+                FilteredNews.created_at <= now
+            )
+            .group_by(Stock.stock_name)
         )
+        result_vol = await db.execute(query_vol)
+        recent_vol_stats = result_vol.all()
+        if len(recent_vol_stats) >= top_n:
+            logger.info(f"동적 탐색: {search_days}일치 데이터에서 {len(recent_vol_stats)}개의 이슈 종목을 찾았습니다.")
+            break
 
-    # 종목 코드 리스트 추출
-    stock_codes = [item.stock_id for item in watchlist_items]
+    if not recent_vol_stats:
+        return []
 
-    # 한국투자증권 API로 실시간 가격 조회
-    prices = await kis_service.get_multiple_prices(stock_codes)
+    issue_stocks = [stat.stock_name for stat in recent_vol_stats]
 
-    # Stock 일괄 조회
-    stock_result = await db.execute(
-        select(Stock).where(Stock.stock_id.in_(stock_codes))
+    past_7_days = now - timedelta(days=7)
+    sentiment_score_expr = case(
+        (FilteredNews.sentiment == '긍정', 1.0),
+        (FilteredNews.sentiment == '부정', -1.0),
+        else_=0.0
     )
-    stock_map = {row.stock_id: row for row in stock_result.scalars().all()}
-
-    # 종목 정보 수집
-    stock_data = []
-    for item in watchlist_items:
-        stock = stock_map.get(item.stock_id)
-        stock_name = stock.stock_name if stock else item.stock_id
-        price_info = prices.get(item.stock_id, {})
-        change_rate = price_info.get("change_rate", 0.0)
-        stock_data.append({
-            "name": stock_name,
-            "change_rate": change_rate,
-            "industry": stock.industry if stock else "",
-        })
-
-    # 브리핑 텍스트 생성
-    rising = [s for s in stock_data if s["change_rate"] > 0]
-    falling = [s for s in stock_data if s["change_rate"] < 0]
-
-    text_parts = []
-    if rising:
-        top_rising = sorted(rising, key=lambda x: x["change_rate"], reverse=True)[:3]
-        names = ", ".join([f"{s['name']}(+{s['change_rate']:.1f}%)" for s in top_rising])
-        text_parts.append(f"상승 종목: {names}")
-
-    if falling:
-        top_falling = sorted(falling, key=lambda x: x["change_rate"])[:3]
-        names = ", ".join([f"{s['name']}({s['change_rate']:.1f}%)" for s in top_falling])
-        text_parts.append(f"하락 종목: {names}")
-
-    if not text_parts:
-        text_parts.append("관심종목이 보합세를 유지하고 있습니다.")
-
-    # 주요 이슈 (업종 기반)
-    industries = list(set([s["industry"] for s in stock_data if s["industry"]]))[:3]
-
-    return WatchlistBriefingResponse(
-        text=" ".join(text_parts),
-        topIssues=industries if industries else ["관심종목 분석중"],
+    query_sent = (
+        select(
+            Stock.stock_name,
+            func.avg(sentiment_score_expr).label('avg_sentiment')
+        )
+        .select_from(Stock)
+        .join(StockSummaryCache, Stock.stock_id == StockSummaryCache.stock_id)
+        .join(NewsStockMapping, StockSummaryCache.stock_id == NewsStockMapping.stock_id)
+        .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
+        .where(
+            Stock.stock_name.in_(issue_stocks),
+            FilteredNews.created_at >= past_7_days,
+            FilteredNews.created_at <= now
+        )
+        .group_by(Stock.stock_name)
     )
+    result_sent = await db.execute(query_sent)
+    sentiment_dict = {stat.stock_name: stat.avg_sentiment for stat in result_sent.all()}
+
+    counts = [stat.recent_news_count for stat in recent_vol_stats]
+    max_count = max(counts) if counts else 1
+    min_count = min(counts) if counts else 0
+
+    processed_stocks = []
+    for stat in recent_vol_stats:
+        stock_name = stat.stock_name
+        recent_count = stat.recent_news_count
+        raw_sentiment = sentiment_dict.get(stock_name)
+        abs_sentiment = abs(raw_sentiment) if raw_sentiment is not None else 0.0
+
+        if max_count == min_count:
+            norm_recent_news = 0.0
+        else:
+            norm_recent_news = (recent_count - min_count) / (max_count - min_count)
+
+        issue_index = (abs_sentiment * 0.7) + (norm_recent_news * 0.3)
+        processed_stocks.append(IssueStock(
+            stock_name=stock_name,
+            recent_news_count=recent_count,
+            abs_recent_sentiment=round(abs_sentiment, 4),
+            issue_index=round(issue_index, 4)
+        ))
+
+    return sorted(processed_stocks, key=lambda x: x.issue_index, reverse=True)[:top_n]
+
+
+async def _call_gemini_briefing(combined_summaries: str) -> str:
+    system_prompt = """
+    당신은 모바일 증권 앱의 수석 AI 애널리스트입니다.
+    오늘 시장에서 가장 뜨거운 이슈가 된 Top 3 종목의 개별 요약문이 제공됩니다.
+    제공된 요약문들을 바탕으로, 사용자가 모바일 화면에서 한눈에 읽기 편한 2~3문장 분량의 '종합 브리핑' 텍스트를 작성해주세요.
+
+    [작성 규칙]
+    1. ⚠️ 마크다운 기호(**, -, * 등)는 절대 사용하지 마세요. 오직 순수 텍스트로만 작성하세요.
+    2. ⚠️ 첫 문장은 반드시 3개 종목의 공통된 테마나 오늘 시장의 전반적인 분위기를 아우르는 요약 문장으로 시작하세요.
+    3. 두 번째 문장부터는 각 종목명과 그들의 이슈를 자연스럽게 이어 붙여 하나의 문단으로 완성하세요.
+    4. 문장은 정중한 존댓말(~했습니다, ~입니다)을 사용하세요.
+    """
+    try:
+        response = await gemini_client.aio.models.generate_content(
+            model="gemini-2.0-flash-lite",
+            contents=combined_summaries,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.3
+            )
+        )
+        text = response.text
+        if not text:
+            return "현재 시장 이슈 요약을 생성할 수 없습니다. 잠시 후 다시 시도해주세요."
+        return text.strip()
+    except Exception:
+        logger.exception("브리핑 생성 오류")
+        return "현재 시장 이슈를 분석하는데 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+
+
+@router.get("/watchlist/briefing", response_model=IssueRankingResponse)
+async def get_watchlist_briefing(db: AsyncSession = Depends(get_db)):
+    """AI 브리핑 - 시장 Top 3 이슈 종목 기반 Gemini 종합 브리핑"""
+    global _briefing_cache
+    now = datetime.now(timezone.utc)
+
+    if _briefing_cache["data"] and now < _briefing_cache["expires_at"]:
+        logger.info("캐시된 AI 브리핑 데이터를 반환합니다.")
+        return _briefing_cache["data"]
+
+    top_issues = await _get_top_issues(db, top_n=3)
+
+    if not top_issues:
+        return {"text": "현재 시장에 뚜렷한 이슈 종목이 없습니다.", "top_issues": []}
+
+    summaries_text_list = []
+    for issue in top_issues:
+        try:
+            stock_summary_response = await get_stock_summary(stock_name=issue.stock_name, db=db)
+            if stock_summary_response.summary:
+                summaries_text_list.append(f"[{issue.stock_name} 요약]\n{stock_summary_response.summary}")
+        except HTTPException:
+            logger.warning("종목 요약 캐시 없음, 건너뜀: %s", issue.stock_name)
+
+    combined_summaries = "\n\n".join(summaries_text_list)
+    final_briefing_text = await _call_gemini_briefing(combined_summaries)
+
+    result_data = {"text": final_briefing_text, "top_issues": top_issues}
+    _briefing_cache["data"] = result_data
+    _briefing_cache["expires_at"] = now + timedelta(minutes=CACHE_TTL_MINUTES)
+
+    return result_data
 
 
 # =============================================================================
@@ -267,16 +326,7 @@ async def get_stock_detail(
     code: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    종목 상세 조회
-
-    Parameters:
-        code: 종목 코드
-
-    Returns:
-        WatchlistStockResponse: 종목 상세 정보
-    """
-    # stocks 테이블에서 종목 정보 조회
+    """종목 상세 조회"""
     result = await db.execute(
         select(Stock).where(Stock.stock_id == code)
     )
@@ -285,18 +335,15 @@ async def get_stock_detail(
     if not stock:
         raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다")
 
-    # 한국투자증권 API로 실시간 가격 조회
     price_info = await kis_service.get_stock_price(code)
     price = price_info.get("price", 0)
     change_rate = price_info.get("change_rate", 0.0)
 
-    # StockSummaryCache에서 AI 요약 조회
     cache_result = await db.execute(
         select(StockSummaryCache).where(StockSummaryCache.stock_id == code)
     )
     cache = cache_result.scalar_one_or_none()
 
-    # 등락률에 따른 날씨 결정
     if change_rate >= 2.0:
         weather = "SUNNY"
     elif change_rate <= -2.0:
