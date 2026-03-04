@@ -29,6 +29,7 @@ class KISService:
         self.BASE_URL = settings.kis_base_url
         self.app_key = settings.kis_app_key
         self.app_secret = settings.kis_app_secret
+        self.timeout = settings.kis_timeout
         self._access_token: Optional[str] = None
         self._token_expires_at: Optional[datetime] = None
         # 가격 캐시: {종목코드: {"data": 가격정보, "expires_at": 만료시간}}
@@ -48,7 +49,7 @@ class KISService:
             "appsecret": self.app_secret,
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(url, json=payload)
             data = response.json()
 
@@ -99,7 +100,7 @@ class KISService:
                 "FID_INPUT_ISCD": stock_code,
             }
 
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(url, headers=headers, params=params)
                 data = response.json()
 
