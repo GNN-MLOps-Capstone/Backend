@@ -16,7 +16,7 @@
 """
 
 import enum
-from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Enum, Boolean, Time, UniqueConstraint
+from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Float, Boolean, Time, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -148,7 +148,7 @@ class User(Base):
     img_url = Column(Text)
 
     role = Column(String, nullable=True)
-
+    onesignal_id = Column(String(255), nullable=True, default=None)
     # 유저정보 생성시간
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -277,7 +277,10 @@ class Notification(Base):
     title = Column(String(255), nullable=False)
     body = Column(Text, nullable=True)
     is_read = Column(Boolean, default=False)
-    
+    star = Column(Boolean, default=False)
+    stock_name = Column(String(255), nullable=True)
+    sentiment_score = Column(Float, nullable=True)
+
     # 생성 시간 (자동 입력)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
