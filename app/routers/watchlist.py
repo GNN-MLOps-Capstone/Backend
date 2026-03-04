@@ -70,7 +70,12 @@ async def get_watchlist(
     # 한국투자증권 API로 실시간 가격 조회
     prices = await kis_service.get_multiple_prices(stock_codes)
 
-    # StockSummaryCache에서 AI 요약 일괄 조회
+    # Stock 및 StockSummaryCache 일괄 조회
+    stock_result = await db.execute(
+        select(Stock).where(Stock.stock_id.in_(stock_codes))
+    )
+    stock_map = {row.stock_id: row for row in stock_result.scalars().all()}
+
     cache_result = await db.execute(
         select(StockSummaryCache).where(StockSummaryCache.stock_id.in_(stock_codes))
     )
@@ -79,11 +84,7 @@ async def get_watchlist(
     # 종목 정보 조회 및 응답 구성
     response_list = []
     for item in watchlist_items:
-        # stocks 테이블에서 종목 정보 조회
-        stock_result = await db.execute(
-            select(Stock).where(Stock.stock_id == item.stock_id)
-        )
-        stock = stock_result.scalar_one_or_none()
+        stock = stock_map.get(item.stock_id)
         stock_name = stock.stock_name if stock else item.stock_id
 
         # 실시간 가격 정보
@@ -221,13 +222,16 @@ async def get_watchlist_briefing(
     # 한국투자증권 API로 실시간 가격 조회
     prices = await kis_service.get_multiple_prices(stock_codes)
 
+    # Stock 일괄 조회
+    stock_result = await db.execute(
+        select(Stock).where(Stock.stock_id.in_(stock_codes))
+    )
+    stock_map = {row.stock_id: row for row in stock_result.scalars().all()}
+
     # 종목 정보 수집
     stock_data = []
     for item in watchlist_items:
-        stock_result = await db.execute(
-            select(Stock).where(Stock.stock_id == item.stock_id)
-        )
-        stock = stock_result.scalar_one_or_none()
+        stock = stock_map.get(item.stock_id)
         stock_name = stock.stock_name if stock else item.stock_id
         price_info = prices.get(item.stock_id, {})
         change_rate = price_info.get("change_rate", 0.0)
