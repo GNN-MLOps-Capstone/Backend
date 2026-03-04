@@ -10,25 +10,25 @@ API 문서: https://apiportal.koreainvestment.com/
 ==============================================================================
 """
 
-import os
 import httpx
 from datetime import datetime, timedelta
 from typing import Optional
 import asyncio
 
+from app.config import get_settings
+
 
 class KISService:
     """한국투자증권 API 서비스"""
-
-    # 실전투자 도메인
-    BASE_URL = "https://openapi.koreainvestment.com:9443"
 
     # 가격 캐시 유효 시간 (초)
     CACHE_TTL = 30
 
     def __init__(self):
-        self.app_key = os.environ.get("KIS_APP_KEY", "")
-        self.app_secret = os.environ.get("KIS_APP_SECRET", "")
+        settings = get_settings()
+        self.BASE_URL = settings.kis_base_url
+        self.app_key = settings.kis_app_key
+        self.app_secret = settings.kis_app_secret
         self._access_token: Optional[str] = None
         self._token_expires_at: Optional[datetime] = None
         # 가격 캐시: {종목코드: {"data": 가격정보, "expires_at": 만료시간}}
