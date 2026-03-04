@@ -14,6 +14,7 @@ API 엔드포인트:
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 
@@ -139,23 +140,13 @@ async def add_watchlist(
     if not stock_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="존재하지 않는 종목입니다")
 
-    # 이미 추가된 종목인지 확인
-    result = await db.execute(
-        select(Watchlist)
-        .where(Watchlist.stock_id == request.code, Watchlist.user_id == current_user.google_id)
-    )
-    existing = result.scalar_one_or_none()
-
-    if existing:
+    # 새 관심종목 추가 (UNIQUE 제약으로 중복 방지, 경쟁 상태 안전)
+    try:
+        db.add(Watchlist(user_id=current_user.google_id, stock_id=request.code))
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
         return {"message": "이미 추가된 종목입니다", "code": request.code}
-
-    # 새 관심종목 추가
-    new_item = Watchlist(
-        user_id=current_user.google_id,
-        stock_id=request.code,
-    )
-    db.add(new_item)
-    await db.commit()
 
     return {"message": "관심종목 추가 완료", "code": request.code}
 

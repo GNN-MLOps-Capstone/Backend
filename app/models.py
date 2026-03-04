@@ -16,7 +16,7 @@
 """
 
 import enum
-from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Enum, Boolean, Time
+from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Enum, Boolean, Time, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -247,6 +247,8 @@ class Watchlist(Base):
     사용자별 관심종목 목록을 저장합니다.
     """
     __tablename__ = "watchlist"
+
+    __table_args__ = (UniqueConstraint("user_id", "stock_id", name="uq_watchlist_user_stock"),)
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.google_id", ondelete="CASCADE"), nullable=True, index=True)
