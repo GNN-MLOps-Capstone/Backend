@@ -135,6 +135,13 @@ async def add_watchlist(
     Returns:
         성공 메시지
     """
+    # 종목 존재 여부 확인 (FK 제약조건 위반 방지)
+    stock_result = await db.execute(
+        select(Stock).where(Stock.stock_id == request.code)
+    )
+    if not stock_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="존재하지 않는 종목입니다")
+
     # 이미 추가된 종목인지 확인
     query = select(Watchlist).where(Watchlist.stock_id == request.code)
     if user_id:
