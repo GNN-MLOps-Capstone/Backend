@@ -218,6 +218,7 @@ class FilteredNews(Base):
     summary = Column(Text, nullable=True)
     refined_text = Column(Text, nullable=True)
     sentiment = Column(String(20), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Stock(Base):
     """
