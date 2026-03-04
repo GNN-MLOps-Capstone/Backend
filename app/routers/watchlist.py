@@ -19,7 +19,7 @@ from sqlalchemy import select, delete
 from typing import Optional
 
 from app.database import get_db
-from app.models import Watchlist, Stock
+from app.models import Watchlist, Stock, StockSummaryCache
 from app.schemas import (
     WatchlistAddRequest,
     WatchlistStockResponse,
@@ -70,6 +70,12 @@ async def get_watchlist(
     # 한국투자증권 API로 실시간 가격 조회
     prices = await kis_service.get_multiple_prices(stock_codes)
 
+    # StockSummaryCache에서 AI 요약 일괄 조회
+    cache_result = await db.execute(
+        select(StockSummaryCache).where(StockSummaryCache.stock_id.in_(stock_codes))
+    )
+    summary_map = {row.stock_id: row.summary_text for row in cache_result.scalars().all()}
+
     # 종목 정보 조회 및 응답 구성
     response_list = []
     for item in watchlist_items:
@@ -101,7 +107,7 @@ async def get_watchlist(
                 price=price,
                 changeRate=change_rate,
                 keyword=stock.industry if stock and stock.industry else "",
-                aiSummary=stock.summary_text if stock and stock.summary_text else "",
+                aiSummary=summary_map.get(item.stock_id) or "",
             )
         )
 
@@ -290,6 +296,12 @@ async def get_stock_detail(
     price = price_info.get("price", 0)
     change_rate = price_info.get("change_rate", 0.0)
 
+    # StockSummaryCache에서 AI 요약 조회
+    cache_result = await db.execute(
+        select(StockSummaryCache).where(StockSummaryCache.stock_id == code)
+    )
+    cache = cache_result.scalar_one_or_none()
+
     # 등락률에 따른 날씨 결정
     if change_rate >= 2.0:
         weather = "SUNNY"
@@ -305,5 +317,5 @@ async def get_stock_detail(
         price=price,
         changeRate=change_rate,
         keyword=stock.industry or "",
-        aiSummary=stock.summary_text or "",
+        aiSummary=cache.summary_text if cache and cache.summary_text else "",
     )
