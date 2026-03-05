@@ -14,8 +14,13 @@ services:
       - CORS_ORIGINS=http://localhost:3000,http://localhost:51151,http://localhost:*
     restart: unless-stopped
     networks:
-      - capstone-network
+      - crawling_news-network
+      - proxy-net
 
 networks:
-  capstone-network:
-    driver: bridge
+  crawling_news-network:
+    external: true
+    name: crawling_news-network
+  proxy-net:
+    external: true
+    name: proxy-net
