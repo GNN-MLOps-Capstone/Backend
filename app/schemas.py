@@ -90,6 +90,7 @@ class NewsRecommendationResponse(BaseModel):
     request_id: str
     source: str
     page: int
+    next_cursor: Optional[str] = None
     served_count: int
     logged: bool
     items: List[NewsRecommendationItem]

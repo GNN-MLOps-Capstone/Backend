@@ -18,6 +18,9 @@ API 엔드포인트:
 """
 
 import html
+import json
+import base64
+import binascii
 from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,6 +66,7 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 gemini_client = genai.Client(api_key=settings.gemini_api)
 recommendation_client = RecommendationClient(settings)
+_CURSOR_VERSION = 1
 
 # =============================================================================
 # 헬퍼 함수
@@ -88,6 +92,52 @@ def decode_html_entities(text: Optional[str]) -> Optional[str]:
     if text is None:
         return None
     return html.unescape(text)
+
+
+def _encode_recommendation_cursor(*, page: int, offset: int, limit: int) -> str:
+    payload = {
+        "v": _CURSOR_VERSION,
+        "page": page,
+        "offset": offset,
+        "limit": limit,
+    }
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii")
+
+
+def _decode_recommendation_cursor(cursor: str) -> tuple[int, int, int | None]:
+    try:
+        raw = base64.urlsafe_b64decode(cursor.encode("ascii"))
+        payload = json.loads(raw.decode("utf-8"))
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="Invalid cursor format")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Invalid cursor payload")
+
+    if payload.get("v") != _CURSOR_VERSION:
+        raise HTTPException(status_code=400, detail="Unsupported cursor version")
+
+    try:
+        page = int(payload.get("page"))
+        offset = int(payload.get("offset"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid cursor values")
+
+    if page < 1 or offset < 0:
+        raise HTTPException(status_code=400, detail="Invalid cursor values")
+
+    raw_limit = payload.get("limit")
+    cursor_limit: int | None = None
+    if raw_limit is not None:
+        try:
+            cursor_limit = int(raw_limit)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Invalid cursor values")
+        if cursor_limit < 1:
+            raise HTTPException(status_code=400, detail="Invalid cursor values")
+
+    return page, offset, cursor_limit
 
 # 새로운 요약문을 생성하는 함수
 async def call_gemini_summary(stock_name, num_article, text_combined):
@@ -219,12 +269,16 @@ async def _load_news_by_ids(
 
     query = (
         select(NaverNews)
-        .options(joinedload(NaverNews.crawled_news))
         .where(NaverNews.news_id.in_(news_ids))
     )
     result = await db.execute(query)
     rows = result.scalars().unique().all()
     row_map = {row.news_id: row for row in rows}
+
+    summary_result = await db.execute(
+        select(FilteredNews.news_id, FilteredNews.summary).where(FilteredNews.news_id.in_(news_ids))
+    )
+    summary_map = {news_id: summary for news_id, summary in summary_result.all()}
 
     response_items: list[NewsRecommendationItem] = []
     for news_id in news_ids:
@@ -232,7 +286,7 @@ async def _load_news_by_ids(
         if not news:
             continue
 
-        summary = decode_html_entities(news.crawled_news.text) if news.crawled_news else None
+        summary = decode_html_entities(summary_map.get(news_id))
         candidate = candidate_map[news_id]
         response_items.append(
             NewsRecommendationItem(
@@ -264,9 +318,12 @@ async def _mock_candidates_from_db_with_offset(
     무한 스크롤 구현을 위해 offset 기반 목업 추천 결과를 반환합니다.
     """
     query = (
-        select(NaverNews.news_id)
-        .where(NaverNews.crawl_status == ProcessStatus.crawl_success)
-        .order_by(desc(NaverNews.pub_date))
+        select(FilteredNews.news_id)
+        .where(
+            FilteredNews.summary.is_not(None),
+            FilteredNews.summary != "",
+        )
+        .order_by(desc(FilteredNews.created_at), desc(FilteredNews.news_id))
         .offset(offset)
         .limit(limit)
     )
@@ -351,6 +408,7 @@ async def get_news_recommendations(
     user_id: str = Query(..., min_length=1, max_length=255, description="추천 대상 사용자 ID"),
     limit: int = Query(20, ge=1, le=100, description="가져올 추천 뉴스 개수"),
     page: int = Query(1, ge=1, le=1000, description="무한 스크롤 페이지 (1부터 시작)"),
+    cursor: Optional[str] = Query(None, max_length=512, description="다음 페이지 커서 (전달 시 page보다 우선)"),
     request_id: Optional[str] = Query(None, max_length=128, description="추천 요청 추적 ID (미전달 시 서버 생성)"),
     screen_session_id: Optional[str] = Query(None, max_length=64, description="추천 화면 세션 ID"),
     app_session_id: Optional[str] = Query(None, max_length=255, description="앱 세션 ID"),
@@ -362,10 +420,17 @@ async def get_news_recommendations(
 
     - RECOMMENDER_MOCK_MODE=true: 외부 서버 대신 DB 기반 mock 추천 사용
     - RECOMMENDER_MOCK_MODE=false: 외부 추천 서버 호출
-    - page > 1: 아직 추천 서버 페이지네이션 연동이 없어 mock 오프셋으로 동작
+    - cursor 전달 시 page 대신 cursor 기반으로 다음 구간 조회
+    - page > 1: 아직 추천 서버 페이지네이션 미연결 상태라 mock 오프셋으로 동작
     """
     resolved_request_id = request_id or f"req-{uuid4().hex}"
-    offset = (page - 1) * limit
+    resolved_page = page
+    offset = (resolved_page - 1) * limit
+    if cursor:
+        resolved_page, offset, cursor_limit = _decode_recommendation_cursor(cursor)
+        if cursor_limit is not None and cursor_limit != limit:
+            raise HTTPException(status_code=400, detail="Cursor limit mismatch")
+
     source = "recommender"
     candidates: list[RecommendationCandidate] = []
 
@@ -377,7 +442,7 @@ async def get_news_recommendations(
     if settings.recommender_mock_mode:
         source = "mock"
         candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
-    elif page > 1:
+    elif resolved_page > 1:
         # 추천 서버 페이지네이션 미연결 상태에서 무한 스크롤을 목업으로 지원
         source = "mock_page"
         candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
@@ -407,7 +472,7 @@ async def get_news_recommendations(
             db=db,
             user_id=user_id,
             request_id=resolved_request_id,
-            page=page,
+            page=resolved_page,
             limit=limit,
             screen_session_id=screen_session_id,
             app_session_id=app_session_id,
@@ -415,11 +480,20 @@ async def get_news_recommendations(
             candidates=served_candidates,
         )
 
+    next_cursor: Optional[str] = None
+    if len(items) == limit:
+        next_cursor = _encode_recommendation_cursor(
+            page=resolved_page + 1,
+            offset=offset + len(items),
+            limit=limit,
+        )
+
     return NewsRecommendationResponse(
         user_id=user_id,
         request_id=resolved_request_id,
         source=source,
-        page=page,
+        page=resolved_page,
+        next_cursor=next_cursor,
         served_count=len(items),
         logged=logged,
         items=items,
