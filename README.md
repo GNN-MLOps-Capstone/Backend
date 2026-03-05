@@ -76,16 +76,21 @@ cd Backend
 cp .env.example .env
 # .env 파일에서 DATABASE_URL 설정
 
-# 3. Docker Compose로 실행
+# 3. 외부 Docker 네트워크 준비(최초 1회)
+docker network create crawling_news-network
+# proxy-net을 함께 쓰는 환경이면 추가 생성
+docker network create proxy-net
+
+# 4. Docker Compose로 실행
 docker compose up -d --build
 
-# 4. 마이그레이션 적용
+# 5. 마이그레이션 적용
 docker compose exec news-api alembic -c alembic.ini upgrade head
 
-# 5. 로그 확인
+# 6. 로그 확인
 docker compose logs -f news-api
 
-# 6. 중지
+# 7. 중지
 docker compose down
 ```
 
@@ -192,6 +197,7 @@ GET /api/news/recommendations
 | user_id  | string  | 추천 대상 사용자 ID                  | -      |
 | limit    | int     | 가져올 추천 뉴스 개수                 | 20     |
 | page     | int     | 무한 스크롤 페이지(1부터 시작)        | 1      |
+| cursor   | string  | 다음 페이지 커서(전달 시 page 우선순위보다 높음) | - |
 | request_id | string | 추천 요청 추적 ID(없으면 서버 생성)   | -      |
 | screen_session_id | string | 추천 탭 세션 ID(로깅 연계용) | -      |
 | app_session_id | string | 앱 세션 ID(선택)                 | -      |
@@ -209,8 +215,9 @@ curl "http://localhost:8000/api/news/recommendations?user_id=test-user&limit=10&
 {
   "user_id": "test-user",
   "request_id": "req-5f8b0d...",
-  "source": "mock",
+  "source": "recommender",
   "page": 1,
+  "next_cursor": "eyJ2IjoxLCJwYWdlIjoyLCJvZmZzZXQiOjEwLCJsaW1pdCI6MTB9",
   "served_count": 1,
   "logged": true,
   "items": [
