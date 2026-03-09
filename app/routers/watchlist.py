@@ -321,89 +321,85 @@ async def get_watchlist_briefing(db: AsyncSession = Depends(get_db)):
     now = datetime.now(timezone.utc)
 
     if _briefing_cache["data"] and now < _briefing_cache["expires_at"]:
-          logger.info("캐시된 AI 브리핑 데이터를 반환합니다. (속도 0.01초!)")
-          return _briefing_cache["data"]
+        logger.info("캐시된 AI 브리핑 데이터를 반환합니다. (속도 0.01초!)")
+        return _briefing_cache["data"]
 
-      logger.info("새로운 AI 브리핑 데이터를 생성합니다. (API 호출)")
+    logger.info("새로운 AI 브리핑 데이터를 생성합니다. (API 호출)")
 
-      top_issues = await _get_top_issues(db, top_n=3)
+    top_issues = await _get_top_issues(db, top_n=3)
 
-      if not top_issues:
-          return {"text": "현재 시장에 뚜렷한 이슈 종목이 없습니다.", "top_issues": []}
+    if not top_issues:
+        return {"text": "현재 시장에 뚜렷한 이슈 종목이 없습니다.", "top_issues": []}
 
-      # 2. news.py 의 함수를 활용해 각 종목별 개별 요약문 수집
-      summaries_text_list = []
+    summaries_text_list = []
 
-      for issue in top_issues:
-          stock_name = issue.stock_name
-          try:
-              stock_summary_response = await get_stock_summary(stock_name=stock_name, db=db)
-              single_summary_text = stock_summary_response.summary
-              if single_summary_text:
-                  summaries_text_list.append(f"[{stock_name} 요약]\n{single_summary_text}")
-          except HTTPException:
-              logger.warning("종목 요약 캐시 없음, 건너뜀: %s", stock_name)
-              continue
+    for issue in top_issues:
+        stock_name = issue.stock_name
+        try:
+            stock_summary_response = await get_stock_summary(stock_name=stock_name, db=db)
+            single_summary_text = stock_summary_response.summary
+            if single_summary_text:
+                summaries_text_list.append(f"[{stock_name} 요약]\n{single_summary_text}")
+        except HTTPException:
+            logger.warning("종목 요약 캐시 없음, 건너뜀: %s", stock_name)
+            continue
 
-      # 3. 3개의 요약문을 하나의 긴 텍스트로 합치기
-      combined_summaries = "\n\n".join(summaries_text_list)
+    combined_summaries = "\n\n".join(summaries_text_list)
 
-      # 4. 결합된 텍스트를 제미나이에 넣고 최종 "브리핑 멘트" 생성
-      final_briefing_text = await _call_gemini_briefing(combined_summaries)
+    final_briefing_text = await _call_gemini_briefing(combined_summaries)
 
-      result_data = {
-          "text": final_briefing_text,
-          "top_issues": top_issues
-      }
+    result_data = {
+        "text": final_briefing_text,
+        "top_issues": top_issues
+    }
 
-      _briefing_cache["data"] = result_data
-      _briefing_cache["expires_at"] = now + timedelta(minutes=CACHE_TTL_MINUTES)
-      logger.info(f"브리핑 캐시 갱신 완료! (다음 갱신: {CACHE_TTL_MINUTES}분 후)")
+    _briefing_cache["data"] = result_data
+    _briefing_cache["expires_at"] = now + timedelta(minutes=CACHE_TTL_MINUTES)
+    logger.info(f"브리핑 캐시 갱신 완료! (다음 갱신: {CACHE_TTL_MINUTES}분 후)")
 
-      # 5. 프론트엔드 포맷에 맞춰 응답 반환
-      return result_data
+    return result_data
 
 
-  # =============================================================================
-  # 종목 상세 조회
-  # =============================================================================
+# =============================================================================
+# 종목 상세 조회
+# =============================================================================
 
-  @router.get("/stocks/{code}", response_model=WatchlistStockResponse)
-  async def get_stock_detail(
-      code: str,
-      db: AsyncSession = Depends(get_db),
-  ):
-      """종목 상세 조회"""
-      result = await db.execute(
-          select(Stock).where(Stock.stock_id == code)
-      )
-      stock = result.scalar_one_or_none()
+@router.get("/stocks/{code}", response_model=WatchlistStockResponse)
+async def get_stock_detail(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """종목 상세 조회"""
+    result = await db.execute(
+        select(Stock).where(Stock.stock_id == code)
+    )
+    stock = result.scalar_one_or_none()
 
-      if not stock:
-          raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다")
+    if not stock:
+        raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다")
 
-      price_info = await kis_service.get_stock_price(code)
-      price = price_info.get("price", 0)
-      change_rate = price_info.get("change_rate", 0.0)
+    price_info = await kis_service.get_stock_price(code)
+    price = price_info.get("price", 0)
+    change_rate = price_info.get("change_rate", 0.0)
 
-      cache_result = await db.execute(
-          select(StockSummaryCache).where(StockSummaryCache.stock_id == code)
-      )
-      cache = cache_result.scalar_one_or_none()
+    cache_result = await db.execute(
+        select(StockSummaryCache).where(StockSummaryCache.stock_id == code)
+    )
+    cache = cache_result.scalar_one_or_none()
 
-      if change_rate >= 2.0:
-          weather = "SUNNY"
-      elif change_rate <= -2.0:
-          weather = "RAINY"
-      else:
-          weather = "CLOUDY"
+    if change_rate >= 2.0:
+        weather = "SUNNY"
+    elif change_rate <= -2.0:
+        weather = "RAINY"
+    else:
+        weather = "CLOUDY"
 
-      return WatchlistStockResponse(
-          code=stock.stock_id,
-          name=stock.stock_name or code,
-          weather=weather,
-          price=price,
-          changeRate=change_rate,
-          keyword=stock.industry or "",
-          aiSummary=cache.summary_text if cache and cache.summary_text else "",
-      )
+    return WatchlistStockResponse(
+        code=stock.stock_id,
+        name=stock.stock_name or code,
+        weather=weather,
+        price=price,
+        changeRate=change_rate,
+        keyword=stock.industry or "",
+        aiSummary=cache.summary_text if cache and cache.summary_text else "",
+    )
