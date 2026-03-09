@@ -255,7 +255,7 @@ class StockSeriesQuery(BaseModel):
         try:
             datetime.strptime(value, "%Y%m%d")
         except ValueError:
-            raise ValueError("date must be a valid calendar date in YYYYMMDD format")
+            raise ValueError("date must be a valid calendar date in YYYYMMDD format") from None
         return value
 
 

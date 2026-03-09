@@ -118,7 +118,7 @@ class KISClient:
                     await asyncio.sleep(0.2 * (attempt + 1))
                     continue
                 if isinstance(exc, KISError):
-                    raise exc
+                    raise
                 raise KISError(f"KIS request failed: {exc}", status_code=502) from exc
 
     async def _acquire_rate_limit_slot(self) -> None:
