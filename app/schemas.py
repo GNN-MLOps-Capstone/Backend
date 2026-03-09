@@ -286,8 +286,12 @@ class StockSeriesQuery(BaseModel):
     def _validate_date(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return value
-        if not re.fullmatch(r"\\d{8}", value):
+        if not re.fullmatch(r"\d{8}", value):
             raise ValueError("date must be in YYYYMMDD format")
+        try:
+            datetime.strptime(value, "%Y%m%d")
+        except ValueError:
+            raise ValueError("date must be a valid calendar date in YYYYMMDD format") from None
         return value
 
 
