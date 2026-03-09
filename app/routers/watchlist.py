@@ -67,7 +67,7 @@ async def get_watchlist(
     """관심종목 목록 조회"""
     query = (
         select(Watchlist)
-        .where(Watchlist.user_id == current_user.google_id)
+        .where(Watchlist.user_id == current_user.id)
         .order_by(Watchlist.created_at.desc())
     )
     result = await db.execute(query)
@@ -139,7 +139,7 @@ async def add_watchlist(
         raise HTTPException(status_code=404, detail="존재하지 않는 종목입니다")
 
     try:
-        db.add(Watchlist(user_id=current_user.google_id, stock_id=request.code))
+        db.add(Watchlist(user_id=current_user.id, stock_id=request.code))
         await db.commit()
     except IntegrityError:
         await db.rollback()
@@ -161,7 +161,7 @@ async def delete_watchlist(
     """관심종목 삭제"""
     await db.execute(
         delete(Watchlist)
-        .where(Watchlist.stock_id == code, Watchlist.user_id == current_user.google_id)
+        .where(Watchlist.stock_id == code, Watchlist.user_id == current_user.id)
     )
     await db.commit()
 
