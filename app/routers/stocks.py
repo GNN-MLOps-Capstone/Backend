@@ -31,9 +31,9 @@ client = KISClient(settings)
 ws_client = KISWSClient(settings)
 cache = TTLCache()
 logger = logging.getLogger(__name__)
-_INTRADAY_PAGE_INTERVAL_SECONDS = max(float(settings.kis_intraday_page_interval_seconds), 0.0)
-_INTRADAY_RATE_LIMIT_RETRY_COUNT = max(int(settings.kis_intraday_rate_limit_retry_count), 0)
-_INTRADAY_RATE_LIMIT_BACKOFF_SECONDS = max(float(settings.kis_intraday_rate_limit_backoff_seconds), 0.0)
+_INTRADAY_PAGE_INTERVAL_SECONDS = float(settings.kis_intraday_page_interval_seconds)
+_INTRADAY_RATE_LIMIT_RETRY_COUNT = int(settings.kis_intraday_rate_limit_retry_count)
+_INTRADAY_RATE_LIMIT_BACKOFF_SECONDS = float(settings.kis_intraday_rate_limit_backoff_seconds)
 
 
 async def shutdown_stocks_resources() -> None:
@@ -181,7 +181,7 @@ async def _resolve_series_bypass_cache(
     if not bypass_requested:
         return False
 
-    cooldown_seconds = max(float(settings.series_cache_bypass_cooldown_seconds), 0.0)
+    cooldown_seconds = float(settings.series_cache_bypass_cooldown_seconds)
     if cooldown_seconds <= 0:
         return True
 
@@ -199,9 +199,17 @@ async def _resolve_series_bypass_cache(
         )
         return False
 
+    return True
+
+
+async def _record_series_bypass_cooldown(request: Request, code: str, range_label: str) -> None:
+    cooldown_seconds = float(settings.series_cache_bypass_cooldown_seconds)
+    if cooldown_seconds <= 0:
+        return
+    client_id = _series_bypass_client_id(request)
+    bypass_key = f"bypass:{client_id}:{code}:{range_label}"
     honored_at = datetime.now(tz=KST).isoformat(timespec="seconds")
     await cache.set(bypass_key, honored_at, ttl_seconds=cooldown_seconds)
-    return True
 
 
 async def _fetch_intraday_page(code: str, cursor: str) -> dict:
@@ -899,7 +907,9 @@ async def get_stock_series(
                                     "v": int(latest.get("v") or 0),
                                 }
                             ]
-            if not bypass_cache:
+            if bypass_cache:
+                await _record_series_bypass_cooldown(request, code, range_label)
+            else:
                 await cache.set(cache_key, series, ttl_seconds=15)
             return series
         except KISError as exc:
@@ -950,7 +960,9 @@ async def get_stock_series(
             )
             _ensure_kis_ok(data)
             series = transform_series_daily(data, code, range_label)
-            if not bypass_cache:
+            if bypass_cache:
+                await _record_series_bypass_cooldown(request, code, range_label)
+            else:
                 await cache.set(cache_key, series, ttl_seconds=120)
             return series
         except KISError as exc:

@@ -102,9 +102,17 @@ class KISClient:
                         code=kis_code,
                     )
                 try:
-                    return resp.json()
+                    data = resp.json()
                 except ValueError as exc:
                     raise KISError("KIS response is not JSON", status_code=502) from exc
+                rt_cd = data.get("rt_cd") if isinstance(data, dict) else None
+                if rt_cd is not None and str(rt_cd) != "0":
+                    raise KISError(
+                        data.get("msg1") or "KIS API error",
+                        status_code=200,
+                        code=data.get("msg_cd"),
+                    )
+                return data
             except (httpx.TimeoutException, httpx.RequestError, KISError) as exc:
                 if attempt < retries and self._is_retriable_error(exc):
                     await asyncio.sleep(0.2 * (attempt + 1))
@@ -141,5 +149,9 @@ class KISClient:
             return True
         if isinstance(exc, KISError):
             status_code = int(exc.status_code or 0)
-            return status_code in (408, 429) or status_code >= 500
+            if status_code in (408, 429) or status_code >= 500:
+                return True
+            code = str(exc.code or "").upper()
+            if code == "EGW00201":
+                return True
         return False

@@ -20,7 +20,7 @@
 
 from pydantic_settings import BaseSettings  # 설정 관리 라이브러리
 from functools import lru_cache  # 캐싱 기능 (설정을 한 번만 읽어옴)
-from pydantic import Field
+from pydantic import Field, model_validator
 
 
 class Settings(BaseSettings):
@@ -112,6 +112,21 @@ class Settings(BaseSettings):
     secret_key: str = Field(..., env="SECRET_KEY")
     algorithm: str = Field(..., env="ALGORITHM")
     access_token_expire_minutes: int = 43200
+
+    @model_validator(mode="after")
+    def _validate_kis_fields(self) -> "Settings":
+        _non_negative = {
+            "kis_timeout": self.kis_timeout,
+            "kis_max_requests_per_second": self.kis_max_requests_per_second,
+            "kis_intraday_page_interval_seconds": self.kis_intraday_page_interval_seconds,
+            "kis_intraday_rate_limit_retry_count": self.kis_intraday_rate_limit_retry_count,
+            "kis_intraday_rate_limit_backoff_seconds": self.kis_intraday_rate_limit_backoff_seconds,
+            "series_cache_bypass_cooldown_seconds": self.series_cache_bypass_cooldown_seconds,
+        }
+        for field_name, value in _non_negative.items():
+            if value < 0:
+                raise ValueError(f"{field_name} must be non-negative, got {value}")
+        return self
 
     class Config:
         """

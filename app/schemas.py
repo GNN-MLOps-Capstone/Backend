@@ -252,6 +252,10 @@ class StockSeriesQuery(BaseModel):
             return value
         if not re.fullmatch(r"\d{8}", value):
             raise ValueError("date must be in YYYYMMDD format")
+        try:
+            datetime.strptime(value, "%Y%m%d")
+        except ValueError:
+            raise ValueError("date must be a valid calendar date in YYYYMMDD format")
         return value
 
 
