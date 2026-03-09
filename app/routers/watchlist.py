@@ -299,28 +299,24 @@ async def _call_gemini_briefing(combined_summaries: str) -> str:
             model="gemini-2.0-flash-lite",
             contents=combined_summaries,
             config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
+            system_instruction=system_prompt,
+            temperature=0.3
+        )
+        )
+        logger.info("최종 AI 브리핑 멘트 생성 완료")
+        text = response.text
+        if not text:
+            logger.warning("Gemini 응답이 비어 있습니다.")
+            return "현재 시장 이슈 요약을 생성할 수 없습니다. 잠시 후 다시 시도해주세요."
+        final_text = text.strip()
+        logger.info(f"생성된 브리핑 결과 :  {final_text}")
+        return final_text
+    except Exception:
+        logger.exception("최종 브리핑 생성 오류")
+        return "현재 시장 이슈를 분석하는데 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
 
-                  temperature=0.3  # 자연스러운 문장 생성을 위해 온도를 살짝 높임
-              )
-          )
-          logger.info("최종 AI 브리핑 멘트 생성 완료")
-          text = response.text
-          if not text:
-              logger.warning("Gemini 응답이 비어 있습니다.")
-              return "현재 시장 이슈 요약을 생성할 수 없습니다. 잠시 후 다시 시도해주세요."
-          final_text = text.strip()
-          logger.info(f"생성된 브리핑 결과 :  {final_text}")
-          return final_text
-      except Exception:
-          logger.exception("최종 브리핑 생성 오류")
-          return "현재 시장 이슈를 분석하는데 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
-
-  @router.get("/watchlist/briefing", response_model=IssueRankingResponse)
-  async def get_watchlist_briefing(db: AsyncSession = Depends(get_db)):
-    # 1. Top 3 이슈 종목 선정 (이전에 만든 내부 함수 호출)
-    # _get_top_issues 함수는 이전 답변에서 작성한 로직을 그대로 사용하시면 됩니다.
-
+@router.get("/watchlist/briefing", response_model=IssueRankingResponse)
+async def get_watchlist_briefing(db: AsyncSession = Depends(get_db)):
     global _briefing_cache
     now = datetime.now(timezone.utc)
 
