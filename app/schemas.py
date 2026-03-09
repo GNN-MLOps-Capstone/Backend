@@ -157,7 +157,7 @@ class NotificationCreateRequest(BaseModel):
     type: str
     title: str
     body: Optional[str] = None
-    stock_name: Optional[str] = None     
+    stock_name: Optional[str] = None
     sentiment_score: Optional[float] = None
 
 
