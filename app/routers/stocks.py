@@ -794,6 +794,7 @@ async def get_stock_series(
             for source_name, result in zip(
                 ("overtime_time", "overtime_daily", "overtime_price"),
                 overtime_results,
+                strict=True,
             ):
                 if isinstance(result, KISError):
                     failed_sources.append(source_name)
