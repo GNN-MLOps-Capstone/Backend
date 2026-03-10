@@ -17,12 +17,12 @@
 
 ```json
 {
-  "user_id": "test-user",
+  "user_id": 1,
   "limit": 20
 }
 ```
 
-- `user_id`: string (필수)
+- `user_id`: int (`users.id`, 필수)
 - `limit`: int (필수, 보통 1~100)
 
 ## 3) 권장 응답 형식 (추천)
@@ -30,16 +30,15 @@
 ```json
 {
   "items": [
-    { "news_id": 101, "score": 0.93, "reason": "최근 관심 종목 연관" },
-    { "news_id": 205, "score": 0.88, "reason": "유사 사용자 클릭 패턴" }
+    { "news_id": 101, "path": "A1" },
+    { "news_id": 205, "path": "B2" }
   ]
 }
 ```
 
 각 item:
 - `news_id`: int (필수)
-- `score`: number (선택)
-- `reason`: string (선택)
+- `path`: string (권장, 서빙 경로 코드)
 
 ## 4) 허용되는 다른 응답 형식
 
@@ -64,7 +63,7 @@ Backend는 아래 형식도 처리합니다.
 
 ## 7) 구현 체크리스트
 
-1. `user_id`, `limit`를 받아 추천 결과 생성
+1. `user_id`(`users.id`), `limit`를 받아 추천 결과 생성
 2. `news_id` 리스트를 응답
 3. 응답 시간은 5초 이내 권장
 4. 빈 결과도 허용 (`items: []`)
@@ -75,5 +74,5 @@ Backend는 아래 형식도 처리합니다.
 ```bash
 curl -X POST "http://localhost:9000/recommend/news" \
   -H "Content-Type: application/json" \
-  -d '{"user_id":"test-user","limit":5}'
+  -d '{"user_id":1,"limit":5}'
 ```

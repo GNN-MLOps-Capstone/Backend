@@ -42,7 +42,6 @@ from app.models import (
     NewsStockMapping,
     FilteredNews,
     RecommendationServe,
-    RecommendationServeItem,
 )
 from app.schemas import (
     NewsSimpleResponse,
@@ -138,6 +137,16 @@ def _decode_recommendation_cursor(cursor: str) -> tuple[int, int, int | None]:
             raise HTTPException(status_code=400, detail="Invalid cursor values")
 
     return page, offset, cursor_limit
+
+
+def _default_recommendation_path(source: str) -> str:
+    path_map = {
+        "recommender": "A1",
+        "mock": "M1",
+        "mock_page": "M2",
+        "mock_fallback": "M3",
+    }
+    return path_map.get(source, "UNK")
 
 # 새로운 요약문을 생성하는 함수
 async def call_gemini_summary(stock_name, num_article, text_combined):
@@ -257,6 +266,7 @@ async def get_news_simple_list(
 async def _load_news_by_ids(
     db: AsyncSession,
     candidates: list[RecommendationCandidate],
+    source: str,
 ) -> list[NewsRecommendationItem]:
     """
     추천 서버가 반환한 news_id 목록을 DB에서 조회해 프론트 응답 형태로 변환합니다.
@@ -294,8 +304,7 @@ async def _load_news_by_ids(
                 title=decode_html_entities(news.title),
                 summary=summary,
                 pub_date=news.pub_date,
-                score=candidate.score,
-                reason=candidate.reason,
+                path=candidate.path or _default_recommendation_path(source),
             )
         )
 
@@ -334,7 +343,7 @@ async def _mock_candidates_from_db_with_offset(
 
 async def _log_recommendation_serve(
     db: AsyncSession,
-    user_id: str,
+    user_id: int,
     request_id: str,
     page: int,
     limit: int,
@@ -347,6 +356,17 @@ async def _log_recommendation_serve(
     추천 목록 응답(요청 단위 + 아이템 목록)을 저장합니다.
     같은 request_id/page 조합은 중복 저장하지 않습니다.
     """
+    base_position = (page - 1) * limit
+    served_items = []
+    for idx, candidate in enumerate(candidates, start=1):
+        served_items.append(
+            {
+                "news_id": candidate.news_id,
+                "position": base_position + idx,
+                "path": candidate.path or _default_recommendation_path(source),
+            }
+        )
+
     serve = RecommendationServe(
         request_id=request_id,
         user_id=user_id,
@@ -357,25 +377,10 @@ async def _log_recommendation_serve(
         limit=limit,
         served_count=len(candidates),
         is_mock=source.startswith("mock"),
+        served_items=served_items,
     )
     db.add(serve)
     try:
-        await db.flush()
-
-        base_position = (page - 1) * limit
-        for idx, candidate in enumerate(candidates, start=1):
-            db.add(
-                RecommendationServeItem(
-                    serve_id=serve.id,
-                    request_id=request_id,
-                    page=page,
-                    news_id=candidate.news_id,
-                    position=base_position + idx,
-                    score=candidate.score,
-                    reason=candidate.reason,
-                )
-            )
-
         await db.commit()
         return True
     except IntegrityError as exc:
@@ -405,7 +410,7 @@ async def _log_recommendation_serve(
 
 @router.get("/recommendations", response_model=NewsRecommendationResponse)
 async def get_news_recommendations(
-    user_id: str = Query(..., min_length=1, max_length=255, description="추천 대상 사용자 ID"),
+    user_id: int = Query(..., ge=1, description="추천 대상 사용자 ID(users.id)"),
     limit: int = Query(20, ge=1, le=100, description="가져올 추천 뉴스 개수"),
     page: int = Query(1, ge=1, le=1000, description="무한 스크롤 페이지 (1부터 시작)"),
     cursor: Optional[str] = Query(None, max_length=512, description="다음 페이지 커서 (전달 시 page보다 우선)"),
@@ -443,7 +448,6 @@ async def get_news_recommendations(
         source = "mock"
         candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
     elif resolved_page > 1:
-        # 추천 서버 페이지네이션 미연결 상태에서 무한 스크롤을 목업으로 지원
         source = "mock_page"
         candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
     else:
@@ -457,7 +461,7 @@ async def get_news_recommendations(
             source = "mock_fallback"
             candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
 
-    items = await _load_news_by_ids(db, candidates)
+    items = await _load_news_by_ids(db, candidates, source=source)
     candidate_by_id: dict[int, RecommendationCandidate] = {
         candidate.news_id: candidate for candidate in candidates
     }

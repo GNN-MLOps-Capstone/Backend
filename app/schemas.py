@@ -18,6 +18,8 @@ from typing import Optional, List
 from datetime import datetime,time
 import re
 
+from app.models import InteractionEventType
+
 class NewsSimpleResponse(BaseModel):
     """
     간단한 뉴스 응답 스키마 (Flutter 앱용)
@@ -81,12 +83,11 @@ class NewsRecommendationItem(BaseModel):
     title: str
     summary: Optional[str] = None
     pub_date: Optional[datetime] = None
-    score: Optional[float] = None
-    reason: Optional[str] = None
+    path: Optional[str] = None
 
 
 class NewsRecommendationResponse(BaseModel):
-    user_id: str
+    user_id: int
     request_id: str
     source: str
     page: int
@@ -222,8 +223,8 @@ class NotificationCountResponse(BaseModel):
 
 class InteractionEventIn(BaseModel):
     event_id: str = Field(..., min_length=1, max_length=64)
-    user_id: str = Field(..., min_length=1, max_length=255)
-    event_type: str = Field(..., min_length=1, max_length=50)  # screen/content/recommendation/scroll 이벤트 타입
+    user_id: int = Field(..., ge=1)
+    event_type: InteractionEventType
     device_id: Optional[str] = Field(None, max_length=255)
     app_session_id: Optional[str] = Field(None, max_length=255)
     screen_session_id: Optional[str] = Field(None, max_length=64)
@@ -243,14 +244,6 @@ class InteractionEventBatchRequest(BaseModel):
 class InteractionIngestResponse(BaseModel):
     accepted: int
     duplicated: int
-    screen_updated: int
-    content_updated: int
-    feedback_updated: int
-
-
-class SessionFinalizeResponse(BaseModel):
-    screen_finalized: int
-    content_finalized: int
 
 # =============================================================================
 # 주식 API 스키마

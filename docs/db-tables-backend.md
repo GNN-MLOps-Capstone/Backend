@@ -52,25 +52,9 @@
 - 용도: 상호작용 원본 이벤트 로그(append-only)
 - 사용: `interactions`
 
-2. `screen_sessions`
-- 용도: 추천 화면 체류 세션 집계
-- 사용: `interactions`
-
-3. `content_sessions`
-- 용도: 뉴스 상세 체류 세션 집계
-- 사용: `interactions`
-
-4. `recommendation_serves`
-- 용도: 추천 응답 단위 로그(`request_id`, `page`)
+2. `recommendation_serves`
+- 용도: 추천 응답 단위 스냅샷 로그(`request_id`, `page`, `served_items`)
 - 사용: `news` 추천 API
-
-5. `recommendation_serve_items`
-- 용도: 추천 응답에 포함된 아이템 스냅샷
-- 사용: `news` 추천 API
-
-6. `recommendation_feedback`
-- 용도: 추천 학습/분석용 하이브리드 피드백(노출/클릭/체류)
-- 사용: `interactions`
 
 ## 5) Alembic 관련
 
@@ -80,7 +64,7 @@
 
 ## 6) 참고
 
-현재 `models.py` 기준 선언 테이블은 아래 15개입니다.
+현재 `models.py` 기준 선언 테이블은 아래 11개입니다.
 
 - `naver_news`
 - `crawled_news`
@@ -92,9 +76,4 @@
 - `notifications`
 - `stocks`
 - `interaction_events`
-- `screen_sessions`
-- `content_sessions`
 - `recommendation_serves`
-- `recommendation_serve_items`
-- `recommendation_feedback`
-

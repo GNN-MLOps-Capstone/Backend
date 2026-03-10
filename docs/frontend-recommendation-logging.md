@@ -11,13 +11,15 @@
 5. 뉴스 클릭 + 체류시간 로그
 6. 화면 이탈까지 로그
 
-백엔드는 이벤트를 받아 다음 2층으로 저장합니다.
+세션/피드백 집계는 API 서버가 즉시 계산하지 않고, 이후 Airflow 배치에서 처리합니다.
+
+백엔드는 이벤트를 받아 다음 2개 테이블에 저장합니다.
 
 1. 원본 이벤트 로그
 - `interaction_events` (append-only)
 
-2. 추천 학습용 피드백 집계
-- `recommendation_feedback` (impression/click/dwell 자동 upsert)
+2. 추천 응답 스냅샷
+- `recommendation_serves` (`served_items` JSONB에 `news_id/position/path` 저장)
 
 ## 2. 사용 API
 
@@ -26,9 +28,6 @@
 
 2. 이벤트 배치 수집
 - `POST /api/interactions/events`
-
-3. 타임아웃 세션 종료(서버/배치 작업에서 호출)
-- `POST /api/interactions/finalize-timeouts`
 
 ## 3. 세션/ID 규칙
 
@@ -54,7 +53,7 @@
 
 `GET /api/news/recommendations` 쿼리:
 
-- `user_id` (필수)
+- `user_id` (필수, `users.id` 정수값)
 - `limit` (기본 20)
 - `page` (기본 1, 무한스크롤 페이지)
 - `request_id` (선택, 미전달 시 서버 생성)
@@ -67,7 +66,7 @@
 - `request_id`: 이후 이벤트 전송 시 그대로 사용
 - `page`: 응답 페이지
 - `served_count`: 실제 반환 개수
-- `logged`: 추천 목록 자동 로깅 성공 여부
+- `logged`: 추천 목록 스냅샷 저장 성공 여부
 
 ## 5. 이벤트 타입 정의
 
@@ -122,7 +121,7 @@
 권장 공통 필드:
 
 - `event_id`
-- `user_id`
+- `user_id` (`users.id` 정수값)
 - `event_type`
 - `event_ts_client` (UTC ISO8601)
 - `app_session_id`
@@ -171,7 +170,7 @@
   "events": [
     {
       "event_id": "8f3c1a96-0b2a-4d7a-b9d4-2f2d4f5db3a1",
-      "user_id": "user-1",
+      "user_id": 1,
       "event_type": "screen_view",
       "app_session_id": "app-s1",
       "screen_session_id": "screen-s1",
@@ -180,7 +179,7 @@
     },
     {
       "event_id": "9c7f0c1d-9a1b-4f6d-8c95-1bb132ec4b27",
-      "user_id": "user-1",
+      "user_id": 1,
       "event_type": "recommendation_request",
       "app_session_id": "app-s1",
       "screen_session_id": "screen-s1",
@@ -189,7 +188,7 @@
     },
     {
       "event_id": "f1c2e7ab-2f6e-4b33-a78f-7dfb6f8f41c9",
-      "user_id": "user-1",
+      "user_id": 1,
       "event_type": "recommendation_response",
       "app_session_id": "app-s1",
       "screen_session_id": "screen-s1",
@@ -198,7 +197,7 @@
     },
     {
       "event_id": "2b6d62de-c42f-4e3f-bb7a-b6b0d460e3af",
-      "user_id": "user-1",
+      "user_id": 1,
       "event_type": "recommendation_impression",
       "app_session_id": "app-s1",
       "screen_session_id": "screen-s1",
@@ -209,7 +208,7 @@
     },
     {
       "event_id": "14d8f23a-7ad0-4aa7-95d4-6f8d5c93227a",
-      "user_id": "user-1",
+      "user_id": 1,
       "event_type": "scroll_depth",
       "app_session_id": "app-s1",
       "screen_session_id": "screen-s1",
@@ -219,7 +218,7 @@
     },
     {
       "event_id": "a61039e4-fd34-4e6f-ac03-fd63327ecbe2",
-      "user_id": "user-1",
+      "user_id": 1,
       "event_type": "content_open",
       "app_session_id": "app-s1",
       "screen_session_id": "screen-s1",
@@ -230,14 +229,14 @@
     },
     {
       "event_id": "5b0038e3-9eb2-41f0-b249-8898a596d931",
-      "user_id": "user-1",
+      "user_id": 1,
       "event_type": "content_leave",
       "app_session_id": "app-s1",
       "content_session_id": "content-c1"
     },
     {
       "event_id": "e24d9f65-4a2e-4ba9-9f4c-364a1d8a90b9",
-      "user_id": "user-1",
+      "user_id": 1,
       "event_type": "screen_leave",
       "app_session_id": "app-s1",
       "screen_session_id": "screen-s1"
@@ -253,4 +252,4 @@
 3. `recommendation_impression`은 `request_id`, `screen_session_id`, `news_id`, `position`이 필요합니다.
 4. `scroll_depth`는 `screen_session_id`, `scroll_depth`가 필요합니다.
 5. `event_ts_client`는 가능하면 UTC로 전송하세요.
-6. `POST /api/interactions/events` 응답의 `feedback_updated`는 추천 피드백 반영 건수입니다.
+6. `POST /api/interactions/events` 응답은 `accepted`, `duplicated`만 반환합니다.

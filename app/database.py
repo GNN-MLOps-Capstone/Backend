@@ -159,11 +159,7 @@ async def ensure_interaction_tables():
     """
     required_tables = {
         "interaction_events",
-        "screen_sessions",
-        "content_sessions",
         "recommendation_serves",
-        "recommendation_serve_items",
-        "recommendation_feedback",
     }
 
     async with engine.connect() as conn:

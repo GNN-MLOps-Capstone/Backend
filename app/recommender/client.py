@@ -12,8 +12,7 @@ from app.kis.errors import KISError
 @dataclass
 class RecommendationCandidate:
     news_id: int
-    score: float | None = None
-    reason: str | None = None
+    path: str | None = None
 
 
 class RecommendationClient:
@@ -22,12 +21,12 @@ class RecommendationClient:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
 
-    async def get_news_candidates(self, user_id: str, limit: int) -> list[RecommendationCandidate]:
+    async def get_news_candidates(self, user_id: int, limit: int) -> list[RecommendationCandidate]:
         """
         Request recommended news list from recommendation server.
 
         Supported response shapes:
-        - {"items": [{"news_id": 1, "score": 0.9, "reason": "..."}]}
+        - {"items": [{"news_id": 1, "path": "A1"}]}
         - {"news_ids": [1, 2, 3]}
         - [{"news_id": 1, ...}, ...]
         - [1, 2, 3]
@@ -97,21 +96,13 @@ class RecommendationClient:
             except (TypeError, ValueError):
                 continue
 
-            score = row.get("score")
-            reason = row.get("reason")
-
-            try:
-                score_value = float(score) if score is not None else None
-            except (TypeError, ValueError):
-                score_value = None
-
-            reason_value = str(reason) if reason is not None else None
+            path = row.get("path")
+            path_value = str(path) if path is not None else None
 
             normalized.append(
                 RecommendationCandidate(
                     news_id=news_id,
-                    score=score_value,
-                    reason=reason_value,
+                    path=path_value,
                 )
             )
 

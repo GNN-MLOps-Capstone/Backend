@@ -194,7 +194,7 @@ GET /api/news/recommendations
 
 | 파라미터 | 타입    | 설명                                 | 기본값 |
 | -------- | ------- | ------------------------------------ | ------ |
-| user_id  | string  | 추천 대상 사용자 ID                  | -      |
+| user_id  | int     | 추천 대상 사용자 ID (`users.id`)     | -      |
 | limit    | int     | 가져올 추천 뉴스 개수                 | 20     |
 | page     | int     | 무한 스크롤 페이지(1부터 시작)        | 1      |
 | cursor   | string  | 다음 페이지 커서(전달 시 page 우선순위보다 높음) | - |
@@ -206,14 +206,14 @@ GET /api/news/recommendations
 예시:
 
 ```bash
-curl "http://localhost:8000/api/news/recommendations?user_id=test-user&limit=10&page=1&screen_session_id=screen-s1"
+curl "http://localhost:8000/api/news/recommendations?user_id=1&limit=10&page=1&screen_session_id=screen-s1"
 ```
 
 응답 예시:
 
 ```json
 {
-  "user_id": "test-user",
+  "user_id": 1,
   "request_id": "req-5f8b0d...",
   "source": "recommender",
   "page": 1,
@@ -226,8 +226,7 @@ curl "http://localhost:8000/api/news/recommendations?user_id=test-user&limit=10&
       "title": "기사 제목",
       "summary": "기사 요약",
       "pub_date": "2026-02-25T12:34:56",
-      "score": null,
-      "reason": null
+      "path": "A1"
     }
   ]
 }
@@ -239,7 +238,6 @@ curl "http://localhost:8000/api/news/recommendations?user_id=test-user&limit=10&
 
 ```
 POST /api/interactions/events
-POST /api/interactions/finalize-timeouts
 ```
 
 - `events`에는 아래 `event_type`을 사용합니다.
@@ -257,14 +255,14 @@ curl -X POST "http://localhost:8000/api/interactions/events" \
     "events": [
       {
         "event_id": "evt-1",
-        "user_id": "user-1",
+        "user_id": 1,
         "event_type": "screen_view",
         "screen_session_id": "screen-s1",
         "request_id": "req-1"
       },
       {
         "event_id": "evt-2",
-        "user_id": "user-1",
+        "user_id": 1,
         "event_type": "recommendation_impression",
         "screen_session_id": "screen-s1",
         "request_id": "req-1",
@@ -274,7 +272,7 @@ curl -X POST "http://localhost:8000/api/interactions/events" \
       },
       {
         "event_id": "evt-2-1",
-        "user_id": "user-1",
+        "user_id": 1,
         "event_type": "scroll_depth",
         "screen_session_id": "screen-s1",
         "request_id": "req-1",
@@ -283,22 +281,23 @@ curl -X POST "http://localhost:8000/api/interactions/events" \
       },
       {
         "event_id": "evt-3",
-        "user_id": "user-1",
+        "user_id": 1,
         "event_type": "content_open",
         "screen_session_id": "screen-s1",
         "content_session_id": "content-c1",
+        "request_id": "req-1",
         "news_id": 101,
         "position": 3
       },
       {
         "event_id": "evt-4",
-        "user_id": "user-1",
+        "user_id": 1,
         "event_type": "content_leave",
         "content_session_id": "content-c1"
       },
       {
         "event_id": "evt-5",
-        "user_id": "user-1",
+        "user_id": 1,
         "event_type": "screen_leave",
         "screen_session_id": "screen-s1"
       }
@@ -308,18 +307,12 @@ curl -X POST "http://localhost:8000/api/interactions/events" \
 
 추천 목록 로깅은 `GET /api/news/recommendations`의 `log_served=true`(기본값)로도 자동 저장됩니다.
 저장 테이블:
-- `recommendation_serves`: 요청 단위(요청 ID, 페이지, source, served_count)
-- `recommendation_serve_items`: 응답된 뉴스 ID/position 목록
-- `recommendation_feedback`: 추천 학습용 하이브리드 피드백(노출/클릭/체류)
+- `recommendation_serves`: 요청 단위(요청 ID, 페이지, source, served_count, `served_items`)
+- `interaction_events`: 추천 요청/응답/노출/스크롤/콘텐츠 이벤트 원본 로그
 
 `POST /api/interactions/events` 응답 필드:
-- `feedback_updated`: 하이브리드 피드백 upsert 건수
-
-타임아웃 세션 종료 처리 예시:
-
-```bash
-curl -X POST "http://localhost:8000/api/interactions/finalize-timeouts?grace_seconds=30"
-```
+- `accepted`: 저장된 이벤트 수
+- `duplicated`: `event_id` 중복으로 스킵된 이벤트 수
 
 ---
 
