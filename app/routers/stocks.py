@@ -79,6 +79,7 @@ _ALNUM6_RE = re.compile(r"^[A-Za-z0-9]{6}$")
 
 
 def _normalize_hhmmss(value: str | None) -> str | None:
+    """4-digit HHMM은 HHMM00으로 보정하고, 5-digit은 모호해 거부하며 HHMMSS만 허용한다."""
     if not value:
         return None
     text = str(value).strip()
@@ -559,8 +560,15 @@ def _build_overtime_fill_rows(
     if anchor_date is None or anchor_price is None or anchor_price <= 0:
         return []
 
-    start_dt = datetime.strptime(f"{anchor_date}153500", "%Y%m%d%H%M%S")
-    end_dt = datetime.strptime(f"{anchor_date}180000", "%Y%m%d%H%M%S")
+    try:
+        start_dt = datetime.strptime(f"{anchor_date}153500", "%Y%m%d%H%M%S")
+        end_dt = datetime.strptime(f"{anchor_date}180000", "%Y%m%d%H%M%S")
+    except ValueError as exc:
+        raise KISError(
+            f"invalid anchor_date for overtime fill rows: {anchor_date}",
+            status_code=502,
+        ) from exc
+
     fill_rows: list[dict] = []
     cursor_dt = start_dt
     while cursor_dt <= end_dt:
@@ -775,55 +783,43 @@ async def get_stock_series(
             failed_sources: list[str] = []
 
             overtime_time_data: dict = {"output2": []}
-            try:
-                overtime_time_data = await _fetch_time_overtime_conclusion(code)
-            except KISError as exc:
-                failed_sources.append("overtime_time")
-                logger.warning(
-                    (
-                        "optional overtime source failed (source=%s code=%s "
-                        "status=%s kis_code=%s message=%s)"
-                    ),
-                    "overtime_time",
-                    code,
-                    exc.status_code,
-                    exc.code,
-                    exc.message,
-                )
-
             overtime_daily_data: dict = {"output2": []}
-            try:
-                overtime_daily_data = await _fetch_daily_overtime_price(code)
-            except KISError as exc:
-                failed_sources.append("overtime_daily")
-                logger.warning(
-                    (
-                        "optional overtime source failed (source=%s code=%s "
-                        "status=%s kis_code=%s message=%s)"
-                    ),
-                    "overtime_daily",
-                    code,
-                    exc.status_code,
-                    exc.code,
-                    exc.message,
-                )
-
             overtime_price_data: dict = {"output": {}}
-            try:
-                overtime_price_data = await _fetch_overtime_price(code)
-            except KISError as exc:
-                failed_sources.append("overtime_price")
-                logger.warning(
-                    (
-                        "optional overtime source failed (source=%s code=%s "
-                        "status=%s kis_code=%s message=%s)"
-                    ),
-                    "overtime_price",
-                    code,
-                    exc.status_code,
-                    exc.code,
-                    exc.message,
-                )
+            overtime_results = await asyncio.gather(
+                _fetch_time_overtime_conclusion(code),
+                _fetch_daily_overtime_price(code),
+                _fetch_overtime_price(code),
+                return_exceptions=True,
+            )
+            for source_name, result in zip(
+                ("overtime_time", "overtime_daily", "overtime_price"),
+                overtime_results,
+                strict=True,
+            ):
+                if isinstance(result, KISError):
+                    failed_sources.append(source_name)
+                    exc = result
+                    logger.warning(
+                        (
+                            "optional overtime source failed (source=%s code=%s "
+                            "status=%s kis_code=%s message=%s)"
+                        ),
+                        source_name,
+                        code,
+                        exc.status_code,
+                        exc.code,
+                        exc.message,
+                    )
+                    continue
+                if isinstance(result, Exception):
+                    raise result
+                if source_name == "overtime_time":
+                    overtime_time_data = result
+                elif source_name == "overtime_daily":
+                    overtime_daily_data = result
+                else:
+                    overtime_price_data = result
+
             regular_rows = intraday_data.get("output2") or []
             if not isinstance(regular_rows, list):
                 regular_rows = []
