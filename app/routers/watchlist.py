@@ -441,7 +441,7 @@ async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str
     latest_news_id = target_news_ids[0]
 
     # 캐시가 최신이고 내용이 있다면 그대로 반환
-    if cache.latest_news_id == latest_news_id and cache.summary_text:
+    if cache and cache.latest_news_id == latest_news_id and cache.summary_text:
         return stock_id, cache.summary_text, None
 
     # 캐시가 만료되었거나 비어있으면 갱신 로직 실행
