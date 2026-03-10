@@ -53,7 +53,7 @@ from app.schemas import (
 )
 from app.config import get_settings
 from app.kis.errors import KISError
-from app.recommender.client import RecommendationClient, RecommendationCandidate
+from app.recommender.client import RecommendationClient, RecommendationCandidate, RecommendationResult
 
 
 router = APIRouter(
@@ -143,8 +143,7 @@ def _default_recommendation_path(source: str) -> str:
     path_map = {
         "recommender": "A1",
         "mock": "M1",
-        "mock_page": "M2",
-        "mock_fallback": "M3",
+        "mock_fallback": "M2",
     }
     return path_map.get(source, "UNK")
 
@@ -426,33 +425,32 @@ async def get_news_recommendations(
     - RECOMMENDER_MOCK_MODE=true: 외부 서버 대신 DB 기반 mock 추천 사용
     - RECOMMENDER_MOCK_MODE=false: 외부 추천 서버 호출
     - cursor 전달 시 page 대신 cursor 기반으로 다음 구간 조회
-    - page > 1: 아직 추천 서버 페이지네이션 미연결 상태라 mock 오프셋으로 동작
+    - cursor 전달 시 추천 서버가 지원하는 next_cursor 연동을 그대로 사용
     """
     resolved_request_id = request_id or f"req-{uuid4().hex}"
     resolved_page = page
     offset = (resolved_page - 1) * limit
-    if cursor:
-        resolved_page, offset, cursor_limit = _decode_recommendation_cursor(cursor)
-        if cursor_limit is not None and cursor_limit != limit:
-            raise HTTPException(status_code=400, detail="Cursor limit mismatch")
 
     source = "recommender"
     candidates: list[RecommendationCandidate] = []
+    recommender_next_cursor: str | None = None
 
     # source 값은 추천 결과의 출처를 분석/디버깅할 때 그대로 사용됩니다.
     # - mock: 강제 목업 모드
-    # - mock_page: 외부 추천은 1페이지만 사용하고 2페이지 이상은 DB 오프셋 목업
     # - mock_fallback: 외부 추천 실패/빈 결과 시 자동 대체
     # - recommender: 외부 추천 서버 정상 결과
     if settings.recommender_mock_mode:
         source = "mock"
         candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
-    elif resolved_page > 1:
-        source = "mock_page"
-        candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
     else:
         try:
-            candidates = await recommendation_client.get_news_candidates(user_id=user_id, limit=limit)
+            result: RecommendationResult = await recommendation_client.get_news_candidates(
+                user_id=user_id,
+                limit=limit,
+                cursor=cursor,
+            )
+            candidates = result.items
+            recommender_next_cursor = result.next_cursor
         except KISError as exc:
             logger.warning("추천 서버 호출 실패: %s", exc)
             candidates = []
@@ -485,7 +483,9 @@ async def get_news_recommendations(
         )
 
     next_cursor: Optional[str] = None
-    if len(items) == limit:
+    if source == "recommender":
+        next_cursor = recommender_next_cursor
+    elif not cursor and len(items) == limit:
         next_cursor = _encode_recommendation_cursor(
             page=resolved_page + 1,
             offset=offset + len(items),

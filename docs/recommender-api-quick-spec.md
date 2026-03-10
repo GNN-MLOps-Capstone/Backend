@@ -18,23 +18,31 @@
 ```json
 {
   "user_id": 1,
-  "limit": 20
+  "limit": 20,
+  "cursor": "opaque-next-cursor"
 }
 ```
 
 - `user_id`: int (`users.id`, 필수)
 - `limit`: int (필수, 보통 1~100)
+- `cursor`: string (선택, 다음 페이지 요청 시 전달)
 
 ## 3) 권장 응답 형식 (추천)
 
 ```json
 {
+  "request_id": "req-123",
   "items": [
     { "news_id": 101, "path": "A1" },
     { "news_id": 205, "path": "B2" }
-  ]
+  ],
+  "next_cursor": "opaque-next-cursor-2"
 }
 ```
+
+응답 최상위:
+- `request_id`: string (선택)
+- `next_cursor`: string|null (선택)
 
 각 item:
 - `news_id`: int (필수)
@@ -63,16 +71,17 @@ Backend는 아래 형식도 처리합니다.
 
 ## 7) 구현 체크리스트
 
-1. `user_id`(`users.id`), `limit`를 받아 추천 결과 생성
+1. `user_id`(`users.id`), `limit`, `cursor`를 받아 추천 결과 생성
 2. `news_id` 리스트를 응답
 3. 응답 시간은 5초 이내 권장
 4. 빈 결과도 허용 (`items: []`)
 5. 결과 순서는 추천 우선순위 순으로 반환
+6. 다음 페이지가 있으면 `next_cursor` 반환
 
 ## 8) 빠른 로컬 테스트
 
 ```bash
 curl -X POST "http://localhost:9000/recommend/news" \
   -H "Content-Type: application/json" \
-  -d '{"user_id":1,"limit":5}'
+  -d '{"user_id":1,"limit":5,"cursor":"opaque-next-cursor"}'
 ```

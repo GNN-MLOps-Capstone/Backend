@@ -15,13 +15,25 @@ class RecommendationCandidate:
     path: str | None = None
 
 
+@dataclass
+class RecommendationResult:
+    items: list[RecommendationCandidate]
+    next_cursor: str | None = None
+    request_id: str | None = None
+
+
 class RecommendationClient:
     """Client wrapper for external recommendation service."""
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
 
-    async def get_news_candidates(self, user_id: int, limit: int) -> list[RecommendationCandidate]:
+    async def get_news_candidates(
+        self,
+        user_id: int,
+        limit: int,
+        cursor: str | None = None,
+    ) -> RecommendationResult:
         """
         Request recommended news list from recommendation server.
 
@@ -44,6 +56,8 @@ class RecommendationClient:
             "user_id": user_id,
             "limit": limit,
         }
+        if cursor:
+            payload["cursor"] = cursor
 
         try:
             async with httpx.AsyncClient(timeout=self._settings.recommender_timeout) as client:
@@ -64,7 +78,9 @@ class RecommendationClient:
 
         return self._normalize(data)
 
-    def _normalize(self, data: Any) -> list[RecommendationCandidate]:
+    def _normalize(self, data: Any) -> RecommendationResult:
+        next_cursor: str | None = None
+        request_id: str | None = None
         if isinstance(data, dict):
             if isinstance(data.get("items"), list):
                 rows = data["items"]
@@ -72,6 +88,10 @@ class RecommendationClient:
                 rows = data["news_ids"]
             else:
                 rows = []
+            if data.get("next_cursor") is not None:
+                next_cursor = str(data["next_cursor"])
+            if data.get("request_id") is not None:
+                request_id = str(data["request_id"])
         elif isinstance(data, list):
             rows = data
         else:
@@ -106,4 +126,8 @@ class RecommendationClient:
                 )
             )
 
-        return normalized
+        return RecommendationResult(
+            items=normalized,
+            next_cursor=next_cursor,
+            request_id=request_id,
+        )

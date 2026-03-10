@@ -60,5 +60,4 @@
 
 - `recommender`: 외부 추천 서버 정상 응답
 - `mock`: `RECOMMENDER_MOCK_MODE=true` 강제 목업
-- `mock_page`: 페이지네이션 미연결 상태에서 2페이지 이상 요청 시 목업 오프셋 사용
 - `mock_fallback`: 외부 추천 실패/빈 응답 시 자동 대체
