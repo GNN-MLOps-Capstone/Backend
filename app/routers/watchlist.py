@@ -84,12 +84,27 @@ async def get_watchlist(
         get_or_update_summary(item.stock_id, db, stock_map.get(item.stock_id).stock_name if item.stock_id in stock_map else None)
         for item in watchlist_items
     ]
-    summaries = await asyncio.gather(*summary_tasks)
+    summary_results = await asyncio.gather(*summary_tasks)
+
+    summary_map = {}
+    for stock_id, final_text, update_data in summary_results:
+        summary_map[stock_id] = final_text
+        
+        if update_data: # 업데이트가 필요한 경우에만
+            stmt = select(StockSummaryCache).where(StockSummaryCache.stock_id == stock_id)
+            res = await db.execute(stmt)
+            cache = res.scalar_one_or_none()
+            
+            if not cache:
+                cache = StockSummaryCache(stock_id=stock_id)
+                db.add(cache)
+            
+            cache.latest_news_id = update_data["latest_news_id"]
+            cache.summary_text = update_data["summary_text"]
+            cache.stock_name = update_data["stock_name"]
+            cache.created_at = datetime.now(timezone.utc)
+
     await db.commit()
-    summary_map = {
-        item.stock_id: summary 
-        for item, summary in zip(watchlist_items, summaries)
-    }
 
     response_list = []
     for item in watchlist_items:
@@ -398,27 +413,18 @@ async def get_stock_detail(
         aiSummary=cache.summary_text if cache and cache.summary_text else "",
     )
 
-async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str = None) -> str:
-    """
-    stock_id를 기준으로 캐시를 관리하고 최신 뉴스 발생 시 요약을 갱신함
-    """
-    # 1. stock_id로 캐시 조회
+async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str = None):
+    # stock_id를 기준으로 캐시 조회
     stmt = select(StockSummaryCache).where(StockSummaryCache.stock_id == stock_id)
     result = await db.execute(stmt)
     cache = result.scalar_one_or_none()
 
-    # 2. stock_name이 없다면 DB에서 조회 (AI 프롬프트용)
     if not stock_name:
         stock_stmt = select(Stock.stock_name).where(Stock.stock_id == stock_id)
         stock_res = await db.execute(stock_stmt)
         stock_name = stock_res.scalar_one_or_none() or stock_id
 
-    # 캐시 레코드가 없으면 생성
-    if not cache:
-        cache = StockSummaryCache(stock_id=stock_id, stock_name=stock_name, summary_text="")
-        db.add(cache)
-
-    # 3. 최신 뉴스 10개 ID 확인
+    # 최신 뉴스 10개 ID 확인
     news_stmt = (
         select(NewsStockMapping.news_id)
         .where(NewsStockMapping.stock_id == stock_id)
@@ -429,32 +435,35 @@ async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str
     target_news_ids = [row[0] for row in news_res.fetchall()]
 
     if not target_news_ids:
-        return cache.summary_text or f"{stock_name}에 대한 최신 뉴스가 없습니다."
+        final_text = cache.summary_text if cache else f"{stock_name}에 대한 최신 뉴스가 없습니다."
+        return stock_id, final_text, None
 
     latest_news_id = target_news_ids[0]
 
-    # 4. 캐시가 최신이고 내용이 있다면 그대로 반환
+    # 캐시가 최신이고 내용이 있다면 그대로 반환
     if cache.latest_news_id == latest_news_id and cache.summary_text:
-        return cache.summary_text
+        return stock_id, cache.summary_text, None
 
-    # 5. 캐시가 만료되었거나 비어있으면 갱신 로직 실행
+    # 캐시가 만료되었거나 비어있으면 갱신 로직 실행
     content_stmt = select(FilteredNews.summary).where(FilteredNews.news_id.in_(target_news_ids))
     content_res = await db.execute(content_stmt)
     news_summaries = [row[0] for row in content_res.fetchall() if row[0]]
 
     if not news_summaries:
-        return cache.summary_text or "기사 내용을 불러올 수 없습니다."
+        final_text = cache.summary_text if cache else "기사 내용을 불러올 수 없습니다."
+        return stock_id, final_text, None
 
     combined_text = "\n\n".join([f"### [기사 {i+1}]\n{s}" for i, s in enumerate(news_summaries)])
     
-    # Gemini AI 호출 (이름을 전달하여 정확한 요약 유도)
+    # 새로운 요약 생성
     new_summary = await call_gemini_summary(stock_name, len(news_summaries), combined_text)
 
     if new_summary:
-        cache.latest_news_id = latest_news_id
-        cache.summary_text = new_summary
-        cache.stock_name = stock_name # 이름 업데이트
-        cache.created_at = datetime.now(timezone.utc)
-        return new_summary
-    
-    return cache.summary_text or "요약 생성에 실패했습니다."
+        update_data = {
+            "latest_news_id": latest_news_id,
+            "summary_text": new_summary,
+            "stock_name": stock_name
+        }
+        return stock_id, new_summary, update_data
+    final_text = cache.summary_text if cache else "요약 생성에 실패했습니다."
+    return stock_id, final_text, None
