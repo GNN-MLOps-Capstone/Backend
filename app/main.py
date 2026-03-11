@@ -27,10 +27,13 @@ FastAPI 메인 애플리케이션 (main.py)
 ==============================================================================
 """
 
+import logging
 from contextlib import asynccontextmanager  # 비동기 컨텍스트 매니저
+from hashlib import sha256
+from pathlib import Path
+
 from fastapi import FastAPI  # 웹 프레임워크
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어
-import logging
 
 from app.config import get_settings  # 설정 가져오기
 from app.database import init_db  # DB 초기화 함수
@@ -53,6 +56,19 @@ from app.routers import news, stocks, users, notifications, watchlist
 
 logger = logging.getLogger(__name__)
 logger.info("Server configuration loaded.")
+
+
+def _file_fingerprint(path: Path) -> dict[str, str] | None:
+    try:
+        stat = path.stat()
+        digest = sha256(path.read_bytes()).hexdigest()[:12]
+    except OSError:
+        return None
+    return {
+        "path": str(path),
+        "sha256_12": digest,
+        "mtime": str(int(stat.st_mtime)),
+    }
 
 # =============================================================================
 # 애플리케이션 생명주기 관리
@@ -242,7 +258,16 @@ async def health_check():
         - Kubernetes liveness probe
         - 로드밸런서 health check
     """
-    return {"status": "healthy"}
+    app_root = Path(__file__).resolve().parent
+    stocks_router = _file_fingerprint(app_root / "routers" / "stocks.py")
+    stocks_transformer = _file_fingerprint(app_root / "kis" / "transformers.py")
+
+    return {
+        "status": "healthy",
+        "debug": settings.debug,
+        "stocks_router": stocks_router,
+        "stocks_transformer": stocks_transformer,
+    }
 
 
 # =============================================================================
