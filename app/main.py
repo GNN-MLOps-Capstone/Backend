@@ -59,6 +59,7 @@ logger.info("Server configuration loaded.")
 
 
 def _file_fingerprint(path: Path) -> dict[str, str] | None:
+    """파일의 경로, 수정 시각, 축약 SHA-256 해시를 반환한다."""
     try:
         stat = path.stat()
         digest = sha256(path.read_bytes()).hexdigest()[:12]

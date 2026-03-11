@@ -98,6 +98,7 @@ def _normalize_hhmmss(value: str | None) -> str | None:
 
 
 def _clamp_intraday_cursor(value: str | None) -> str | None:
+    """분봉 조회 기준 시각을 정규장 범위(09:00~15:30) 안으로 제한한다."""
     normalized = _normalize_hhmmss(value)
     if normalized is None:
         return None
@@ -154,6 +155,7 @@ def _minute_cursor_for_now() -> str:
 
 
 def _hhmmss_to_seconds(value: str | None) -> int | None:
+    """HHMMSS 문자열을 자정 기준 초 단위로 변환한다."""
     normalized = _normalize_hhmmss(value)
     if normalized is None:
         return None
@@ -182,6 +184,7 @@ def _previous_minute_cursor(hhmmss: str) -> str:
 
 
 def _extract_intraday_session_context(data: dict) -> tuple[str | None, str | None]:
+    """KIS 분봉 응답에서 현재 세션의 거래일과 최신 체결시각을 추출한다."""
     session_date: str | None = None
     session_time: str | None = None
 
@@ -209,6 +212,7 @@ def _extract_intraday_session_context(data: dict) -> tuple[str | None, str | Non
 
 
 def _should_restart_intraday_from_session_time(requested_cursor: str, session_time: str | None) -> bool:
+    """로컬 기준 시각이 크게 뒤처졌을 때 KIS 세션 시각으로 재시작할지 판단한다."""
     requested_seconds = _hhmmss_to_seconds(requested_cursor)
     session_seconds = _hhmmss_to_seconds(session_time)
     if requested_seconds is None or session_seconds is None:
@@ -498,6 +502,7 @@ async def _fetch_overtime_price(code: str) -> dict:
 
 
 def _normalize_overtime_rows(code: str, rows: list[dict], fallback_date: str | None = None) -> list[dict]:
+    """시간외 체결 응답을 시계열 병합용 공통 row 형식으로 정규화한다."""
     normalized_fallback_date = _normalize_yyyymmdd(fallback_date) or datetime.now(tz=KST).strftime("%Y%m%d")
     normalized_rows: list[dict] = []
 
@@ -588,6 +593,7 @@ def _build_overtime_price_anchor_row(
     price_payload: dict,
     fallback_date: str | None = None,
 ) -> dict | None:
+    """시간외 현재가 응답에서 병합용 단일 앵커 row를 생성한다."""
     output = price_payload.get("output") or {}
     if not isinstance(output, dict):
         return None
