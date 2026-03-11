@@ -97,6 +97,18 @@ def _normalize_hhmmss(value: str | None) -> str | None:
     return text
 
 
+def _clamp_intraday_cursor(value: str | None) -> str | None:
+    """분봉 조회 기준 시각을 정규장 범위(09:00~15:30) 안으로 제한한다."""
+    normalized = _normalize_hhmmss(value)
+    if normalized is None:
+        return None
+    if normalized < "090000":
+        return "090000"
+    if normalized > "153000":
+        return "153000"
+    return normalized
+
+
 def _normalize_yyyymmdd(value: object | None) -> str | None:
     if value is None:
         return None
@@ -142,6 +154,17 @@ def _minute_cursor_for_now() -> str:
     return now_hhmmss
 
 
+def _hhmmss_to_seconds(value: str | None) -> int | None:
+    """HHMMSS 문자열을 자정 기준 초 단위로 변환한다."""
+    normalized = _normalize_hhmmss(value)
+    if normalized is None:
+        return None
+    hour = int(normalized[:2])
+    minute = int(normalized[2:4])
+    second = int(normalized[4:6])
+    return (hour * 3600) + (minute * 60) + second
+
+
 def _previous_minute_cursor(hhmmss: str) -> str:
     """
     HHMMSS 커서를 이전 1분으로 이동한다.
@@ -158,6 +181,46 @@ def _previous_minute_cursor(hhmmss: str) -> str:
     if prev_text < "090000":
         return "090000"
     return prev_text
+
+
+def _extract_intraday_session_context(data: dict) -> tuple[str | None, str | None]:
+    """KIS 분봉 응답에서 현재 세션의 거래일과 최신 체결시각을 추출한다."""
+    session_date: str | None = None
+    session_time: str | None = None
+
+    output1 = data.get("output1") or {}
+    if isinstance(output1, dict):
+        session_date = _normalize_yyyymmdd(output1.get("stck_bsop_date"))
+        session_time = _clamp_intraday_cursor(output1.get("stck_cntg_hour"))
+
+    output2 = data.get("output2") or []
+    if isinstance(output2, list):
+        latest_key: tuple[str, str] | None = None
+        for row in output2:
+            if not isinstance(row, dict):
+                continue
+            key = _series_row_key(row)
+            if key is None:
+                continue
+            if latest_key is None or key > latest_key:
+                latest_key = key
+        if latest_key is not None:
+            session_date = session_date or latest_key[0]
+            session_time = session_time or _clamp_intraday_cursor(latest_key[1])
+
+    return session_date, session_time
+
+
+def _should_restart_intraday_from_session_time(requested_cursor: str, session_time: str | None) -> bool:
+    """로컬 기준 시각이 크게 뒤처졌을 때 KIS 세션 시각으로 재시작할지 판단한다."""
+    requested_seconds = _hhmmss_to_seconds(requested_cursor)
+    session_seconds = _hhmmss_to_seconds(session_time)
+    if requested_seconds is None or session_seconds is None:
+        return False
+    if session_seconds <= requested_seconds:
+        return False
+    # 로컬 PC 시계가 크게 뒤처진 경우에만 KIS 기준 체결시각으로 재시작한다.
+    return (session_seconds - requested_seconds) >= 30 * 60
 
 
 def _series_bypass_client_id(request: Request) -> str:
@@ -262,10 +325,11 @@ async def _fetch_intraday_full_session(code: str) -> dict:
     여러 번 조회해 당일 장 전체 구간(개장~현재/종가)을 수집한다.
     """
     cursor = _minute_cursor_for_now()
-    today_kst = datetime.now(tz=KST).strftime("%Y%m%d")
     merged_rows: list[dict] = []
     seen_keys: set[tuple[str, str]] = set()
     first_payload: dict | None = None
+    session_date: str | None = None
+    restarted_from_session_time = False
     # 09:00~15:30(약 390분) 기준 30건 페이지면 13회 내외
     max_calls = 20
 
@@ -307,7 +371,30 @@ async def _fetch_intraday_full_session(code: str) -> dict:
                 break
             raise
         if first_payload is None:
+            response_session_date, response_session_time = _extract_intraday_session_context(data)
+            if (
+                not restarted_from_session_time
+                and _should_restart_intraday_from_session_time(cursor, response_session_time)
+                and response_session_time is not None
+                and response_session_time != cursor
+            ):
+                logger.info(
+                    (
+                        "intraday pagination restarted from KIS session time "
+                        "(code=%s initial_cursor=%s session_time=%s session_date=%s)"
+                    ),
+                    code,
+                    cursor,
+                    response_session_time,
+                    response_session_date,
+                )
+                cursor = response_session_time
+                restarted_from_session_time = True
+                await _sleep_intraday_page_interval()
+                continue
+
             first_payload = data
+            session_date = response_session_date
 
         output2 = data.get("output2") or []
         if not isinstance(output2, list) or not output2:
@@ -322,9 +409,11 @@ async def _fetch_intraday_full_session(code: str) -> dict:
             time_text = _normalize_hhmmss(row.get("stck_cntg_hour"))
             if not date_text or not time_text:
                 continue
+            if session_date is None:
+                session_date = date_text
             if page_oldest_time is None or time_text < page_oldest_time:
                 page_oldest_time = time_text
-            if date_text != today_kst:
+            if session_date is not None and date_text != session_date:
                 crossed_prev_day = True
                 continue
             key = (date_text, time_text)
@@ -412,8 +501,9 @@ async def _fetch_overtime_price(code: str) -> dict:
     return data
 
 
-def _normalize_overtime_rows(code: str, rows: list[dict]) -> list[dict]:
-    today_kst = datetime.now(tz=KST).strftime("%Y%m%d")
+def _normalize_overtime_rows(code: str, rows: list[dict], fallback_date: str | None = None) -> list[dict]:
+    """시간외 체결 응답을 시계열 병합용 공통 row 형식으로 정규화한다."""
+    normalized_fallback_date = _normalize_yyyymmdd(fallback_date) or datetime.now(tz=KST).strftime("%Y%m%d")
     normalized_rows: list[dict] = []
 
     for row in rows:
@@ -425,7 +515,7 @@ def _normalize_overtime_rows(code: str, rows: list[dict]) -> list[dict]:
         date_text = (
             _normalize_yyyymmdd(row.get("stck_bsop_date"))
             or _normalize_yyyymmdd(row.get("bsop_date"))
-            or today_kst
+            or normalized_fallback_date
         )
         price = _coerce_int(row.get("stck_prpr"))
         if price is None:
@@ -498,7 +588,12 @@ def _build_daily_overtime_anchor_rows(code: str, daily_payload: dict) -> list[di
     return rows
 
 
-def _build_overtime_price_anchor_row(code: str, price_payload: dict) -> dict | None:
+def _build_overtime_price_anchor_row(
+    code: str,
+    price_payload: dict,
+    fallback_date: str | None = None,
+) -> dict | None:
+    """시간외 현재가 응답에서 병합용 단일 앵커 row를 생성한다."""
     output = price_payload.get("output") or {}
     if not isinstance(output, dict):
         return None
@@ -508,7 +603,12 @@ def _build_overtime_price_anchor_row(code: str, price_payload: dict) -> dict | N
         return None
 
     volume = _coerce_int(output.get("ovtm_untp_vol")) or 0
-    date_text = datetime.now(tz=KST).strftime("%Y%m%d")
+    date_text = (
+        _normalize_yyyymmdd(output.get("stck_bsop_date"))
+        or _normalize_yyyymmdd(output.get("bsop_date"))
+        or _normalize_yyyymmdd(fallback_date)
+        or datetime.now(tz=KST).strftime("%Y%m%d")
+    )
     row = {
         "stck_bsop_date": date_text,
         "stck_cntg_hour": "180000",
@@ -781,6 +881,7 @@ async def get_stock_series(
         try:
             intraday_data = await _fetch_intraday_full_session(code)
             failed_sources: list[str] = []
+            intraday_session_date, _ = _extract_intraday_session_context(intraday_data)
 
             overtime_time_data: dict = {"output2": []}
             overtime_daily_data: dict = {"output2": []}
@@ -826,9 +927,17 @@ async def get_stock_series(
             overtime_time_rows_raw = overtime_time_data.get("output2") or []
             if not isinstance(overtime_time_rows_raw, list):
                 overtime_time_rows_raw = []
-            overtime_time_rows = _normalize_overtime_rows(code, overtime_time_rows_raw)
+            overtime_time_rows = _normalize_overtime_rows(
+                code,
+                overtime_time_rows_raw,
+                fallback_date=intraday_session_date,
+            )
             overtime_daily_rows = _build_daily_overtime_anchor_rows(code, overtime_daily_data)
-            overtime_price_row = _build_overtime_price_anchor_row(code, overtime_price_data)
+            overtime_price_row = _build_overtime_price_anchor_row(
+                code,
+                overtime_price_data,
+                fallback_date=intraday_session_date,
+            )
             overtime_fill_rows: list[dict] = []
             if "overtime_time" in failed_sources:
                 overtime_fill_rows = _build_overtime_fill_rows(
