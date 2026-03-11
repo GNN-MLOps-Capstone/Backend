@@ -80,31 +80,94 @@ async def get_watchlist(
     )
     stock_map = {row.stock_id: row for row in stock_result.scalars().all()}
 
-    summary_tasks = [
-        get_or_update_summary(item.stock_id, db, stock_map.get(item.stock_id).stock_name if item.stock_id in stock_map else None)
-        for item in watchlist_items
-    ]
-    summary_results = await asyncio.gather(*summary_tasks)
-
     summary_map = {}
-    for stock_id, final_text, update_data in summary_results:
-        summary_map[stock_id] = final_text
+    ai_tasks_payload = []
+    for item in watchlist_items:
+        s_id = item.stock_id
+        s_name = stock_map[s_id].stock_name if s_id in stock_map else s_id
         
-        if update_data: # 업데이트가 필요한 경우에만
-            stmt = select(StockSummaryCache).where(StockSummaryCache.stock_id == stock_id)
-            res = await db.execute(stmt)
-            cache = res.scalar_one_or_none()
-            
-            if not cache:
-                cache = StockSummaryCache(stock_id=stock_id)
-                db.add(cache)
-            
-            cache.latest_news_id = update_data["latest_news_id"]
-            cache.summary_text = update_data["summary_text"]
-            cache.stock_name = update_data["stock_name"]
-            cache.created_at = datetime.now(timezone.utc)
+        # 캐시 및 최신 뉴스 ID 확인
+        cache_stmt = select(StockSummaryCache).where(StockSummaryCache.stock_id == s_id)
+        cache_res = await db.execute(cache_stmt)
+        cache = cache_res.scalar_one_or_none()
 
-    await db.commit()
+        news_stmt = (
+            select(NewsStockMapping.news_id)
+            .where(NewsStockMapping.stock_id == s_id)
+            .order_by(desc(NewsStockMapping.created_at))
+            .limit(10)
+        )
+        news_res = await db.execute(news_stmt)
+        target_news_ids = [row[0] for row in news_res.fetchall()]
+
+        # 케이스 분류: 뉴스가 아예 없는 경우
+        if not target_news_ids:
+            summary_map[s_id] = cache.summary_text if cache else f"{s_name}에 대한 최신 뉴스가 없습니다."
+            continue
+
+        latest_news_id = target_news_ids[0]
+
+        # 케이스 분류: 캐시가 최신인 경우 (Null 안전 체크 포함)
+        if cache and cache.latest_news_id == latest_news_id and cache.summary_text:
+            summary_map[s_id] = cache.summary_text
+            continue
+
+        # 케이스 분류: AI 요약 갱신이 필요한 경우 (뉴스 본문 수집)
+        content_stmt = select(FilteredNews.summary).where(FilteredNews.news_id.in_(target_news_ids))
+        content_res = await db.execute(content_stmt)
+        news_summaries = [row[0] for row in content_res.fetchall() if row[0]]
+
+        if not news_summaries:
+            summary_map[s_id] = cache.summary_text if cache else "기사 내용을 불러올 수 없습니다."
+            continue
+
+        combined_text = "\n\n".join([f"### [기사 {i+1}]\n{s}" for i, s in enumerate(news_summaries)])
+        
+        # AI 호출용 페이로드 구성 (DB 세션 없이 순수 데이터만)
+        ai_tasks_payload.append({
+            "stock_id": s_id,
+            "stock_name": s_name,
+            "news_count": len(news_summaries),
+            "combined_text": combined_text,
+            "latest_news_id": latest_news_id
+        })
+
+    # ------------------------------------------------------------------
+    # 3. [AI 병렬 작업] DB 세션 공유 없이 제미나이만 한꺼번에 호출
+    # ------------------------------------------------------------------
+    if ai_tasks_payload:
+        # call_gemini_summary는 순수 I/O 작업이므로 병렬 처리가 가장 효율적입니다.
+        gemini_results = await asyncio.gather(*[
+            call_gemini_summary(p["stock_name"], p["news_count"], p["combined_text"])
+            for p in ai_tasks_payload
+        ])
+
+        # ------------------------------------------------------------------
+        # 4. [DB 순차 작업] AI 결과를 DB 캐시에 저장 및 최종 맵핑
+        # ------------------------------------------------------------------
+        for payload, new_summary in zip(ai_tasks_payload, gemini_results):
+            s_id = payload["stock_id"]
+            
+            if new_summary:
+                summary_map[s_id] = new_summary
+                
+                # 캐시 테이블 업데이트
+                stmt = select(StockSummaryCache).where(StockSummaryCache.stock_id == s_id)
+                res = await db.execute(stmt)
+                cache = res.scalar_one_or_none()
+                
+                if not cache:
+                    cache = StockSummaryCache(stock_id=s_id)
+                    db.add(cache)
+                
+                cache.latest_news_id = payload["latest_news_id"]
+                cache.summary_text = new_summary
+                cache.stock_name = payload["stock_name"]
+                cache.created_at = datetime.now(timezone.utc)
+            else:
+                summary_map[s_id] = "요약 생성에 실패했습니다."
+
+        await db.commit() # 모든 변경 사항 일괄 저장
 
     response_list = []
     for item in watchlist_items:
@@ -413,18 +476,27 @@ async def get_stock_detail(
         aiSummary=cache.summary_text if cache and cache.summary_text else "",
     )
 
-async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str = None):
-    # stock_id를 기준으로 캐시 조회
+async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str = None) -> str:
+    """
+    stock_id를 기준으로 캐시를 관리하고 최신 뉴스 발생 시 요약을 갱신함
+    """
+    # 1. stock_id로 캐시 조회
     stmt = select(StockSummaryCache).where(StockSummaryCache.stock_id == stock_id)
     result = await db.execute(stmt)
     cache = result.scalar_one_or_none()
 
+    # 2. stock_name이 없다면 DB에서 조회 (AI 프롬프트용)
     if not stock_name:
         stock_stmt = select(Stock.stock_name).where(Stock.stock_id == stock_id)
         stock_res = await db.execute(stock_stmt)
         stock_name = stock_res.scalar_one_or_none() or stock_id
 
-    # 최신 뉴스 10개 ID 확인
+    # 캐시 레코드가 없으면 생성
+    if not cache:
+        cache = StockSummaryCache(stock_id=stock_id, stock_name=stock_name, summary_text="")
+        db.add(cache)
+
+    # 3. 최신 뉴스 10개 ID 확인
     news_stmt = (
         select(NewsStockMapping.news_id)
         .where(NewsStockMapping.stock_id == stock_id)
@@ -435,35 +507,32 @@ async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str
     target_news_ids = [row[0] for row in news_res.fetchall()]
 
     if not target_news_ids:
-        final_text = cache.summary_text if cache else f"{stock_name}에 대한 최신 뉴스가 없습니다."
-        return stock_id, final_text, None
+        return cache.summary_text or f"{stock_name}에 대한 최신 뉴스가 없습니다."
 
     latest_news_id = target_news_ids[0]
 
-    # 캐시가 최신이고 내용이 있다면 그대로 반환
-    if cache and cache.latest_news_id == latest_news_id and cache.summary_text:
-        return stock_id, cache.summary_text, None
+    # 4. 캐시가 최신이고 내용이 있다면 그대로 반환
+    if cache.latest_news_id == latest_news_id and cache.summary_text:
+        return cache.summary_text
 
-    # 캐시가 만료되었거나 비어있으면 갱신 로직 실행
+    # 5. 캐시가 만료되었거나 비어있으면 갱신 로직 실행
     content_stmt = select(FilteredNews.summary).where(FilteredNews.news_id.in_(target_news_ids))
     content_res = await db.execute(content_stmt)
     news_summaries = [row[0] for row in content_res.fetchall() if row[0]]
 
     if not news_summaries:
-        final_text = cache.summary_text if cache else "기사 내용을 불러올 수 없습니다."
-        return stock_id, final_text, None
+        return cache.summary_text or "기사 내용을 불러올 수 없습니다."
 
     combined_text = "\n\n".join([f"### [기사 {i+1}]\n{s}" for i, s in enumerate(news_summaries)])
     
-    # 새로운 요약 생성
+    # Gemini AI 호출 (이름을 전달하여 정확한 요약 유도)
     new_summary = await call_gemini_summary(stock_name, len(news_summaries), combined_text)
 
     if new_summary:
-        update_data = {
-            "latest_news_id": latest_news_id,
-            "summary_text": new_summary,
-            "stock_name": stock_name
-        }
-        return stock_id, new_summary, update_data
-    final_text = cache.summary_text if cache else "요약 생성에 실패했습니다."
-    return stock_id, final_text, None
+        cache.latest_news_id = latest_news_id
+        cache.summary_text = new_summary
+        cache.stock_name = stock_name # 이름 업데이트
+        cache.created_at = datetime.now(timezone.utc)
+        return new_summary
+    
+    return cache.summary_text or "요약 생성에 실패했습니다."
