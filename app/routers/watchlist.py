@@ -130,7 +130,8 @@ async def get_watchlist(
             "stock_name": s_name,
             "news_count": len(news_summaries),
             "combined_text": combined_text,
-            "latest_news_id": latest_news_id
+            "latest_news_id": latest_news_id,
+            "cached_summary": cache.summary_text if cache else None
         })
 
     # 제미나이만 호출
@@ -142,7 +143,7 @@ async def get_watchlist(
         ])
 
         # ai 결과를 db에 저장
-        for payload, new_summary in zip(ai_tasks_payload, gemini_results):
+        for payload, new_summary in zip(ai_tasks_payload, gemini_results, strict=False):
             s_id = payload["stock_id"]
             
             if new_summary:
@@ -167,7 +168,7 @@ async def get_watchlist(
                 )
                 await db.execute(stmt)
             else:
-                summary_map[s_id] = "요약 생성에 실패했습니다."
+                summary_map[s_id] = payload["cached_summary"] or "요약 생성에 실패했습니다."
 
         await db.commit() # 모든 변경 사항 일괄 저장
 
