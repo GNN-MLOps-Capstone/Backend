@@ -120,6 +120,7 @@ class KISClient:
                 if isinstance(exc, KISError):
                     raise
                 raise KISError(f"KIS request failed: {exc}", status_code=502) from exc
+        raise KISError("KIS request failed after retries", status_code=502)
 
     async def _acquire_rate_limit_slot(self) -> None:
         max_rps = int(self._settings.kis_max_requests_per_second or 0)
