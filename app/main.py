@@ -32,7 +32,7 @@ from contextlib import asynccontextmanager  # 비동기 컨텍스트 매니저
 from hashlib import sha256
 from pathlib import Path
 
-from fastapi import FastAPI  # 웹 프레임워크
+from fastapi import FastAPI, Header, HTTPException, status  # 웹 프레임워크
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어
 
 from app.config import get_settings  # 설정 가져오기
@@ -259,13 +259,36 @@ async def health_check():
         - Kubernetes liveness probe
         - 로드밸런서 health check
     """
+    return {"status": "healthy"}
+
+
+@app.get("/internal/health/code")
+async def internal_health_code(
+    x_internal_health_key: str | None = Header(default=None, alias="X-Internal-Health-Key"),
+):
+    """
+    내부 전용 코드 fingerprint 확인 엔드포인트.
+
+    올바른 내부 헤더 키가 있어야 현재 실행 중인 주요 파일 fingerprint를 반환한다.
+    """
+    configured_key = settings.internal_health_key.strip()
+    if not configured_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Internal health endpoint is disabled",
+        )
+    if x_internal_health_key != configured_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid internal health key",
+        )
+
     app_root = Path(__file__).resolve().parent
     stocks_router = _file_fingerprint(app_root / "routers" / "stocks.py")
     stocks_transformer = _file_fingerprint(app_root / "kis" / "transformers.py")
 
     return {
         "status": "healthy",
-        "debug": settings.debug,
         "stocks_router": stocks_router,
         "stocks_transformer": stocks_transformer,
     }

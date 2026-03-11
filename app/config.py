@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = True
+    internal_health_key: str = ""
     
     # =========================================================================
     # CORS 설정 (Cross-Origin Resource Sharing)
