@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, func, case, desc
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 import asyncio
 
 from datetime import datetime, timedelta, timezone
@@ -102,7 +103,7 @@ async def get_watchlist(
 
         # 케이스 분류: 뉴스가 아예 없는 경우
         if not target_news_ids:
-            summary_map[s_id] = cache.summary_text if cache else f"{s_name}에 대한 최신 뉴스가 없습니다."
+            summary_map[s_id] = (cache.summary_text or f"{s_name}에 대한 최신 뉴스가 없습니다.") if cache else f"{s_name}에 대한 최신 뉴스가 없습니다."
             continue
 
         latest_news_id = target_news_ids[0]
@@ -118,7 +119,7 @@ async def get_watchlist(
         news_summaries = [row[0] for row in content_res.fetchall() if row[0]]
 
         if not news_summaries:
-            summary_map[s_id] = cache.summary_text if cache else "기사 내용을 불러올 수 없습니다."
+            summary_map[s_id] = (cache.summary_text or "기사 내용을 불러올 수 없습니다.") if cache else "기사 내용을 불러올 수 없습니다."
             continue
 
         combined_text = "\n\n".join([f"### [기사 {i+1}]\n{s}" for i, s in enumerate(news_summaries)])
@@ -132,9 +133,7 @@ async def get_watchlist(
             "latest_news_id": latest_news_id
         })
 
-    # ------------------------------------------------------------------
-    # 3. [AI 병렬 작업] DB 세션 공유 없이 제미나이만 한꺼번에 호출
-    # ------------------------------------------------------------------
+    # 제미나이만 호출
     if ai_tasks_payload:
         # call_gemini_summary는 순수 I/O 작업이므로 병렬 처리가 가장 효율적입니다.
         gemini_results = await asyncio.gather(*[
@@ -142,28 +141,31 @@ async def get_watchlist(
             for p in ai_tasks_payload
         ])
 
-        # ------------------------------------------------------------------
-        # 4. [DB 순차 작업] AI 결과를 DB 캐시에 저장 및 최종 맵핑
-        # ------------------------------------------------------------------
+        # ai 결과를 db에 저장
         for payload, new_summary in zip(ai_tasks_payload, gemini_results):
             s_id = payload["stock_id"]
             
             if new_summary:
                 summary_map[s_id] = new_summary
                 
-                # 캐시 테이블 업데이트
-                stmt = select(StockSummaryCache).where(StockSummaryCache.stock_id == s_id)
-                res = await db.execute(stmt)
-                cache = res.scalar_one_or_none()
-                
-                if not cache:
-                    cache = StockSummaryCache(stock_id=s_id)
-                    db.add(cache)
-                
-                cache.latest_news_id = payload["latest_news_id"]
-                cache.summary_text = new_summary
-                cache.stock_name = payload["stock_name"]
-                cache.created_at = datetime.now(timezone.utc)
+                stmt = pg_insert(StockSummaryCache).values(
+                    stock_id=s_id,
+                    stock_name=payload["stock_name"],
+                    summary_text=new_summary,
+                    latest_news_id=payload["latest_news_id"],
+                    created_at=datetime.now(timezone.utc)
+                )
+
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=["stock_id"],  # PK 혹은 Unique 제약 조건 컬럼
+                    set_={
+                        "summary_text": new_summary,
+                        "latest_news_id": payload["latest_news_id"],
+                        "stock_name": payload["stock_name"],
+                        "created_at": datetime.now(timezone.utc)
+                    }
+                )
+                await db.execute(stmt)
             else:
                 summary_map[s_id] = "요약 생성에 실패했습니다."
 
