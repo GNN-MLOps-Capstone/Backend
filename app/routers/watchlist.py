@@ -411,13 +411,25 @@ async def get_watchlist_briefing(
     for issue in top_issues:
         stock_name = issue.stock_name
         try:
-            stock_summary_response = await get_stock_summary(stock_name=stock_name, db=db)
-            single_summary_text = stock_summary_response.summary
+            stock_id_result = await db.execute(
+                select(Stock.stock_id).where(Stock.stock_name == stock_name)
+            )
+            stock_id = stock_id_result.scalar_one_or_none()
+            if not stock_id:
+                logger.warning("종목 ID 조회 실패, 건너뜀: %s", stock_name)
+                continue
+            single_summary_text = await get_or_update_summary(
+                stock_id=stock_id,
+                db=db,
+                stock_name=stock_name,
+            )
             if single_summary_text:
                 summaries_text_list.append(f"[{stock_name} 요약]\n{single_summary_text}")
         except HTTPException:
-            logger.warning("종목 요약 캐시 없음, 건너뜀: %s", stock_name)
+            logger.warning("종목 요약 생성 실패, 건너뜀: %s", stock_name)
             continue
+    if summaries_text_list:
+        await db.commit()
 
     if not summaries_text_list:
         return IssueRankingResponse(
