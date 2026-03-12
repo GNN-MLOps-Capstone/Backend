@@ -84,16 +84,14 @@ docker network create proxy-net
 # 4. 이미지 빌드
 docker compose build
 
-# 5. 마이그레이션 적용
-docker compose run --rm news-api alembic -c alembic.ini upgrade head
-
-# 6. 앱 실행
+# 5. 앱 실행
+# news-api 컨테이너 entrypoint가 시작 전에 alembic upgrade head를 자동 실행
 docker compose up -d
 
-# 7. 로그 확인
+# 6. 로그 확인
 docker compose logs -f news-api
 
-# 8. 중지
+# 7. 중지
 docker compose down
 ```
 
@@ -127,9 +125,9 @@ alembic -c alembic.ini revision --autogenerate -m "describe-change"
 
 ## 추가 문서
 
-- [docs/README.md](/home/dobi/Backend/docs/README.md): `docs` 운영 원칙과 남겨둔 문서 목록
-- [docs/recommendation-logging.md](/home/dobi/Backend/docs/recommendation-logging.md): 추천/상호작용 로깅 기준 문서
-- [docs/recommender-api.md](/home/dobi/Backend/docs/recommender-api.md): 외부 추천 서버 연동 스펙
+- [docs/README.md](docs/README.md): `docs` 운영 원칙과 남겨둔 문서 목록
+- [docs/recommendation-logging.md](docs/recommendation-logging.md): 추천/상호작용 로깅 기준 문서
+- [docs/recommender-api.md](docs/recommender-api.md): 외부 추천 서버 연동 스펙
 
 ---
 
@@ -199,7 +197,7 @@ curl http://localhost:8000/api/news/1
 
 ### 개인화 뉴스 추천 목록
 
-```
+```http
 GET /api/news/recommendations
 ```
 
@@ -247,7 +245,7 @@ curl "http://localhost:8000/api/news/recommendations?user_id=1&page=1&screen_ses
 
 ### 추천 로그 수집 (탭/뉴스 체류시간)
 
-```
+```http
 POST /api/interactions/events
 ```
 
@@ -315,7 +313,7 @@ curl -X POST "http://localhost:8000/api/interactions/events" \
 - `interaction_events`: 추천 요청/응답/스크롤/콘텐츠 이벤트 원본 로그
 
 현재 운영 권장안:
-- `content_open`에는 `news_id`를 반드시 포함
+- `content_open`에는 `request_id`와 `news_id`를 반드시 포함
 - `content_leave`에도 같은 `news_id`를 함께 포함
 
 `POST /api/interactions/events` 응답 필드:

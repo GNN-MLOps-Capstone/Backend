@@ -15,6 +15,10 @@ echo "Starting News API..."
 MASKED_URL=$(echo "$DATABASE_URL" | sed 's|://[^:]*:[^@]*@|://****:****@|')
 echo "Database: $MASKED_URL"
 
+# 컨테이너 기동 시 최신 스키마를 먼저 반영
+echo "Running Alembic migrations..."
+alembic -c alembic.ini upgrade head
+
 # -----------------------------------------------------------------------------
 # 서버 시작
 # -----------------------------------------------------------------------------

@@ -88,4 +88,4 @@ curl -X POST "http://localhost:9000/recommend/news" \
 
 주의:
 - 위 `localhost:9000`은 로컬 테스트 예시입니다.
-- `.env.example`의 기본 서비스 주소는 `http://recommend-api:8000` 계열일 수 있으므로, 실제 실행 환경에 맞게 호스트와 포트를 조정해야 합니다.
+- `.env.example`의 기본 `RECOMMENDER_BASE_URL`은 `http://recommend-api:8000`이므로, `localhost:9000` 대신 현재 로컬에서 실제로 열린 호스트/포트를 사용해야 합니다.

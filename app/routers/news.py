@@ -477,6 +477,11 @@ async def get_news_recommendations(
         except KISError as exc:
             logger.warning("추천 서버 호출 실패: %s", exc)
             candidates = []
+            recommender_next_cursor = None
+        except Exception:
+            logger.exception("추천 서버 응답 정규화 실패")
+            candidates = []
+            recommender_next_cursor = None
 
         if not candidates:
             source = "mock_fallback"
