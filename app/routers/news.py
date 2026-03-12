@@ -419,6 +419,44 @@ async def _log_recommendation_serve(
         raise
 
 
+async def _load_recommendation_items_with_topup(
+    db: AsyncSession,
+    candidates: list[RecommendationCandidate],
+    source: str,
+    limit: int,
+) -> tuple[list[NewsRecommendationItem], list[RecommendationCandidate]]:
+    """누락된 뉴스 행이 있을 때 다음 후보로 응답 개수를 보충한다."""
+    if not candidates or limit <= 0:
+        return [], []
+
+    loaded_items: list[NewsRecommendationItem] = []
+    loaded_candidates: list[RecommendationCandidate] = []
+    loaded_ids: set[int] = set()
+    start = 0
+
+    while start < len(candidates) and len(loaded_items) < limit:
+        batch = candidates[start : start + limit]
+        start += len(batch)
+        batch_items = await _load_news_by_ids(db, batch, source=source)
+        if not batch_items:
+            continue
+
+        candidate_by_id = {candidate.news_id: candidate for candidate in batch}
+        for item in batch_items:
+            if item.news_id in loaded_ids:
+                continue
+            candidate = candidate_by_id.get(item.news_id)
+            if candidate is None:
+                continue
+            loaded_ids.add(item.news_id)
+            loaded_items.append(item)
+            loaded_candidates.append(candidate)
+            if len(loaded_items) >= limit:
+                break
+
+    return loaded_items, loaded_candidates
+
+
 @router.get("/recommendations", response_model=NewsRecommendationResponse)
 async def get_news_recommendations(
     user_id: Optional[int] = Query(None, ge=1, description="호환용 사용자 ID(토큰 사용자와 같아야 함)"),
@@ -508,28 +546,38 @@ async def get_news_recommendations(
     if not resolved_request_id:
         resolved_request_id = f"req-{uuid4().hex}"
 
-    items = await _load_news_by_ids(db, candidates, source=source)
-    candidate_by_id: dict[int, RecommendationCandidate] = {
-        candidate.news_id: candidate for candidate in candidates
-    }
-    served_candidates = [
-        candidate_by_id[item.news_id]
-        for item in items
-        if item.news_id in candidate_by_id
-    ]
+    items, served_candidates = await _load_recommendation_items_with_topup(
+        db=db,
+        candidates=candidates,
+        source=source,
+        limit=effective_limit,
+    )
     logged = False
     if log_served:
-        logged = await _log_recommendation_serve(
-            db=db,
-            user_id=resolved_user_id,
-            request_id=resolved_request_id,
-            page=resolved_page,
-            limit=effective_limit,
-            screen_session_id=screen_session_id,
-            app_session_id=app_session_id,
-            source=source,
-            candidates=served_candidates,
-        )
+        try:
+            logged = await _log_recommendation_serve(
+                db=db,
+                user_id=resolved_user_id,
+                request_id=resolved_request_id,
+                page=resolved_page,
+                limit=effective_limit,
+                screen_session_id=screen_session_id,
+                app_session_id=app_session_id,
+                source=source,
+                candidates=served_candidates,
+            )
+        except Exception as exc:
+            await db.rollback()
+            logger.warning(
+                "recommendation serve logging failed: user_id=%s request_id=%s page=%s limit=%s source=%s err=%s",
+                resolved_user_id,
+                resolved_request_id,
+                resolved_page,
+                effective_limit,
+                source,
+                exc,
+            )
+            logged = False
 
     next_cursor: Optional[str] = None
     if source == "recommender":

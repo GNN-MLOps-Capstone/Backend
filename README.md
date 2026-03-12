@@ -77,16 +77,17 @@ cp .env.example .env
 # .env 파일에서 DATABASE_URL 설정
 
 # 3. 외부 Docker 네트워크 준비(최초 1회)
-docker network create crawling_news-network
+docker network inspect crawling_news-network >/dev/null 2>&1 || docker network create crawling_news-network
 # proxy-net을 함께 쓰는 환경이면 추가 생성
-docker network create proxy-net
+docker network inspect proxy-net >/dev/null 2>&1 || docker network create proxy-net
 
 # 4. 이미지 빌드
 docker compose build
 
 # 5. 앱 실행
-# news-api 컨테이너 entrypoint가 시작 전에 alembic upgrade head를 자동 실행
+# 마이그레이션이 필요하면 MIGRATE_ON_STARTUP=true를 함께 지정해 1회만 실행
 docker compose up -d
+# 예시: MIGRATE_ON_STARTUP=true docker compose up -d
 
 # 6. 로그 확인
 docker compose logs -f news-api
