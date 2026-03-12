@@ -317,3 +317,5 @@ class AITrendResponse(BaseModel):
     name: str
     weather: WeatherType
     score: int
+    last_price: int | None = None
+    change_rate: float | None = None

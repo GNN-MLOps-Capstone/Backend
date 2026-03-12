@@ -1194,7 +1194,43 @@ async def read_ai_trends(
             # 데이터가 없을 경우 빈 리스트 혹은 404 선택 (여기선 빈 리스트)
             return []
             
-        return trends
+        async def _fetch_overview_safe(code: str) -> dict | None:
+            try:
+                cache_key = f"overview:{code}"
+                cached = await cache.get(cache_key)
+                if cached is not None:
+                    return cached
+
+                data = await client.request(
+                    "GET",
+                    "/uapi/domestic-stock/v1/quotations/inquire-price",
+                    tr_id="FHKST01010100",
+                    params={
+                        "FID_COND_MRKT_DIV_CODE": "J",
+                        "FID_INPUT_ISCD": code,
+                    },
+                )
+                _ensure_kis_ok(data)
+                overview = transform_overview(data, code)
+                await cache.set(cache_key, overview, ttl_seconds=3)
+                return overview
+            except Exception as e:
+                logger.warning("overview fetch failed for %s: %s", code, e)
+                return None
+
+        overviews = await asyncio.gather(
+            *[_fetch_overview_safe(t["code"]) for t in trends]
+        )
+
+        results = []
+        for trend, overview in zip(trends, overviews):
+            results.append({
+                **trend,
+                "last_price": overview.get("last_price") if overview else None,
+                "change_rate": overview.get("change_rate") if overview else None,
+            })
+
+        return results
         
     except Exception as e:
         # 실제 서비스 시 로그 기록(logger.error) 필요
