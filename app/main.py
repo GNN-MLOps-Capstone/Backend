@@ -27,13 +27,21 @@ FastAPI 메인 애플리케이션 (main.py)
 ==============================================================================
 """
 
-from contextlib import asynccontextmanager  # 비동기 컨텍스트 매니저
-from fastapi import FastAPI  # 웹 프레임워크
-from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어
 import logging
+from contextlib import asynccontextmanager  # 비동기 컨텍스트 매니저
+from hashlib import sha256
+from pathlib import Path
+
+from fastapi import FastAPI, Header, HTTPException, status  # 웹 프레임워크
+from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어
 
 from app.config import get_settings  # 설정 가져오기
 from app.database import init_db  # DB 초기화 함수
+from app.routers import news  # 뉴스 API 라우터
+from app.routers import stocks
+from app.routers import users
+from app.routers import notifications
+from app.routers import watchlist
 
 # 설정 객체 가져오기
 settings = get_settings()
@@ -48,6 +56,20 @@ from app.routers import news, stocks, users, notifications, watchlist, interacti
 
 logger = logging.getLogger(__name__)
 logger.info("Server configuration loaded.")
+
+
+def _file_fingerprint(path: Path) -> dict[str, str] | None:
+    """파일의 경로, 수정 시각, 축약 SHA-256 해시를 반환한다."""
+    try:
+        stat = path.stat()
+        digest = sha256(path.read_bytes()).hexdigest()[:12]
+    except OSError:
+        return None
+    return {
+        "path": str(path),
+        "sha256_12": digest,
+        "mtime": str(int(stat.st_mtime)),
+    }
 
 # =============================================================================
 # 애플리케이션 생명주기 관리
@@ -239,6 +261,38 @@ async def health_check():
         - 로드밸런서 health check
     """
     return {"status": "healthy"}
+
+
+@app.get("/internal/health/code")
+async def internal_health_code(
+    x_internal_health_key: str | None = Header(default=None, alias="X-Internal-Health-Key"),
+):
+    """
+    내부 전용 코드 fingerprint 확인 엔드포인트.
+
+    올바른 내부 헤더 키가 있어야 현재 실행 중인 주요 파일 fingerprint를 반환한다.
+    """
+    configured_key = settings.internal_health_key.strip()
+    if not configured_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Internal health endpoint is disabled",
+        )
+    if x_internal_health_key != configured_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid internal health key",
+        )
+
+    app_root = Path(__file__).resolve().parent
+    stocks_router = _file_fingerprint(app_root / "routers" / "stocks.py")
+    stocks_transformer = _file_fingerprint(app_root / "kis" / "transformers.py")
+
+    return {
+        "status": "healthy",
+        "stocks_router": stocks_router,
+        "stocks_transformer": stocks_transformer,
+    }
 
 
 # =============================================================================

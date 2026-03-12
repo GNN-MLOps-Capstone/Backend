@@ -1,25 +1,46 @@
 """
-위치리스트
+==============================================================================
+관심종목 API 라우터 (watchlist.py)
+==============================================================================
+
+API 엔드포인트:
+    GET    /api/watchlist              -> 관심종목 목록
+    POST   /api/watchlist              -> 종목 추가
+    DELETE /api/watchlist/{code}       -> 종목 삭제
+    GET    /api/watchlist/briefing     -> AI 브리핑 (Gemini, 시장 Top3 이슈)
+    GET    /api/stocks/{code}          -> 종목 상세
+
+==============================================================================
 """
 
-
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, case
+from sqlalchemy import select, delete, func, case
+
 from datetime import datetime, timedelta, timezone
 import logging
 from google.genai import types
 from google import genai
 
 from app.database import get_db
-from app.models import FilteredNews, NewsStockMapping, Stock, StockSummaryCache
-from app.schemas import IssueStock, IssueRankingResponse
-from app.config import get_settings
+
+from app.models import Watchlist, Stock, StockSummaryCache, User, FilteredNews, NewsStockMapping
+from app.routers.users import get_current_user
 from app.routers.news import get_stock_summary
+from app.schemas import (
+    WatchlistAddRequest,
+    WatchlistStockResponse,
+    IssueStock,
+    IssueRankingResponse,
+)
+from app.config import get_settings
+from app.services.kis_service import kis_service
 
 
 router = APIRouter(
-    prefix="/api/watchlist",
+    prefix="/api",
+
     tags=["watchlist"],
 )
 
@@ -29,20 +50,135 @@ gemini_client = genai.Client(api_key=settings.gemini_api)
 
 _briefing_cache = {
     "data": None,
-    "expires_at": datetime.min.replace(tzinfo=timezone.utc) # 초기값은 과거 시간으로 설정하여 무조건 1번은 실행되게 함
+    "expires_at": datetime.min.replace(tzinfo=timezone.utc)
 }
 CACHE_TTL_MINUTES = 60
 
+
+# =============================================================================
+# 관심종목 목록 조회
+# =============================================================================
+
+@router.get("/watchlist", response_model=list[WatchlistStockResponse])
+async def get_watchlist(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """관심종목 목록 조회"""
+    query = (
+        select(Watchlist)
+        .where(Watchlist.user_id == current_user.id)
+        .order_by(Watchlist.created_at.desc())
+    )
+    result = await db.execute(query)
+    watchlist_items = result.scalars().all()
+
+    if not watchlist_items:
+        return []
+
+    stock_codes = [item.stock_id for item in watchlist_items]
+
+    prices = await kis_service.get_multiple_prices(stock_codes)
+
+    stock_result = await db.execute(
+        select(Stock).where(Stock.stock_id.in_(stock_codes))
+    )
+    stock_map = {row.stock_id: row for row in stock_result.scalars().all()}
+
+    cache_result = await db.execute(
+        select(StockSummaryCache).where(StockSummaryCache.stock_id.in_(stock_codes))
+    )
+    summary_map = {row.stock_id: row.summary_text for row in cache_result.scalars().all()}
+
+    response_list = []
+    for item in watchlist_items:
+        stock = stock_map.get(item.stock_id)
+        stock_name = stock.stock_name if stock else item.stock_id
+
+        price_info = prices.get(item.stock_id, {})
+        price = price_info.get("price", 0)
+        change_rate = price_info.get("change_rate", 0.0)
+
+        if change_rate >= 2.0:
+            weather = "SUNNY"
+        elif change_rate <= -2.0:
+            weather = "RAINY"
+        else:
+            weather = "CLOUDY"
+
+        response_list.append(
+            WatchlistStockResponse(
+                code=item.stock_id,
+                name=stock_name,
+                weather=weather,
+                price=price,
+                changeRate=change_rate,
+                keyword=stock.industry if stock and stock.industry else "",
+                aiSummary=summary_map.get(item.stock_id) or "",
+            )
+        )
+
+    return response_list
+
+
+# =============================================================================
+# 관심종목 추가
+# =============================================================================
+
+@router.post("/watchlist", response_model=dict)
+async def add_watchlist(
+    request: WatchlistAddRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """관심종목 추가"""
+    stock_result = await db.execute(
+        select(Stock).where(Stock.stock_id == request.code)
+    )
+    if not stock_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="존재하지 않는 종목입니다")
+
+    try:
+        db.add(Watchlist(user_id=current_user.id, stock_id=request.code))
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        return {"message": "이미 추가된 종목입니다", "code": request.code}
+
+    return {"message": "관심종목 추가 완료", "code": request.code}
+
+
+# =============================================================================
+# 관심종목 삭제
+# =============================================================================
+
+@router.delete("/watchlist/{code}", response_model=dict)
+async def delete_watchlist(
+    code: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """관심종목 삭제"""
+    await db.execute(
+        delete(Watchlist)
+        .where(Watchlist.stock_id == code, Watchlist.user_id == current_user.id)
+    )
+    await db.commit()
+
+    return {"message": "관심종목 삭제 완료", "code": code}
+
+
+# =============================================================================
+# AI 브리핑 (Gemini - 시장 Top3 이슈 종목)
+# =============================================================================
+
 async def _get_top_issues(db: AsyncSession, top_n: int = 3) -> list[IssueStock]:
-    """
-    특정 기간 동안의 뉴스를 분석하여 이슈지수가 높은 Top N 종목을 반환하는 내부 함수.
-    """
+    """특정 기간 동안의 뉴스를 분석하여 이슈지수가 높은 Top N 종목을 반환."""
     now = datetime.now(timezone.utc)
     recent_vol_stats = []
 
     for search_days in [1, 2, 3, 4, 5, 6, 7]:
         past_days_vol = now - timedelta(days=search_days)
-        
         query_vol = (
             select(
                 Stock.stock_name,
@@ -96,17 +232,11 @@ async def _get_top_issues(db: AsyncSession, top_n: int = 3) -> list[IssueStock]:
             FilteredNews.created_at >= past_7_days,
             FilteredNews.created_at <= now
         )
-        .group_by(Stock.stock_name) 
+        .group_by(Stock.stock_name)
     )
-    
     result_sent = await db.execute(query_sent)
-    recent_sentiment_stats = result_sent.all()
+    sentiment_dict = {stat.stock_name: stat.avg_sentiment for stat in result_sent.all()}
 
-    sentiment_dict = {stat.stock_name: stat.avg_sentiment for stat in recent_sentiment_stats}
-
-    # ---------------------------------------------------------
-    # 3. 로직 처리 (정규화 및 이슈지수 계산)
-    # ---------------------------------------------------------
     counts = [stat.recent_news_count for stat in recent_vol_stats]
     max_count = max(counts) if counts else 1
     min_count = min(counts) if counts else 0
@@ -138,6 +268,7 @@ async def _get_top_issues(db: AsyncSession, top_n: int = 3) -> list[IssueStock]:
             issue_index=round(issue_index, 4)
         ))
 
+
     # ---------------------------------------------------------
     # 4. 정렬 후 Top N 반환
     # ---------------------------------------------------------
@@ -145,9 +276,9 @@ async def _get_top_issues(db: AsyncSession, top_n: int = 3) -> list[IssueStock]:
 
     return top_issues
 
-async def call_gemini_overall_briefing(combined_summaries: str):
+async def _call_gemini_briefing(combined_summaries: str) -> str:
     """3개 종목의 개별 요약문을 받아, 하나의 자연스러운 종합 브리핑으로 묶어줍니다."""
-    
+
     system_prompt = """
     당신은 모바일 증권 앱의 수석 AI 애널리스트입니다.
     오늘 시장에서 가장 뜨거운 이슈가 된 Top 3 종목의 개별 요약문이 제공됩니다.
@@ -168,9 +299,9 @@ async def call_gemini_overall_briefing(combined_summaries: str):
             model="gemini-2.0-flash-lite",
             contents=combined_summaries,
             config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                temperature=0.3  # 자연스러운 문장 생성을 위해 온도를 살짝 높임
-            )
+            system_instruction=system_prompt,
+            temperature=0.3
+        )
         )
         logger.info("최종 AI 브리핑 멘트 생성 완료")
         text = response.text
@@ -183,28 +314,25 @@ async def call_gemini_overall_briefing(combined_summaries: str):
     except Exception:
         logger.exception("최종 브리핑 생성 오류")
         return "현재 시장 이슈를 분석하는데 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
-    
-@router.get("/briefing", response_model=IssueRankingResponse)
+
+@router.get("/watchlist/briefing", response_model=IssueRankingResponse)
 async def get_watchlist_briefing(db: AsyncSession = Depends(get_db)):
-    # 1. Top 3 이슈 종목 선정 (이전에 만든 내부 함수 호출)
-    # _get_top_issues 함수는 이전 답변에서 작성한 로직을 그대로 사용하시면 됩니다.
     global _briefing_cache
     now = datetime.now(timezone.utc)
 
     if _briefing_cache["data"] and now < _briefing_cache["expires_at"]:
         logger.info("캐시된 AI 브리핑 데이터를 반환합니다. (속도 0.01초!)")
         return _briefing_cache["data"]
-    
+
     logger.info("새로운 AI 브리핑 데이터를 생성합니다. (API 호출)")
 
     top_issues = await _get_top_issues(db, top_n=3)
-    
+
     if not top_issues:
         return {"text": "현재 시장에 뚜렷한 이슈 종목이 없습니다.", "top_issues": []}
 
-    # 2. news.py 의 함수를 활용해 각 종목별 개별 요약문 수집
     summaries_text_list = []
-    
+
     for issue in top_issues:
         stock_name = issue.stock_name
         try:
@@ -216,11 +344,9 @@ async def get_watchlist_briefing(db: AsyncSession = Depends(get_db)):
             logger.warning("종목 요약 캐시 없음, 건너뜀: %s", stock_name)
             continue
 
-    # 3. 3개의 요약문을 하나의 긴 텍스트로 합치기
     combined_summaries = "\n\n".join(summaries_text_list)
 
-    # 4. 결합된 텍스트를 제미나이에 넣고 최종 "브리핑 멘트" 생성
-    final_briefing_text = await call_gemini_overall_briefing(combined_summaries)
+    final_briefing_text = await _call_gemini_briefing(combined_summaries)
 
     result_data = {
         "text": final_briefing_text,
@@ -231,5 +357,49 @@ async def get_watchlist_briefing(db: AsyncSession = Depends(get_db)):
     _briefing_cache["expires_at"] = now + timedelta(minutes=CACHE_TTL_MINUTES)
     logger.info(f"브리핑 캐시 갱신 완료! (다음 갱신: {CACHE_TTL_MINUTES}분 후)")
 
-    # 5. 프론트엔드 포맷에 맞춰 응답 반환
     return result_data
+
+
+# =============================================================================
+# 종목 상세 조회
+# =============================================================================
+
+@router.get("/stocks/{code}", response_model=WatchlistStockResponse)
+async def get_stock_detail(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """종목 상세 조회"""
+    result = await db.execute(
+        select(Stock).where(Stock.stock_id == code)
+    )
+    stock = result.scalar_one_or_none()
+
+    if not stock:
+        raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다")
+
+    price_info = await kis_service.get_stock_price(code)
+    price = price_info.get("price", 0)
+    change_rate = price_info.get("change_rate", 0.0)
+
+    cache_result = await db.execute(
+        select(StockSummaryCache).where(StockSummaryCache.stock_id == code)
+    )
+    cache = cache_result.scalar_one_or_none()
+
+    if change_rate >= 2.0:
+        weather = "SUNNY"
+    elif change_rate <= -2.0:
+        weather = "RAINY"
+    else:
+        weather = "CLOUDY"
+
+    return WatchlistStockResponse(
+        code=stock.stock_id,
+        name=stock.stock_name or code,
+        weather=weather,
+        price=price,
+        changeRate=change_rate,
+        keyword=stock.industry or "",
+        aiSummary=cache.summary_text if cache and cache.summary_text else "",
+    )
