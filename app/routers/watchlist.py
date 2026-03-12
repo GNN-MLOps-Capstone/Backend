@@ -24,6 +24,7 @@ from datetime import datetime, timedelta, timezone
 import logging
 from google.genai import types
 from google import genai
+from enum import Enum, auto
 
 from app.database import get_db
 
@@ -249,6 +250,9 @@ async def delete_watchlist(
 
     return {"message": "관심종목 삭제 완료", "code": code}
 
+class IssueError(Enum):
+    NO_WATCHLIST = auto()
+    NO_RECENT_NEWS = auto()
 
 # =============================================================================
 # AI 브리핑 (Gemini - 시장 Top3 이슈 종목)
@@ -258,17 +262,17 @@ async def _get_top_issues(
     db: AsyncSession, 
     current_user: User, 
     top_n: int = 3
-) -> list[IssueStock] | int:
+) -> list[IssueStock] | IssueError:
     now = datetime.now(timezone.utc)
     past_7_days = now - timedelta(days=7)
 
     # 1. 사용자의 관심종목 리스트 가져오기
     watchlist_query = select(Watchlist.stock_id).where(Watchlist.user_id == current_user.id)
     watchlist_result = await db.execute(watchlist_query)
-    watchlist_ids = [row for row in watchlist_result.scalars().all()]
+    watchlist_ids = watchlist_result.scalars().all()
 
     if not watchlist_ids:
-        return 1  # 관심종목이 존재하지 않음
+        return IssueError.NO_WATCHLIST
 
     # 2. 관심종목들의 최근 7일간 뉴스 통계 조회 (이슈지수 계산용)
     # FilteredNews와 NewsStockMapping을 조인하여 관심종목(watchlist_ids)에 해당하는 데이터만 필터링
@@ -293,7 +297,7 @@ async def _get_top_issues(
     recent_vol_stats = result_vol.all()
 
     if not recent_vol_stats:
-        return 2  # 관심종목에 대한 최근 7일간 뉴스가 없음
+        return IssueError.NO_RECENT_NEWS
 
     # 3. 감성 점수 계산 (7일간 평균)
     sentiment_score_expr = case(
@@ -400,9 +404,9 @@ async def get_watchlist_briefing(
     logger.info(f"유저 {current_user.id}: 실시간 AI 브리핑 생성을 시작합니다.")
 
     top_issues = await _get_top_issues(db, current_user, top_n=3)
-    if top_issues == 1:
+    if top_issues == IssueError.NO_WATCHLIST:
         return IssueRankingResponse(text="선택하신 관심종목이 존재하지 않습니다.", top_issues=[])
-    if top_issues == 2:
+    if top_issues == IssueError.NO_RECENT_NEWS:
         return IssueRankingResponse(text="관심종목에 대해 최근 7일간 발생한 뉴스가 없습니다.", top_issues=[])
 
     summaries_text_list = []
@@ -490,7 +494,7 @@ async def get_stock_detail(
         aiSummary=cache.summary_text if cache and cache.summary_text else "",
     )
 
-async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str = None) -> str:
+async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str | None = None) -> str:
     """
     stock_id를 기준으로 캐시를 관리하고 최신 뉴스 발생 시 요약을 갱신함
     """
@@ -505,10 +509,6 @@ async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str
         stock_res = await db.execute(stock_stmt)
         stock_name = stock_res.scalar_one_or_none() or stock_id
 
-    # 캐시 레코드가 없으면 생성
-    if not cache:
-        cache = StockSummaryCache(stock_id=stock_id, stock_name=stock_name, summary_text="")
-        db.add(cache)
 
     # 3. 최신 뉴스 10개 ID 확인
     news_stmt = (
@@ -543,10 +543,22 @@ async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str
     new_summary = await call_gemini_summary(stock_name, len(news_summaries), combined_text)
 
     if new_summary:
-        cache.latest_news_id = latest_news_id
-        cache.summary_text = new_summary
-        cache.stock_name = stock_name # 이름 업데이트
-        cache.created_at = datetime.now(timezone.utc)
-        return new_summary
+        stmt = pg_insert(StockSummaryCache).values(
+            stock_id=stock_id,
+            stock_name=stock_name,
+            summary_text=new_summary,
+            latest_news_id=latest_news_id,
+            created_at=datetime.now(timezone.utc),
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["stock_id"],
+            set_={
+                "stock_name": stock_name,
+                "summary_text": new_summary,
+                "latest_news_id": latest_news_id,
+                "created_at": datetime.now(timezone.utc),
+            },
+        )
+        await db.execute(stmt)
     
     return cache.summary_text or "요약 생성에 실패했습니다."
