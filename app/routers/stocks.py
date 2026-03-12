@@ -1158,6 +1158,7 @@ async def get_ai_trends(db: AsyncSession, top_n: int = 3) -> list[dict]:
         temp_results.append({
             "code": stat.stock_id,
             "weather": weather,
+            "name": stat.stock_name,
             "score": round(score * 100), # 100점 만점 환산
             "issue_index": score        # 정렬용
         })
@@ -1169,6 +1170,7 @@ async def get_ai_trends(db: AsyncSession, top_n: int = 3) -> list[dict]:
         {
             "rank": i + 1,
             "code": item["code"],
+            "name": item["name"],
             "weather": item["weather"],
             "score": item["score"]
         }

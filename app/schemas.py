@@ -314,5 +314,6 @@ class WeatherType(str, Enum):
 class AITrendResponse(BaseModel):
     rank: int
     code: str
+    name: str
     weather: WeatherType
     score: int
