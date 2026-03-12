@@ -17,6 +17,7 @@ from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from datetime import datetime,time
 import re
+from enum import Enum
 
 class NewsSimpleResponse(BaseModel):
     """
@@ -304,3 +305,14 @@ class IssueStock(BaseModel):
 class IssueRankingResponse(BaseModel):
     text: str
     top_issues: List[IssueStock]
+
+class WeatherType(str, Enum):
+    SUNNY = "SUNNY"
+    CLOUDY = "CLOUDY"
+    RAINY = "RAINY"
+
+class AITrendResponse(BaseModel):
+    rank: int
+    code: str
+    weather: WeatherType
+    score: int

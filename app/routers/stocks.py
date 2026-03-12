@@ -4,13 +4,15 @@ KIS Open API를 사용하는 주식 라우터
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Path, WebSocket, WebSocketDisconnect, Query, Request
 import re
 import asyncio
 import contextlib
 import logging
+from sqlalchemy import select, func, case
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.kis.cache import TTLCache
@@ -18,7 +20,9 @@ from app.kis.client import KISClient
 from app.kis.errors import KISError
 from app.kis.transformers import transform_overview, transform_series_time, transform_series_daily, KST
 from app.kis.ws_client import KISWSClient
-from app.schemas import StockOverviewResponse, StockSeriesResponse, StockSeriesQuery
+from app.schemas import StockOverviewResponse, StockSeriesResponse, StockSeriesQuery, AITrendResponse
+from app.models import Stock, FilteredNews, NewsStockMapping
+from app.database import get_db
 
 
 router = APIRouter(
@@ -1074,3 +1078,122 @@ async def get_stock_series(
             _raise_kis_http_error(exc)
 
     raise HTTPException(status_code=400, detail="Unsupported range")
+
+async def get_ai_trends(db: AsyncSession, top_n: int = 3) -> list[dict]:
+    """오늘의 AI 트렌드: 이슈 지수 기반 Top N 종목 반환"""
+    now = datetime.now(timezone.utc)
+    recent_vol_stats = []
+    
+    # 1. 뉴스 데이터가 있는 기간 동적 탐색 (기존 로직 유지)
+    for search_days in range(1, 8):
+        past_days_vol = now - timedelta(days=search_days)
+        query_vol = (
+            select(
+                Stock.stock_name,
+                Stock.stock_id,  # API 응답을 위해 코드 추가
+                func.count(FilteredNews.news_id).label('recent_news_count')
+            )
+            .select_from(Stock)
+            .join(NewsStockMapping, Stock.stock_id == NewsStockMapping.stock_id)
+            .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
+            .where(
+                FilteredNews.created_at >= past_days_vol,
+                FilteredNews.created_at <= now
+            )
+            .group_by(Stock.stock_name, Stock.stock_id)
+        )
+        
+        result_vol = await db.execute(query_vol)
+        recent_vol_stats = result_vol.all()
+        if len(recent_vol_stats) >= top_n:
+            break
+
+    if not recent_vol_stats:
+        return []
+
+    # 2. 감성 점수 계산 (날씨 판별을 위해 원본 감성값 필요)
+    issue_stocks = [stat.stock_name for stat in recent_vol_stats]
+    past_7_days = now - timedelta(days=7)
+    sentiment_score_expr = case(
+        (FilteredNews.sentiment == '긍정', 1.0),
+        (FilteredNews.sentiment == '부정', -1.0),
+        else_=0.0
+    )
+
+    query_sent = (
+        select(
+            Stock.stock_name,
+            func.avg(sentiment_score_expr).label('avg_sentiment')
+        )
+        .select_from(Stock)
+        .join(NewsStockMapping, Stock.stock_id == NewsStockMapping.stock_id)
+        .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
+        .where(
+            Stock.stock_name.in_(issue_stocks),
+            FilteredNews.created_at >= past_7_days,
+            FilteredNews.created_at <= now
+        )
+        .group_by(Stock.stock_name)
+    )
+    result_sent = await db.execute(query_sent)
+    sentiment_dict = {stat.stock_name: stat.avg_sentiment for stat in result_sent.all()}
+
+    # 3. 점수 계산 및 정규화
+    counts = [stat.recent_news_count for stat in recent_vol_stats]
+    max_count, min_count = max(counts), min(counts)
+
+    temp_results = []
+    for stat in recent_vol_stats:
+        raw_sent = sentiment_dict.get(stat.stock_name, 0.0)
+        norm_vol = (stat.recent_news_count - min_count) / (max_count - min_count) if max_count != min_count else 0.5
+        
+        # 이슈 지수: (|감성| * 0.7) + (뉴스량 * 0.3)
+        score = (abs(raw_sent) * 0.7) + (norm_vol * 0.3)
+        
+        # 날씨 매핑 로직 (감성값 기준)
+        if raw_sent > 0.2: weather = "SUNNY"
+        elif raw_sent < -0.2: weather = "RAINY"
+        else: weather = "CLOUDY"
+
+        temp_results.append({
+            "code": stat.stock_id,
+            "weather": weather,
+            "score": round(score * 100), # 100점 만점 환산
+            "issue_index": score        # 정렬용
+        })
+
+    # 4. 내림차순 정렬 후 순위(rank) 부여
+    top_issues = sorted(temp_results, key=lambda x: x['issue_index'], reverse=True)[:top_n]
+    
+    return [
+        {
+            "rank": i + 1,
+            "code": item["code"],
+            "weather": item["weather"],
+            "score": item["score"]
+        }
+        for i, item in enumerate(top_issues)
+    ]
+
+@router.get("/trends", response_model=list[AITrendResponse])
+async def read_ai_trends(
+    db: AsyncSession = Depends(get_db), 
+    top_n: int = 3
+):
+    """
+    오늘의 AI 트렌드 종목 조회
+    - 이슈 지수 = (|감성| * 0.7) + (뉴스량 * 0.3)
+    - 내림차순 정렬 후 상위 N개 반환
+    """
+    try:
+        trends = await get_ai_trends(db, top_n=top_n)
+        
+        if not trends:
+            # 데이터가 없을 경우 빈 리스트 혹은 404 선택 (여기선 빈 리스트)
+            return []
+            
+        return trends
+        
+    except Exception as e:
+        # 실제 서비스 시 로그 기록(logger.error) 필요
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
