@@ -244,7 +244,9 @@ POST /api/interactions/events
 - 추천 탭: `screen_view`, `screen_heartbeat`, `screen_leave`
 - 뉴스 상세: `content_open`, `content_heartbeat`, `content_leave`
 - 추천 요청/응답: `recommendation_request`, `recommendation_response`
-- 추천 노출/스크롤: `recommendation_impression`, `scroll_depth`
+- 추천 스크롤: `scroll_depth`
+
+현재 운영 가이드 기준으로는 추천 목록 노출은 `recommendation_serves`로 판단하므로 `recommendation_impression`은 기본적으로 사용하지 않습니다.
 
 예시:
 
@@ -262,16 +264,6 @@ curl -X POST "http://localhost:8000/api/interactions/events" \
       },
       {
         "event_id": "evt-2",
-        "user_id": 1,
-        "event_type": "recommendation_impression",
-        "screen_session_id": "screen-s1",
-        "request_id": "req-1",
-        "news_id": 101,
-        "position": 1,
-        "page": 1
-      },
-      {
-        "event_id": "evt-2-1",
         "user_id": 1,
         "event_type": "scroll_depth",
         "screen_session_id": "screen-s1",
@@ -293,7 +285,8 @@ curl -X POST "http://localhost:8000/api/interactions/events" \
         "event_id": "evt-4",
         "user_id": 1,
         "event_type": "content_leave",
-        "content_session_id": "content-c1"
+        "content_session_id": "content-c1",
+        "news_id": 101
       },
       {
         "event_id": "evt-5",
@@ -308,7 +301,11 @@ curl -X POST "http://localhost:8000/api/interactions/events" \
 추천 목록 로깅은 `GET /api/news/recommendations`의 `log_served=true`(기본값)로도 자동 저장됩니다.
 저장 테이블:
 - `recommendation_serves`: 요청 단위(요청 ID, 페이지, source, served_count, `served_items`)
-- `interaction_events`: 추천 요청/응답/노출/스크롤/콘텐츠 이벤트 원본 로그
+- `interaction_events`: 추천 요청/응답/스크롤/콘텐츠 이벤트 원본 로그
+
+현재 운영 권장안:
+- `content_open`에는 `news_id`를 반드시 포함
+- `content_leave`에도 같은 `news_id`를 함께 포함
 
 `POST /api/interactions/events` 응답 필드:
 - `accepted`: 저장된 이벤트 수

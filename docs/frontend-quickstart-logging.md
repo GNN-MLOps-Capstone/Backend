@@ -29,7 +29,8 @@
 2. `screen_session_id`는 화면 진입~이탈 동안 같은 값
 3. `content_session_id`는 기사 진입~이탈 동안 같은 값
 4. `content_open`에는 `news_id` 반드시 포함
-5. 한 번에 여러 이벤트를 `events` 배열로 배치 전송 가능
+5. `content_leave`에도 같은 `news_id`를 함께 넣는 것을 권장
+6. 한 번에 여러 이벤트를 `events` 배열로 배치 전송 가능
 
 ## 4) 바로 쓰는 예시 payload
 
@@ -60,7 +61,8 @@
       "user_id": 1,
       "event_type": "content_leave",
       "app_session_id": "app-s1",
-      "content_session_id": "content-c1"
+      "content_session_id": "content-c1",
+      "news_id": 101
     },
     {
       "event_id": "2b6d62de-c42f-4e3f-bb7a-b6b0d460e3af",
@@ -75,8 +77,9 @@
 
 ## 5) 나중에 여유되면 추가할 이벤트
 
-- `recommendation_impression` (목록 노출)
 - `scroll_depth` (스크롤 깊이)
 - `recommendation_request`, `recommendation_response`
 
 이건 2차 작업으로 붙여도 됩니다.
+
+현재 운영 기준으로는 추천 목록 노출을 `recommendation_serves`로 판단하므로 `recommendation_impression`은 사용하지 않습니다.

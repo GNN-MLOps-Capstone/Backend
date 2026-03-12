@@ -6,8 +6,7 @@
 
 1. 유저 추천 탭 진입
 2. 추천 API 호출
-3. 추천 목록 렌더링(노출 로그)
-4. 스크롤/무한스크롤 탐색 로그
+3. 스크롤/무한스크롤 탐색 로그
 5. 뉴스 클릭 + 체류시간 로그
 6. 화면 이탈까지 로그
 
@@ -54,7 +53,7 @@
 `GET /api/news/recommendations` 쿼리:
 
 - `user_id` (필수, `users.id` 정수값)
-- `limit` (기본 20)
+- `limit` (호환용 파라미터, 서버는 항상 20개 고정 반환)
 - `page` (기본 1, 무한스크롤 페이지)
 - `request_id` (선택, 미전달 시 서버 생성)
 - `screen_session_id` (권장, 로깅 연계)
@@ -94,12 +93,9 @@
 
 ### 5.3 추천 목록 노출/스크롤
 
-1. `recommendation_impression`
-- 아이템이 실제 화면에 노출될 때
-- 필수: `request_id`, `screen_session_id`, `news_id`, `position`
-- 권장: `page`
+현재 운영 기준으로 추천 목록 노출은 `recommendation_serves`로 판단하므로 `recommendation_impression`은 기본적으로 전송하지 않습니다.
 
-2. `scroll_depth`
+1. `scroll_depth`
 - 스크롤 깊이 변화 시(예: 25/50/75/100% 구간 진입)
 - 필수: `screen_session_id`, `scroll_depth`
 - 권장: `request_id`, `page`
@@ -115,6 +111,7 @@
 
 3. `content_leave`
 - 상세 이탈 시
+- 권장: `news_id`를 함께 전송
 
 ## 6. 이벤트 공통 필드
 
@@ -143,13 +140,12 @@
 2. `request_id` 생성 후 `recommendation_request` enqueue
 3. `GET /api/news/recommendations` 호출
 4. 응답 수신 후 `recommendation_response` enqueue
-5. 목록 렌더링하면서 최초 노출 아이템 `recommendation_impression` enqueue
-6. 스크롤 시 구간별 `scroll_depth` enqueue
-7. 하단 도달 시 `page += 1`로 추가 호출(같은 `request_id` 유지)
-8. 아이템 클릭 시 `content_session_id` 생성 + `content_open` enqueue
-9. 상세 체류 heartbeat 전송, 이탈 시 `content_leave` enqueue
-10. 추천 탭 종료 시 `screen_leave` enqueue
-11. 배치 전송: `POST /api/interactions/events`
+5. 스크롤 시 구간별 `scroll_depth` enqueue
+6. 하단 도달 시 `page += 1`로 추가 호출(같은 `request_id` 유지)
+7. 아이템 클릭 시 `content_session_id` 생성 + `content_open` enqueue
+8. 상세 체류 heartbeat 전송, 이탈 시 `content_leave` enqueue
+9. 추천 탭 종료 시 `screen_leave` enqueue
+10. 배치 전송: `POST /api/interactions/events`
 
 ## 8. 전송 전략
 
@@ -196,17 +192,6 @@
       "page": 1
     },
     {
-      "event_id": "2b6d62de-c42f-4e3f-bb7a-b6b0d460e3af",
-      "user_id": 1,
-      "event_type": "recommendation_impression",
-      "app_session_id": "app-s1",
-      "screen_session_id": "screen-s1",
-      "request_id": "req-r1",
-      "news_id": 101,
-      "position": 1,
-      "page": 1
-    },
-    {
       "event_id": "14d8f23a-7ad0-4aa7-95d4-6f8d5c93227a",
       "user_id": 1,
       "event_type": "scroll_depth",
@@ -232,7 +217,8 @@
       "user_id": 1,
       "event_type": "content_leave",
       "app_session_id": "app-s1",
-      "content_session_id": "content-c1"
+      "content_session_id": "content-c1",
+      "news_id": 101
     },
     {
       "event_id": "e24d9f65-4a2e-4ba9-9f4c-364a1d8a90b9",
@@ -249,7 +235,8 @@
 
 1. `content_open`에 `news_id`가 없으면 400 에러입니다.
 2. `recommendation_request/response`는 `request_id`, `screen_session_id`가 필요합니다.
-3. `recommendation_impression`은 `request_id`, `screen_session_id`, `news_id`, `position`이 필요합니다.
-4. `scroll_depth`는 `screen_session_id`, `scroll_depth`가 필요합니다.
-5. `event_ts_client`는 가능하면 UTC로 전송하세요.
-6. `POST /api/interactions/events` 응답은 `accepted`, `duplicated`만 반환합니다.
+3. `scroll_depth`는 `screen_session_id`, `scroll_depth`가 필요합니다.
+4. `content_leave`도 가능하면 `content_open`과 같은 `news_id`를 함께 보내세요.
+5. 추천 목록 노출 여부는 현재 `recommendation_serves` 기준으로 판단합니다.
+6. `event_ts_client`는 가능하면 UTC로 전송하세요.
+7. `POST /api/interactions/events` 응답은 `accepted`, `duplicated`만 반환합니다.

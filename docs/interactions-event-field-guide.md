@@ -11,10 +11,10 @@
 | `screen_leave` | `event_id`, `user_id`, `screen_session_id` | 화면 세션 종료 |
 | `content_open` | `event_id`, `user_id`, `content_session_id`, `news_id`, `request_id` | 기사 상세 진입(클릭) |
 | `content_heartbeat` | `event_id`, `user_id`, `content_session_id` | 기사 체류 갱신 |
-| `content_leave` | `event_id`, `user_id`, `content_session_id` | 기사 세션 종료 |
+| `content_leave` | `event_id`, `user_id`, `content_session_id` | 기사 세션 종료, 현재 운영 권장안은 `news_id`도 함께 전송 |
 | `recommendation_request` | `event_id`, `user_id`, `request_id`, `screen_session_id` | 추천 요청 추적 |
 | `recommendation_response` | `event_id`, `user_id`, `request_id`, `screen_session_id` | 추천 응답 추적 |
-| `recommendation_impression` | `event_id`, `user_id`, `request_id`, `screen_session_id`, `news_id`, `position` | 노출 집계 |
+| `recommendation_impression` | `event_id`, `user_id`, `request_id`, `screen_session_id`, `news_id`, `position` | 현재 기본 운영 흐름에서는 미사용 |
 | `scroll_depth` | `event_id`, `user_id`, `screen_session_id`, `scroll_depth` | 스크롤 깊이 기록 |
 
 기본 공통 필드:
@@ -23,12 +23,17 @@
 - `event_ts_client`: 클라이언트 이벤트 시각(없으면 서버 시각 사용)
 - `event_type`: DB enum(`interaction_event_type_enum`) 값만 허용
 
+콘텐츠 체류 이벤트 권장 규칙:
+- `content_open`에는 `news_id`를 반드시 넣습니다.
+- `content_leave`에도 같은 `news_id`를 함께 넣는 것을 권장합니다.
+
 ## 2. 저장 규칙
 
 - 모든 이벤트는 `interaction_events`에 append-only로 저장됩니다.
 - 서버는 이벤트 적재 시점에 세션/피드백 집계를 수행하지 않습니다.
 - 추천 성과 집계(노출/클릭/체류/완독)는 `interaction_events`와 `recommendation_serves`를 기준으로 Airflow 등 배치에서 처리합니다.
 - `GET /api/news/recommendations`의 `log_served=true`일 때는 `recommendation_serves`에 추천 응답 스냅샷이 저장됩니다.
+- 현재 운영 가이드에서는 추천 목록 노출 여부를 `recommendation_serves`로 간주하므로 `recommendation_impression`은 기본적으로 보내지 않습니다.
 
 ## 3. recommendation_serves 저장 형식
 
