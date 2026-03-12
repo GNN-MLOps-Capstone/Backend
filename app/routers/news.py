@@ -66,6 +66,7 @@ logger = logging.getLogger(__name__)
 gemini_client = genai.Client(api_key=settings.gemini_api)
 recommendation_client = RecommendationClient(settings)
 _CURSOR_VERSION = 1
+_RECOMMENDATION_PAGE_SIZE = 20
 
 # =============================================================================
 # 헬퍼 함수
@@ -410,7 +411,7 @@ async def _log_recommendation_serve(
 @router.get("/recommendations", response_model=NewsRecommendationResponse)
 async def get_news_recommendations(
     user_id: int = Query(..., ge=1, description="추천 대상 사용자 ID(users.id)"),
-    limit: int = Query(20, ge=1, le=100, description="가져올 추천 뉴스 개수"),
+    limit: int = Query(20, ge=1, le=100, description="호환용 파라미터(서버는 항상 20개 고정 반환)"),
     page: int = Query(1, ge=1, le=1000, description="무한 스크롤 페이지 (1부터 시작)"),
     cursor: Optional[str] = Query(None, max_length=512, description="다음 페이지 커서 (전달 시 page보다 우선)"),
     request_id: Optional[str] = Query(None, max_length=128, description="추천 요청 추적 ID (미전달 시 서버 생성)"),
@@ -426,10 +427,12 @@ async def get_news_recommendations(
     - RECOMMENDER_MOCK_MODE=false: 외부 추천 서버 호출
     - cursor 전달 시 page 대신 cursor 기반으로 다음 구간 조회
     - cursor 전달 시 추천 서버가 지원하는 next_cursor 연동을 그대로 사용
+    - 반환 개수는 클라이언트 limit과 무관하게 항상 20개로 고정
     """
+    effective_limit = _RECOMMENDATION_PAGE_SIZE
     resolved_request_id = request_id or f"req-{uuid4().hex}"
     resolved_page = page
-    offset = (resolved_page - 1) * limit
+    offset = (resolved_page - 1) * effective_limit
 
     source = "recommender"
     candidates: list[RecommendationCandidate] = []
@@ -441,12 +444,16 @@ async def get_news_recommendations(
     # - recommender: 외부 추천 서버 정상 결과
     if settings.recommender_mock_mode:
         source = "mock"
-        candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
+        candidates = await _mock_candidates_from_db_with_offset(
+            db=db,
+            limit=effective_limit,
+            offset=offset,
+        )
     else:
         try:
             result: RecommendationResult = await recommendation_client.get_news_candidates(
                 user_id=user_id,
-                limit=limit,
+                limit=effective_limit,
                 cursor=cursor,
             )
             candidates = result.items
@@ -457,7 +464,11 @@ async def get_news_recommendations(
 
         if not candidates:
             source = "mock_fallback"
-            candidates = await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=offset)
+            candidates = await _mock_candidates_from_db_with_offset(
+                db=db,
+                limit=effective_limit,
+                offset=offset,
+            )
 
     items = await _load_news_by_ids(db, candidates, source=source)
     candidate_by_id: dict[int, RecommendationCandidate] = {
@@ -475,7 +486,7 @@ async def get_news_recommendations(
             user_id=user_id,
             request_id=resolved_request_id,
             page=resolved_page,
-            limit=limit,
+            limit=effective_limit,
             screen_session_id=screen_session_id,
             app_session_id=app_session_id,
             source=source,
@@ -485,11 +496,11 @@ async def get_news_recommendations(
     next_cursor: Optional[str] = None
     if source == "recommender":
         next_cursor = recommender_next_cursor
-    elif not cursor and len(items) == limit:
+    elif not cursor and len(items) == effective_limit:
         next_cursor = _encode_recommendation_cursor(
             page=resolved_page + 1,
             offset=offset + len(items),
-            limit=limit,
+            limit=effective_limit,
         )
 
     return NewsRecommendationResponse(

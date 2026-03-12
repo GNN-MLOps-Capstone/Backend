@@ -195,7 +195,7 @@ GET /api/news/recommendations
 | 파라미터 | 타입    | 설명                                 | 기본값 |
 | -------- | ------- | ------------------------------------ | ------ |
 | user_id  | int     | 추천 대상 사용자 ID (`users.id`)     | -      |
-| limit    | int     | 가져올 추천 뉴스 개수                 | 20     |
+| limit    | int     | 호환용 파라미터(서버는 항상 20개 고정 반환) | 20 |
 | page     | int     | 무한 스크롤 페이지(1부터 시작)        | 1      |
 | cursor   | string  | 다음 페이지 커서(전달 시 page 우선순위보다 높음) | - |
 | request_id | string | 추천 요청 추적 ID(없으면 서버 생성)   | -      |
@@ -206,7 +206,7 @@ GET /api/news/recommendations
 예시:
 
 ```bash
-curl "http://localhost:8000/api/news/recommendations?user_id=1&limit=10&page=1&screen_session_id=screen-s1"
+curl "http://localhost:8000/api/news/recommendations?user_id=1&page=1&screen_session_id=screen-s1"
 ```
 
 응답 예시:
@@ -218,7 +218,7 @@ curl "http://localhost:8000/api/news/recommendations?user_id=1&limit=10&page=1&s
   "source": "recommender",
   "page": 1,
   "next_cursor": "eyJ2IjoxLCJwYWdlIjoyLCJvZmZzZXQiOjEwLCJsaW1pdCI6MTB9",
-  "served_count": 1,
+  "served_count": 20,
   "logged": true,
   "items": [
     {
