@@ -203,7 +203,7 @@ GET /api/news/recommendations
 
 | 파라미터 | 타입    | 설명                                 | 기본값 |
 | -------- | ------- | ------------------------------------ | ------ |
-| user_id  | int     | 추천 대상 사용자 ID (`users.id`)     | -      |
+| user_id  | int     | 호환용 사용자 ID. 전달 시 인증 사용자와 같아야 함 | - |
 | limit    | int     | 호환용 파라미터(서버는 항상 20개 고정 반환) | 20 |
 | page     | int     | 무한 스크롤 페이지(1부터 시작)        | 1      |
 | cursor   | string  | 다음 페이지 커서(전달 시 page 우선순위보다 높음) | - |
@@ -215,8 +215,12 @@ GET /api/news/recommendations
 예시:
 
 ```bash
-curl "http://localhost:8000/api/news/recommendations?user_id=1&page=1&screen_session_id=screen-s1"
+curl "http://localhost:8000/api/news/recommendations?page=1&screen_session_id=screen-s1" \
+  -H "Authorization: Bearer <access_token>"
 ```
+
+- 인증 필수 엔드포인트입니다.
+- `RECOMMENDER_MOCK_MODE=false`에서 2페이지 이상 조회할 때는 반드시 직전 응답의 `next_cursor`를 전달해야 합니다.
 
 응답 예시:
 
@@ -262,6 +266,7 @@ POST /api/interactions/events
 ```bash
 curl -X POST "http://localhost:8000/api/interactions/events" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access_token>" \
   -d '{
     "events": [
       {

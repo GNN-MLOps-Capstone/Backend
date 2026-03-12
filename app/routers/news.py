@@ -42,6 +42,7 @@ from app.models import (
     NewsStockMapping,
     FilteredNews,
     RecommendationServe,
+    User,
 )
 from app.schemas import (
     NewsSimpleResponse,
@@ -54,6 +55,7 @@ from app.schemas import (
 from app.config import get_settings
 from app.kis.errors import KISError
 from app.recommender.client import RecommendationClient, RecommendationCandidate, RecommendationResult
+from app.routers.users import get_current_user
 
 
 router = APIRouter(
@@ -419,7 +421,7 @@ async def _log_recommendation_serve(
 
 @router.get("/recommendations", response_model=NewsRecommendationResponse)
 async def get_news_recommendations(
-    user_id: int = Query(..., ge=1, description="추천 대상 사용자 ID(users.id)"),
+    user_id: Optional[int] = Query(None, ge=1, description="호환용 사용자 ID(토큰 사용자와 같아야 함)"),
     limit: int = Query(20, ge=1, le=100, description="호환용 파라미터(서버는 항상 20개 고정 반환)"),
     page: int = Query(1, ge=1, le=1000, description="무한 스크롤 페이지 (1부터 시작)"),
     cursor: Optional[str] = Query(None, max_length=512, description="다음 페이지 커서 (전달 시 page보다 우선)"),
@@ -427,6 +429,7 @@ async def get_news_recommendations(
     screen_session_id: Optional[str] = Query(None, max_length=64, description="추천 화면 세션 ID"),
     app_session_id: Optional[str] = Query(None, max_length=255, description="앱 세션 ID"),
     log_served: bool = Query(True, description="추천 응답을 DB 로깅할지 여부"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -438,8 +441,12 @@ async def get_news_recommendations(
     - cursor 전달 시 추천 서버가 지원하는 next_cursor 연동을 그대로 사용
     - 반환 개수는 클라이언트 limit과 무관하게 항상 20개로 고정
     """
+    if user_id is not None and user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="user_id does not match authenticated user")
+
+    resolved_user_id = current_user.id
     effective_limit = _RECOMMENDATION_PAGE_SIZE
-    resolved_request_id = request_id or f"req-{uuid4().hex}"
+    resolved_request_id = request_id
     resolved_page = page
     offset = (resolved_page - 1) * effective_limit
     decoded_cursor = _try_decode_recommendation_cursor(cursor)
@@ -466,14 +473,21 @@ async def get_news_recommendations(
             offset=offset,
         )
     else:
+        if cursor is None and page > 1:
+            raise HTTPException(
+                status_code=400,
+                detail="page>1 requires cursor when recommender_mock_mode is false",
+            )
         try:
             result: RecommendationResult = await recommendation_client.get_news_candidates(
-                user_id=user_id,
+                user_id=resolved_user_id,
                 limit=effective_limit,
                 cursor=cursor,
             )
             candidates = result.items
             recommender_next_cursor = result.next_cursor
+            if not resolved_request_id and result.request_id:
+                resolved_request_id = result.request_id
         except KISError as exc:
             logger.warning("추천 서버 호출 실패: %s", exc)
             candidates = []
@@ -491,6 +505,9 @@ async def get_news_recommendations(
                 offset=offset,
             )
 
+    if not resolved_request_id:
+        resolved_request_id = f"req-{uuid4().hex}"
+
     items = await _load_news_by_ids(db, candidates, source=source)
     candidate_by_id: dict[int, RecommendationCandidate] = {
         candidate.news_id: candidate for candidate in candidates
@@ -504,7 +521,7 @@ async def get_news_recommendations(
     if log_served:
         logged = await _log_recommendation_serve(
             db=db,
-            user_id=user_id,
+            user_id=resolved_user_id,
             request_id=resolved_request_id,
             page=resolved_page,
             limit=effective_limit,
@@ -525,7 +542,7 @@ async def get_news_recommendations(
         )
 
     return NewsRecommendationResponse(
-        user_id=user_id,
+        user_id=resolved_user_id,
         request_id=resolved_request_id,
         source=source,
         page=resolved_page,

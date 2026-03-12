@@ -12,8 +12,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import InteractionEvent, InteractionEventType
+from app.models import InteractionEvent, InteractionEventType, User
 from app.schemas import InteractionEventBatchRequest, InteractionIngestResponse
+from app.routers.users import get_current_user
 
 
 router = APIRouter(
@@ -60,6 +61,7 @@ def _as_utc(dt: datetime | None) -> datetime:
 @router.post("/events", response_model=InteractionIngestResponse)
 async def ingest_interaction_events(
     payload: InteractionEventBatchRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     if len(payload.events) > _MAX_BATCH_SIZE:
@@ -72,6 +74,8 @@ async def ingest_interaction_events(
     duplicated = 0
 
     for item in payload.events:
+        if item.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="event user_id does not match authenticated user")
         if item.event_type not in _ALLOWED_TYPES:
             raise HTTPException(status_code=400, detail=f"Unsupported event_type: {item.event_type}")
         if item.event_type in _RECOMMEND_REQUEST_RESPONSE:
