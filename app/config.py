@@ -136,6 +136,14 @@ class Settings(BaseSettings):
         for field_name, value in _non_negative.items():
             if value < 0:
                 raise ValueError(f"{field_name} must be non-negative, got {value}")
+        if self.recommender_timeout <= 0:
+            raise ValueError(
+                f"recommender_timeout must be greater than 0, got {self.recommender_timeout}"
+            )
+        if not self.recommender_mock_mode and not self.recommender_base_url.strip():
+            raise ValueError(
+                "recommender_base_url is required when recommender_mock_mode is false"
+            )
         return self
 
     class Config:

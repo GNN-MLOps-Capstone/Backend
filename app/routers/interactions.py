@@ -30,6 +30,7 @@ _CONTENT_HEARTBEAT = {InteractionEventType.content_heartbeat}
 _CONTENT_END = {InteractionEventType.content_leave}
 _RECOMMEND_REQUEST = {InteractionEventType.recommendation_request}
 _RECOMMEND_RESPONSE = {InteractionEventType.recommendation_response}
+_RECOMMEND_REQUEST_RESPONSE = _RECOMMEND_REQUEST | _RECOMMEND_RESPONSE
 _RECOMMEND_IMPRESSION = {InteractionEventType.recommendation_impression}
 _SCROLL = {InteractionEventType.scroll_depth}
 _MAX_BATCH_SIZE = 500
@@ -73,7 +74,7 @@ async def ingest_interaction_events(
     for item in payload.events:
         if item.event_type not in _ALLOWED_TYPES:
             raise HTTPException(status_code=400, detail=f"Unsupported event_type: {item.event_type}")
-        if item.event_type in (_RECOMMEND_REQUEST | _RECOMMEND_RESPONSE):
+        if item.event_type in _RECOMMEND_REQUEST_RESPONSE:
             if not item.request_id:
                 raise HTTPException(status_code=400, detail=f"{item.event_type} requires request_id")
             if not item.screen_session_id:

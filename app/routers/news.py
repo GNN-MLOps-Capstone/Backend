@@ -140,6 +140,15 @@ def _decode_recommendation_cursor(cursor: str) -> tuple[int, int, int | None]:
     return page, offset, cursor_limit
 
 
+def _try_decode_recommendation_cursor(cursor: str | None) -> tuple[int, int, int | None] | None:
+    if not cursor:
+        return None
+    try:
+        return _decode_recommendation_cursor(cursor)
+    except HTTPException:
+        return None
+
+
 def _default_recommendation_path(source: str) -> str:
     path_map = {
         "recommender": "A1",
@@ -433,6 +442,13 @@ async def get_news_recommendations(
     resolved_request_id = request_id or f"req-{uuid4().hex}"
     resolved_page = page
     offset = (resolved_page - 1) * effective_limit
+    decoded_cursor = _try_decode_recommendation_cursor(cursor)
+    if settings.recommender_mock_mode and cursor and decoded_cursor is None:
+        raise HTTPException(status_code=400, detail="Invalid cursor format")
+    if decoded_cursor is not None:
+        resolved_page, offset, cursor_limit = decoded_cursor
+        if cursor_limit is not None and cursor_limit != effective_limit:
+            raise HTTPException(status_code=400, detail="Unsupported cursor limit")
 
     source = "recommender"
     candidates: list[RecommendationCandidate] = []
@@ -496,7 +512,7 @@ async def get_news_recommendations(
     next_cursor: Optional[str] = None
     if source == "recommender":
         next_cursor = recommender_next_cursor
-    elif not cursor and len(items) == effective_limit:
+    elif len(items) == effective_limit:
         next_cursor = _encode_recommendation_cursor(
             page=resolved_page + 1,
             offset=offset + len(items),
