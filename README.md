@@ -81,16 +81,19 @@ docker network create crawling_news-network
 # proxy-net을 함께 쓰는 환경이면 추가 생성
 docker network create proxy-net
 
-# 4. Docker Compose로 실행
-docker compose up -d --build
+# 4. 이미지 빌드
+docker compose build
 
 # 5. 마이그레이션 적용
-docker compose exec news-api alembic -c alembic.ini upgrade head
+docker compose run --rm news-api alembic -c alembic.ini upgrade head
 
-# 6. 로그 확인
+# 6. 앱 실행
+docker compose up -d
+
+# 7. 로그 확인
 docker compose logs -f news-api
 
-# 7. 중지
+# 8. 중지
 docker compose down
 ```
 
@@ -119,6 +122,14 @@ alembic -c alembic.ini revision --autogenerate -m "describe-change"
 | http://localhost:8000/docs   | API 문서 (Swagger UI) |
 | http://localhost:8000/redoc  | API 문서 (ReDoc)      |
 | http://localhost:8000/health | 서버 상태 확인        |
+
+---
+
+## 추가 문서
+
+- [docs/README.md](/home/dobi/Backend/docs/README.md): `docs` 운영 원칙과 남겨둔 문서 목록
+- [docs/recommendation-logging.md](/home/dobi/Backend/docs/recommendation-logging.md): 추천/상호작용 로깅 기준 문서
+- [docs/recommender-api.md](/home/dobi/Backend/docs/recommender-api.md): 외부 추천 서버 연동 스펙
 
 ---
 

@@ -1,6 +1,6 @@
-# 추천 서버 API 간단 스펙
+# 추천 서버 API 스펙
 
-이 문서는 `Backend` 서버가 호출하는 추천 API의 최소 계약입니다.
+이 문서는 Backend가 호출하는 외부 추천 서버의 최소 계약입니다.
 
 ## 1) 엔드포인트
 
@@ -27,7 +27,7 @@
 - `limit`: int (필수, 보통 1~100)
 - `cursor`: string (선택, 다음 페이지 요청 시 전달)
 
-## 3) 권장 응답 형식 (추천)
+## 3) 권장 응답 형식
 
 ```json
 {
@@ -48,7 +48,7 @@
 - `news_id`: int (필수)
 - `path`: string (권장, 서빙 경로 코드)
 
-## 4) 허용되는 다른 응답 형식
+## 4) 호환 응답 형식
 
 Backend는 아래 형식도 처리합니다.
 
@@ -71,7 +71,7 @@ Backend는 아래 형식도 처리합니다.
 
 ## 7) 구현 체크리스트
 
-1. `user_id`(`users.id`), `limit`, `cursor`를 받아 추천 결과 생성
+1. `user_id`, `limit`, `cursor`를 받아 추천 결과 생성
 2. `news_id` 리스트를 응답
 3. 응답 시간은 5초 이내 권장
 4. 빈 결과도 허용 (`items: []`)
@@ -85,3 +85,7 @@ curl -X POST "http://localhost:9000/recommend/news" \
   -H "Content-Type: application/json" \
   -d '{"user_id":1,"limit":5,"cursor":"opaque-next-cursor"}'
 ```
+
+주의:
+- 위 `localhost:9000`은 로컬 테스트 예시입니다.
+- `.env.example`의 기본 서비스 주소는 `http://recommend-api:8000` 계열일 수 있으므로, 실제 실행 환경에 맞게 호스트와 포트를 조정해야 합니다.
