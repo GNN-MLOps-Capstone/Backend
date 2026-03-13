@@ -1083,14 +1083,15 @@ async def get_ai_trends(db: AsyncSession, top_n: int = 3) -> list[dict]:
     """오늘의 AI 트렌드: 이슈 지수 기반 Top N 종목 반환"""
     now = datetime.now(timezone.utc)
     recent_vol_stats = []
-    
-    # 1. 뉴스 데이터가 있는 기간 동적 탐색 (기존 로직 유지)
+    search_days = 1  # 볼륨/감성 윈도우 공유
+
+    # 1. 뉴스 데이터가 있는 기간 동적 탐색 (볼륨 + 감성 윈도우 동시 확장)
     for search_days in range(1, 8):
         past_days_vol = now - timedelta(days=search_days)
         query_vol = (
             select(
                 Stock.stock_name,
-                Stock.stock_id,  # API 응답을 위해 코드 추가
+                Stock.stock_id,
                 func.count(FilteredNews.news_id).label('recent_news_count')
             )
             .select_from(Stock)
@@ -1102,7 +1103,7 @@ async def get_ai_trends(db: AsyncSession, top_n: int = 3) -> list[dict]:
             )
             .group_by(Stock.stock_name, Stock.stock_id)
         )
-        
+
         result_vol = await db.execute(query_vol)
         recent_vol_stats = result_vol.all()
         if len(recent_vol_stats) >= top_n:
@@ -1111,9 +1112,9 @@ async def get_ai_trends(db: AsyncSession, top_n: int = 3) -> list[dict]:
     if not recent_vol_stats:
         return []
 
-    # 2. 감성 점수 계산 (날씨 판별을 위해 원본 감성값 필요)
+    # 2. 감성 점수 계산 (볼륨과 동일한 search_days 윈도우 사용)
     issue_stocks = [stat.stock_name for stat in recent_vol_stats]
-    past_7_days = now - timedelta(days=7)
+    past_days_sent = now - timedelta(days=search_days)  # 볼륨과 같은 윈도우
     sentiment_score_expr = case(
         (FilteredNews.sentiment == '긍정', 1.0),
         (FilteredNews.sentiment == '부정', -1.0),
@@ -1130,7 +1131,7 @@ async def get_ai_trends(db: AsyncSession, top_n: int = 3) -> list[dict]:
         .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
         .where(
             Stock.stock_name.in_(issue_stocks),
-            FilteredNews.created_at >= past_7_days,
+            FilteredNews.created_at >= past_days_sent,
             FilteredNews.created_at <= now
         )
         .group_by(Stock.stock_name)
@@ -1146,61 +1147,58 @@ async def get_ai_trends(db: AsyncSession, top_n: int = 3) -> list[dict]:
     for stat in recent_vol_stats:
         raw_sent = sentiment_dict.get(stat.stock_name, 0.0)
         norm_vol = (stat.recent_news_count - min_count) / (max_count - min_count) if max_count != min_count else 0.5
-        
+
         # 이슈 지수: (|감성| * 0.7) + (뉴스량 * 0.3)
         score = (abs(raw_sent) * 0.7) + (norm_vol * 0.3)
-        
-        # 날씨 매핑 로직 (감성값 기준)
-        if raw_sent > 0.2: weather = "SUNNY"
-        elif raw_sent < -0.2: weather = "RAINY"
-        else: weather = "CLOUDY"
 
         temp_results.append({
             "code": stat.stock_id,
-            "weather": weather,
             "name": stat.stock_name,
-            "score": round(score * 100), # 100점 만점 환산
-            "issue_index": score        # 정렬용
+            "avg_sentiment": raw_sent,
+            "news_count": stat.recent_news_count,
+            "score": round(score * 100),
+            "issue_index": score,
         })
 
     # 4. 내림차순 정렬 후 순위(rank) 부여
     top_issues = sorted(temp_results, key=lambda x: x['issue_index'], reverse=True)[:top_n]
-    
+
     return [
         {
             "rank": i + 1,
             "code": item["code"],
             "name": item["name"],
-            "weather": item["weather"],
-            "score": item["score"]
+            "avg_sentiment": item["avg_sentiment"],
+            "news_count": item["news_count"],
+            "score": item["score"],
         }
         for i, item in enumerate(top_issues)
     ]
 
 @router.get("/trends", response_model=list[AITrendResponse])
 async def read_ai_trends(
-    db: AsyncSession = Depends(get_db), 
+    db: AsyncSession = Depends(get_db),
     top_n: int = 3
 ):
     """
     오늘의 AI 트렌드 종목 조회
     - 이슈 지수 = (|감성| * 0.7) + (뉴스량 * 0.3)
+    - 날씨 = 주가 등락률 점수 + 감성 점수
     - 내림차순 정렬 후 상위 N개 반환
     """
     try:
         trends = await get_ai_trends(db, top_n=top_n)
-        
+ 
         if not trends:
-            # 데이터가 없을 경우 빈 리스트 혹은 404 선택 (여기선 빈 리스트)
             return []
-            
+ 
         async def _fetch_overview_safe(code: str) -> dict | None:
             try:
                 cache_key = f"overview:{code}"
                 cached = await cache.get(cache_key)
                 if cached is not None:
                     return cached
-
+ 
                 data = await client.request(
                     "GET",
                     "/uapi/domestic-stock/v1/quotations/inquire-price",
@@ -1217,21 +1215,229 @@ async def read_ai_trends(
             except Exception as e:
                 logger.warning("overview fetch failed for %s: %s", code, e)
                 return None
-
+ 
         overviews = await asyncio.gather(
             *[_fetch_overview_safe(t["code"]) for t in trends]
         )
-
+ 
         results = []
         for trend, overview in zip(trends, overviews):
+            change_rate = overview.get("change_rate") if overview else None
+            avg_sentiment = trend.get("avg_sentiment")
             results.append({
-                **trend,
+                "rank": trend["rank"],
+                "code": trend["code"],
+                "name": trend["name"],
+                "score": trend["score"],
+                "weather": get_weather(change_rate, avg_sentiment),
                 "last_price": overview.get("last_price") if overview else None,
-                "change_rate": overview.get("change_rate") if overview else None,
+                "change_rate": change_rate,
+                "news_count": trend["news_count"],
+                "avg_sentiment": round(avg_sentiment, 4) if avg_sentiment is not None else None,
             })
-
+ 
         return results
-        
+ 
     except Exception as e:
-        # 실제 서비스 시 로그 기록(logger.error) 필요
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+async def get_stock_weather(
+    db: AsyncSession,
+    *,
+    stock_id: str | None = None,
+    stock_name: str | None = None,
+) -> str:
+    """
+    종목코드(stock_id) 또는 종목명(stock_name)으로 날씨 코드 반환.
+ 
+    - 감성 윈도우: 가장 최근 16:00 ~ 현재 (16시 기준 슬라이딩)
+      ex) 오후 3시 → 전날 16:00 ~ 현재 / 오후 4시 1분 → 오늘 16:00 ~ 현재
+    - 등락률: KIS 현재가 overview의 change_rate (전일 대비 실시간)
+    """
+    if stock_id is None and stock_name is None:
+        raise ValueError("stock_id 또는 stock_name 중 하나는 필수입니다.")
+ 
+    # 1. 종목명으로 종목코드 조회
+    if stock_id is None:
+        row = await db.execute(
+            select(Stock.stock_id).where(Stock.stock_name == stock_name)
+        )
+        stock_id = row.scalar_one_or_none()
+        if stock_id is None:
+            return "CLOUDY"  # 종목 없으면 중립
+ 
+    # 2. 감성 집계 (가장 최근 16:00 ~ 현재)
+    now_kst = datetime.now(tz=KST)
+    today_cutoff = now_kst.replace(hour=16, minute=0, second=0, microsecond=0)
+    window_start = today_cutoff if now_kst >= today_cutoff else today_cutoff - timedelta(days=1)
+ 
+    sentiment_score_expr = case(
+        (FilteredNews.sentiment == "긍정", 1.0),
+        (FilteredNews.sentiment == "부정", -1.0),
+        else_=0.0,
+    )
+    result = await db.execute(
+        select(func.avg(sentiment_score_expr))
+        .select_from(FilteredNews)
+        .join(NewsStockMapping, FilteredNews.news_id == NewsStockMapping.news_id)
+        .where(
+            NewsStockMapping.stock_id == stock_id,
+            FilteredNews.created_at >= window_start,
+            FilteredNews.created_at <= now_kst,
+        )
+    )
+    avg_sentiment: float | None = result.scalar_one_or_none()
+ 
+    # 3. 등락률 조회 (캐시 우선)
+    change_rate: float | None = None
+    try:
+        overview = await cache.get(f"overview:{stock_id}")
+        if overview is None:
+            data = await client.request(
+                "GET",
+                "/uapi/domestic-stock/v1/quotations/inquire-price",
+                tr_id="FHKST01010100",
+                params={
+                    "FID_COND_MRKT_DIV_CODE": "J",
+                    "FID_INPUT_ISCD": stock_id,
+                },
+            )
+            _ensure_kis_ok(data)
+            overview = transform_overview(data, stock_id)
+            await cache.set(f"overview:{stock_id}", overview, ttl_seconds=3)
+        change_rate = overview.get("change_rate")
+    except Exception as e:
+        logger.warning("get_stock_weather: overview fetch failed for %s: %s", stock_id, e)
+ 
+    return get_weather(change_rate, avg_sentiment)
+ 
+    
+def get_weather(change_rate: float | None, avg_sentiment: float | None) -> str:
+    """
+    주가 등락률 + 감성 평균으로 날씨 코드 반환.
+
+    주가 점수: -5% 이하=-2, -4%~-1%=-1, -1%~+1%=0, +1%~+5%=+1, +5% 초과=+2
+    감성 점수: 부정(avg<0)=-1, 중립(None or 0)=0, 긍정(avg>0)=+1
+    합산:      <= -2=THUNDERSTORM, -1=RAINY, 0=CLOUDY, +1=PARTLY_CLOUDY, >= +2=SUNNY
+    """
+    # 주가 점수
+    if change_rate is None:
+        price_score = 0
+    elif change_rate <= -5.0:
+        price_score = -2
+    elif change_rate <= -1.0:
+        price_score = -1
+    elif change_rate < 1.0:
+        price_score = 0
+    elif change_rate < 5.0:
+        price_score = 1
+    else:
+        price_score = 2
+
+    # 감성 점수 (뉴스 없으면 None → 0점 중립)
+    if avg_sentiment is None or avg_sentiment == 0.0:
+        sentiment_score = 0
+    elif avg_sentiment > 0.0:
+        sentiment_score = 1
+    else:
+        sentiment_score = -1
+
+    total = price_score + sentiment_score
+
+    if total <= -2:
+        return "THUNDERSTORM"
+    if total == -1:
+        return "RAINY"
+    if total == 0:
+        return "CLOUDY"
+    if total == 1:
+        return "PARTLY_CLOUDY"
+    return "SUNNY"
+
+
+async def get_stock_weather(
+    db: AsyncSession,
+    *,
+    stock_id: str | None = None,
+    stock_name: str | None = None,
+) -> str:
+    """
+    종목코드(stock_id) 또는 종목명(stock_name)으로 날씨 코드 반환.
+
+    - 감성 윈도우: 가장 최근 16:00 ~ 현재 (16시 기준 슬라이딩)
+      ex) 오후 3시 → 전날 16:00 ~ 현재 / 오후 4시 1분 → 오늘 16:00 ~ 현재
+    - 등락률: KIS 현재가 overview의 change_rate (전일 대비 실시간)
+    """
+    if stock_id is None and stock_name is None:
+        raise ValueError("stock_id 또는 stock_name 중 하나는 필수입니다.")
+
+    # 1. 종목명으로 종목코드 조회
+    if stock_id is None:
+        row = await db.execute(
+            select(Stock.stock_id).where(Stock.stock_name == stock_name)
+        )
+        stock_id = row.scalar_one_or_none()
+        if stock_id is None:
+            return "CLOUDY"  # 종목 없으면 중립
+
+    # 2. 감성 집계 (가장 최근 16:00 ~ 현재)
+    now_kst = datetime.now(tz=KST)
+    today_cutoff = now_kst.replace(hour=16, minute=0, second=0, microsecond=0)
+    window_start = today_cutoff if now_kst >= today_cutoff else today_cutoff - timedelta(days=1)
+
+    sentiment_score_expr = case(
+        (FilteredNews.sentiment == "긍정", 1.0),
+        (FilteredNews.sentiment == "부정", -1.0),
+        else_=0.0,
+    )
+    result = await db.execute(
+        select(func.avg(sentiment_score_expr))
+        .select_from(FilteredNews)
+        .join(NewsStockMapping, FilteredNews.news_id == NewsStockMapping.news_id)
+        .where(
+            NewsStockMapping.stock_id == stock_id,
+            FilteredNews.created_at >= window_start,
+            FilteredNews.created_at <= now_kst,
+        )
+    )
+    avg_sentiment: float | None = result.scalar_one_or_none()
+
+    # 3. 등락률 조회 (캐시 우선)
+    change_rate: float | None = None
+    try:
+        overview = await cache.get(f"overview:{stock_id}")
+        if overview is None:
+            data = await client.request(
+                "GET",
+                "/uapi/domestic-stock/v1/quotations/inquire-price",
+                tr_id="FHKST01010100",
+                params={
+                    "FID_COND_MRKT_DIV_CODE": "J",
+                    "FID_INPUT_ISCD": stock_id,
+                },
+            )
+            _ensure_kis_ok(data)
+            overview = transform_overview(data, stock_id)
+            await cache.set(f"overview:{stock_id}", overview, ttl_seconds=3)
+        change_rate = overview.get("change_rate")
+    except Exception as e:
+        logger.warning("get_stock_weather: overview fetch failed for %s: %s", stock_id, e)
+
+    return get_weather(change_rate, avg_sentiment)
+
+@router.get("/weather", response_model=dict)
+async def get_stock_weather_endpoint(
+    db: AsyncSession = Depends(get_db),
+    stock_id: str | None = Query(None, description="종목코드 (6자리)"),
+    stock_name: str | None = Query(None, description="종목명"),
+):
+    """
+    종목코드 또는 종목명으로 날씨 코드 반환.
+    - stock_id: 종목코드 (예: 005930)
+    - stock_name: 종목명 (예: 삼성전자)
+    """
+    if stock_id is None and stock_name is None:
+        raise HTTPException(status_code=400, detail="stock_id 또는 stock_name 중 하나는 필수입니다.")
+
+    weather = await get_stock_weather(db, stock_id=stock_id, stock_name=stock_name)
+    return {"weather": weather}

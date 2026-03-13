@@ -307,9 +307,11 @@ class IssueRankingResponse(BaseModel):
     top_issues: List[IssueStock]
 
 class WeatherType(str, Enum):
-    SUNNY = "SUNNY"
-    CLOUDY = "CLOUDY"
+    THUNDERSTORM = "THUNDERSTORM"
     RAINY = "RAINY"
+    CLOUDY = "CLOUDY"
+    PARTLY_CLOUDY = "PARTLY_CLOUDY"
+    SUNNY = "SUNNY"
 
 class AITrendResponse(BaseModel):
     rank: int
@@ -319,3 +321,5 @@ class AITrendResponse(BaseModel):
     score: int
     last_price: int | None = None
     change_rate: float | None = None
+    news_count: int
+    avg_sentiment: float | None
