@@ -457,6 +457,7 @@ async def get_watchlist_briefing(
 @router.get("/stocks/{code}", response_model=WatchlistStockResponse)
 async def get_stock_detail(
     code: str,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """종목 상세 조회"""

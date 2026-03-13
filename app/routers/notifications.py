@@ -16,7 +16,7 @@ API 엔드포인트:
 ==============================================================================
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Body, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func, desc
 from typing import List
@@ -204,23 +204,16 @@ async def delete_notification(
 # =============================================================================
 #
 # URL: POST /api/notifications
-# 용도: 앱이 OneSignal 발송 성공 후, DB에 이력을 남기기 위해 호출
+# 용도: 로그인한 사용자가 자신의 알림 이력을 저장
 #
-@router.post("", status_code=201, openapi_extra={"security": []})
+@router.post("", status_code=201)
 async def create_notification(
-    req: NotificationCreateRequest, # Body에는 내용만 있음 (user_id 없음)
+    req: NotificationCreateRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(
-        select(User).where(User.onesignal_id == req.onesignal_id)
-    )
-    user = result.scalar_one_or_none()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다")
-    
     new_noti = Notification(
-        user_id=user.google_id,
+        user_id=current_user.google_id,
         type=req.type,
         title=req.title,
         stock_name=req.stock_name,

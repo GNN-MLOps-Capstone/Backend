@@ -11,13 +11,17 @@ import re
 import asyncio
 import contextlib
 import logging
+from sqlalchemy import select
 
 from app.config import get_settings
+from app.database import AsyncSessionLocal
 from app.kis.cache import TTLCache
 from app.kis.client import KISClient
 from app.kis.errors import KISError
 from app.kis.transformers import transform_overview, transform_series_time, transform_series_daily, KST
 from app.kis.ws_client import KISWSClient
+from app.models import User
+from app.routers.users import decode_access_token, get_current_user
 from app.schemas import StockOverviewResponse, StockSeriesResponse, StockSeriesQuery
 
 
@@ -38,6 +42,26 @@ _INTRADAY_RATE_LIMIT_BACKOFF_SECONDS = float(settings.kis_intraday_rate_limit_ba
 
 async def shutdown_stocks_resources() -> None:
     await client.aclose()
+
+
+async def _require_stock_ws_user(websocket: WebSocket) -> User | None:
+    auth_header = websocket.headers.get("authorization") or ""
+    token = ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+    if not token:
+        token = (websocket.query_params.get("access_token") or "").strip()
+    if not token:
+        return None
+
+    try:
+        google_id = decode_access_token(token)
+    except HTTPException:
+        return None
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User).where(User.google_id == google_id))
+        return result.scalar_one_or_none()
 
 
 def _raise_kis_http_error(exc: KISError) -> None:
@@ -764,6 +788,11 @@ async def stream_current_price(
         await websocket.close(code=1008)
         return
 
+    current_user = await _require_stock_ws_user(websocket)
+    if current_user is None:
+        await websocket.close(code=1008)
+        return
+
     await websocket.accept()
 
     async def _send(payload: dict) -> None:
@@ -812,6 +841,7 @@ async def stream_current_price(
 @router.get("/{code}/overview", response_model=StockOverviewResponse)
 async def get_stock_overview(
     code: str = Path(..., pattern=r"^[A-Za-z0-9]{6}$", description="종목코드 (6자리)"),
+    current_user: User = Depends(get_current_user),
 ):
     """
     종목 상단 카드용 현재가 요약 정보.
@@ -856,6 +886,7 @@ async def get_stock_series(
     request: Request,
     query: StockSeriesQuery = Depends(),
     code: str = Path(..., pattern=r"^[A-Za-z0-9]{6}$", description="종목코드 (6자리)"),
+    current_user: User = Depends(get_current_user),
 ):
     """
     기간별 시세 (1d/1w/1m).
