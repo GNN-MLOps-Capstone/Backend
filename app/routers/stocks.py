@@ -1013,10 +1013,9 @@ async def get_stock_series(
                                     "v": int(latest.get("v") or 0),
                                 }
                             ]
+            await cache.set(cache_key, series, ttl_seconds=120)
             if bypass_cache:
                 await _record_series_bypass_cooldown(request, code, range_label)
-            else:
-                await cache.set(cache_key, series, ttl_seconds=120)
             return series
         except KISError as exc:
             _raise_kis_http_error(exc)
@@ -1066,10 +1065,9 @@ async def get_stock_series(
             )
             _ensure_kis_ok(data)
             series = transform_series_daily(data, code, range_label)
+            await cache.set(cache_key, series, ttl_seconds=120)
             if bypass_cache:
                 await _record_series_bypass_cooldown(request, code, range_label)
-            else:
-                await cache.set(cache_key, series, ttl_seconds=120)
             return series
         except KISError as exc:
             _raise_kis_http_error(exc)
