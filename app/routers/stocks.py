@@ -41,8 +41,9 @@ async def shutdown_stocks_resources() -> None:
 
 
 def _raise_kis_http_error(exc: KISError) -> None:
+    http_status = int(exc.status_code) if exc.status_code and int(exc.status_code) >= 400 else 502
     raise HTTPException(
-        status_code=502,
+        status_code=http_status,
         detail={
             "status_code": exc.status_code,
             "code": exc.code,
