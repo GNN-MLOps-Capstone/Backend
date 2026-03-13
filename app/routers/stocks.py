@@ -830,6 +830,7 @@ async def get_stock_overview(
                 "FID_COND_MRKT_DIV_CODE": "J",
                 "FID_INPUT_ISCD": code,
             },
+            retries=3,
         )
         _ensure_kis_ok(data)
         overview = transform_overview(data, code)
@@ -1015,7 +1016,7 @@ async def get_stock_series(
             if bypass_cache:
                 await _record_series_bypass_cooldown(request, code, range_label)
             else:
-                await cache.set(cache_key, series, ttl_seconds=15)
+                await cache.set(cache_key, series, ttl_seconds=120)
             return series
         except KISError as exc:
             _raise_kis_http_error(exc)

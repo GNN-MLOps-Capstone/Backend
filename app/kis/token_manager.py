@@ -53,6 +53,10 @@ class TokenManager:
             cls._expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
             return token
 
+    _RETRYABLE_TOKEN_STATUS = frozenset({403, 429, 500, 502, 503})
+    _TOKEN_MAX_RETRIES = 3
+    _TOKEN_BACKOFF_SECONDS = 0.5
+
     @classmethod
     async def _issue_token(cls, settings: Settings) -> Tuple[str, int]:
         if not settings.kis_app_key or not settings.kis_app_secret:
@@ -65,22 +69,29 @@ class TokenManager:
             "appkey": settings.kis_app_key,
             "appsecret": settings.kis_app_secret,
         }
+        headers = {"content-type": "application/json; charset=utf-8"}
 
-        try:
-            async with httpx.AsyncClient(timeout=settings.kis_timeout) as client:
-                resp = await client.post(
-                    url,
-                    json=payload,
-                    headers={"content-type": "application/json; charset=utf-8"},
-                )
-        except httpx.RequestError as exc:
-            raise KISError(f"KIS token request failed: {exc}", status_code=502) from exc
+        last_exc: KISError | None = None
+        for attempt in range(cls._TOKEN_MAX_RETRIES):
+            try:
+                async with httpx.AsyncClient(timeout=settings.kis_timeout) as client:
+                    resp = await client.post(url, json=payload, headers=headers)
+            except httpx.RequestError as exc:
+                raise KISError(f"KIS token request failed: {exc}", status_code=502) from exc
 
-        if resp.status_code >= 400:
-            raise KISError(
+            if resp.status_code < 400:
+                break
+
+            last_exc = KISError(
                 f"KIS token request HTTP {resp.status_code}",
                 status_code=resp.status_code,
             )
+            if attempt < cls._TOKEN_MAX_RETRIES - 1 and resp.status_code in cls._RETRYABLE_TOKEN_STATUS:
+                await asyncio.sleep(cls._TOKEN_BACKOFF_SECONDS * (attempt + 1))
+                continue
+            raise last_exc
+        else:
+            raise last_exc or KISError("KIS token request failed after retries", status_code=502)
 
         try:
             data = resp.json()
