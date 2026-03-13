@@ -21,7 +21,7 @@ from app.kis.errors import KISError
 from app.kis.transformers import transform_overview, transform_series_time, transform_series_daily, KST
 from app.kis.ws_client import KISWSClient
 from app.schemas import StockOverviewResponse, StockSeriesResponse, StockSeriesQuery, AITrendResponse, StockWeatherResponse
-from app.models import Stock, FilteredNews, NewsStockMapping
+from app.models import Stock, StockSummaryCache, FilteredNews, NewsStockMapping
 from app.database import get_db
 
 
@@ -1094,9 +1094,10 @@ async def get_ai_trends(db: AsyncSession, top_n: int = 3) -> list[dict]:
                 Stock.stock_id,
                 func.count(FilteredNews.news_id).label('recent_news_count')
             )
-            .select_from(Stock)
-            .join(NewsStockMapping, Stock.stock_id == NewsStockMapping.stock_id)
+            .select_from(StockSummaryCache)
+            .join(NewsStockMapping, StockSummaryCache.stock_id == NewsStockMapping.stock_id)
             .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
+            .join(Stock, StockSummaryCache.stock_id == Stock.stock_id)
             .where(
                 FilteredNews.created_at >= past_days_vol,
                 FilteredNews.created_at <= now
@@ -1126,9 +1127,10 @@ async def get_ai_trends(db: AsyncSession, top_n: int = 3) -> list[dict]:
             Stock.stock_id,
             func.avg(sentiment_score_expr).label('avg_sentiment')
         )
-        .select_from(Stock)
-        .join(NewsStockMapping, Stock.stock_id == NewsStockMapping.stock_id)
+        .select_from(StockSummaryCache)
+        .join(NewsStockMapping, StockSummaryCache.stock_id == NewsStockMapping.stock_id)
         .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
+        .join(Stock, StockSummaryCache.stock_id == Stock.stock_id)
         .where(
             Stock.stock_id.in_(issue_stock_ids),
             FilteredNews.created_at >= past_days_sent,

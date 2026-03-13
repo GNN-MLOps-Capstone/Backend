@@ -139,7 +139,7 @@ async def get_watchlist(
 
     # 제미나이만 호출
     if ai_tasks_payload:
-        semaphore = asyncio.Semaphore(5)
+        semaphore = asyncio.Semaphore(int(settings.gemini_max_concurrency))
 
         async def _call_gemini_bounded(payload: dict) -> str | None:
             async with semaphore:
@@ -299,9 +299,10 @@ async def _get_top_issues(
             func.coalesce(Stock.stock_name, Stock.stock_id).label("stock_name"),
             func.count(FilteredNews.news_id).label('recent_news_count')
         )
-        .select_from(Stock)
-        .join(NewsStockMapping, Stock.stock_id == NewsStockMapping.stock_id)
+        .select_from(StockSummaryCache)
+        .join(NewsStockMapping, StockSummaryCache.stock_id == NewsStockMapping.stock_id)
         .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
+        .join(Stock, StockSummaryCache.stock_id == Stock.stock_id)
         .where(
             Stock.stock_id.in_(watchlist_ids),
             FilteredNews.created_at >= past_7_days,
@@ -330,9 +331,10 @@ async def _get_top_issues(
             Stock.stock_id,
             func.avg(sentiment_score_expr).label('avg_sentiment')
         )
-        .select_from(Stock)
-        .join(NewsStockMapping, Stock.stock_id == NewsStockMapping.stock_id)
+        .select_from(StockSummaryCache)
+        .join(NewsStockMapping, StockSummaryCache.stock_id == NewsStockMapping.stock_id)
         .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
+        .join(Stock, StockSummaryCache.stock_id == Stock.stock_id)
         .where(
             Stock.stock_id.in_(issue_stock_ids),
             FilteredNews.created_at >= past_7_days,
