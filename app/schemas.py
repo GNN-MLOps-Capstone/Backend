@@ -112,9 +112,16 @@ class StockSummaryResponse(BaseModel):
         from_attributes = True
 
 class UserLoginRequest(BaseModel):
-    google_id: str
-    email: str     
-    nickname: str 
+    id_token: str
+    nickname: Optional[str] = None
+    img_url: Optional[str] = None
+    onesignal_id: Optional[str] = None
+
+
+class DevLoginRequest(BaseModel):
+    google_id: str = Field(..., min_length=1, max_length=255)
+    email: str = Field(..., min_length=3, max_length=255)
+    nickname: Optional[str] = Field(None, max_length=255)
     img_url: Optional[str] = None
     onesignal_id: Optional[str] = None
 
@@ -172,9 +179,8 @@ class NotificationCreateRequest(BaseModel):
     """
     N-0: 알림 저장 요청 스키마 (앱 -> 서버)
     
-    앱이 OneSignal 발송 성공 후 서버에 저장을 요청할 때 사용합니다.
+    로그인한 사용자가 자신의 알림 이력을 서버에 저장할 때 사용합니다.
     """
-    onesignal_id: str
     type: str
     title: str
     body: Optional[str] = None
