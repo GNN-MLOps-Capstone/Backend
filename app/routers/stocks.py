@@ -1212,7 +1212,7 @@ async def read_ai_trends(
         )
  
         results = []
-        for trend, overview in zip(trends, overviews):
+        for trend, overview in zip(trends, overviews, strict=True):
             change_rate = overview.get("change_rate") if overview else None
             avg_sentiment = trend.get("avg_sentiment")
             results.append({

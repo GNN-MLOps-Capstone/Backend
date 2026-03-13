@@ -154,7 +154,7 @@ async def get_watchlist(
         ], return_exceptions=True)
 
         # ai 결과를 db에 저장
-        for payload, new_summary in zip(ai_tasks_payload, gemini_results, strict=False):
+        for payload, new_summary in zip(ai_tasks_payload, gemini_results, strict=True):
             s_id = payload["stock_id"]
 
             if isinstance(new_summary, Exception):
@@ -285,7 +285,7 @@ async def _get_top_issues(
     # 1. 사용자의 관심종목 리스트 가져오기
     watchlist_query = select(Watchlist.stock_id).where(Watchlist.user_id == current_user.id)
     watchlist_result = await db.execute(watchlist_query)
-    watchlist_ids = [row for row in watchlist_result.scalars().all()]
+    watchlist_ids = list(watchlist_result.scalars().all())
 
     if not watchlist_ids:
         return [], TopIssueStatus.EMPTY_WATCHLIST
@@ -517,7 +517,7 @@ async def get_stock_detail(
         aiSummary=cache.summary_text if cache and cache.summary_text else "",
     )
 
-async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str = None) -> str:
+async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str | None = None) -> str:
     """
     stock_id를 기준으로 캐시를 관리하고 최신 뉴스 발생 시 요약을 갱신함
     """
