@@ -154,8 +154,19 @@
           return;
         }
 
-        const configResponse = await fetch("/api/users/google-login-config");
-        const config = await configResponse.json();
+        let configResponse;
+        let config;
+        try {
+          configResponse = await fetch("/api/users/google-login-config");
+          config = await configResponse.json();
+        } catch (error) {
+          serverOutput.value = JSON.stringify(
+            { detail: `설정 조회 실패: ${error.message || error}` },
+            null,
+            2,
+          );
+          return;
+        }
         if (!configResponse.ok || !config.client_id) {
           serverOutput.value = JSON.stringify(config, null, 2);
           return;
@@ -181,7 +192,12 @@
           alert("복사할 토큰이 없습니다.");
           return;
         }
-        await navigator.clipboard.writeText(backendAccessToken);
+        try {
+          await navigator.clipboard.writeText(backendAccessToken);
+          alert("토큰이 복사되었습니다.");
+        } catch (error) {
+          alert(`복사 실패: ${error.message || error}`);
+        }
       });
     </script>
   </body>

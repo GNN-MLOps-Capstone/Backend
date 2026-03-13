@@ -18,15 +18,18 @@ API 엔드포인트:
 ==============================================================================
 """
 
+import asyncio
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from jose import jwt, JWTError
-from datetime import datetime, timedelta
 
 from app.database import get_db
 from app.models import User, UserSettings
@@ -71,13 +74,14 @@ def decode_access_token(token: str) -> str:
         if not google_id:
             raise credentials_exception
         return google_id
-    except JWTError:
-        raise credentials_exception
+    except JWTError as exc:
+        raise credentials_exception from exc
 
 
-def verify_google_login_token(login_token: str) -> dict:
+async def verify_google_login_token(login_token: str) -> dict:
     try:
-        token_info = id_token.verify_oauth2_token(
+        token_info = await asyncio.to_thread(
+            id_token.verify_oauth2_token,
             login_token,
             requests.Request(),
             settings.google_client_id,
@@ -152,9 +156,30 @@ async def _upsert_user_for_login(
         )
         user.settings = UserSettings()
         db.add(user)
-        await db.commit()
-        await db.refresh(user)
-        return user
+        try:
+            await db.commit()
+            await db.refresh(user)
+            return user
+        except IntegrityError:
+            await db.rollback()
+            result = await db.execute(
+                select(User).options(selectinload(User.settings)).where(User.google_id == google_id)
+            )
+            user = result.scalar_one_or_none()
+            if user is None:
+                raise
+
+            user.email = email
+            user.nickname = nickname
+            user.img_url = img_url
+            if onesignal_id is not None:
+                user.onesignal_id = onesignal_id
+            if user.settings is None:
+                user.settings = UserSettings()
+
+            await db.commit()
+            await db.refresh(user)
+            return user
 
     user.email = email
     user.nickname = nickname
@@ -175,7 +200,7 @@ async def _upsert_user_for_login(
 #
 @router.post("/login", response_model=AuthResponse)
 async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
-    token_info = verify_google_login_token(req.id_token)
+    token_info = await verify_google_login_token(req.id_token)
 
     google_id = token_info.get("sub")
     email = token_info.get("email")

@@ -16,10 +16,12 @@ API 엔드포인트:
 ==============================================================================
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, func, desc
+import logging
 from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select, update, func, desc
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Notification,User
@@ -30,6 +32,7 @@ router = APIRouter(
     prefix="/api/notifications",
     tags=["notifications"],
 )
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -229,4 +232,5 @@ async def create_notification(
         return {"success": True, "id": new_noti.id}
     except Exception as e:
         await db.rollback()
+        logger.exception("알림 저장 실패: user_id=%s", current_user.google_id)
         raise HTTPException(status_code=400, detail="알림 저장 실패") from e

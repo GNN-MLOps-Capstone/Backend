@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, func, case, desc
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 import asyncio
+from enum import Enum
 
 from datetime import datetime, timedelta, timezone
 import logging
@@ -86,7 +87,8 @@ async def get_watchlist(
     ai_tasks_payload = []
     for item in watchlist_items:
         s_id = item.stock_id
-        s_name = stock_map[s_id].stock_name if s_id in stock_map else s_id
+        stock_row = stock_map.get(s_id)
+        s_name = (stock_row.stock_name if stock_row else None) or s_id
         
         # 캐시 및 최신 뉴스 ID 확인
         cache_stmt = select(StockSummaryCache).where(StockSummaryCache.stock_id == s_id)
@@ -137,15 +139,29 @@ async def get_watchlist(
 
     # 제미나이만 호출
     if ai_tasks_payload:
+        semaphore = asyncio.Semaphore(int(settings.gemini_max_concurrency))
+
+        async def _call_gemini_bounded(payload: dict) -> str | None:
+            async with semaphore:
+                return await call_gemini_summary(
+                    payload["stock_name"],
+                    payload["news_count"],
+                    payload["combined_text"],
+                )
         # call_gemini_summary는 순수 I/O 작업이므로 병렬 처리가 가장 효율적입니다.
         gemini_results = await asyncio.gather(*[
-            call_gemini_summary(p["stock_name"], p["news_count"], p["combined_text"])
+            _call_gemini_bounded(p)
             for p in ai_tasks_payload
-        ])
+        ], return_exceptions=True)
 
         # ai 결과를 db에 저장
-        for payload, new_summary in zip(ai_tasks_payload, gemini_results, strict=False):
+        for payload, new_summary in zip(ai_tasks_payload, gemini_results, strict=True):
             s_id = payload["stock_id"]
+
+            if isinstance(new_summary, Exception):
+                logger.warning("요약 생성 실패(stock_id=%s): %s", s_id, new_summary)
+                summary_map[s_id] = payload["cached_summary"] or "요약 생성에 실패했습니다."
+                continue
             
             if new_summary:
                 summary_map[s_id] = new_summary
@@ -250,9 +266,10 @@ async def delete_watchlist(
 
     return {"message": "관심종목 삭제 완료", "code": code}
 
-class IssueError(Enum):
-    NO_WATCHLIST = auto()
-    NO_RECENT_NEWS = auto()
+class TopIssueStatus(Enum):
+    SUCCESS = "SUCCESS"
+    EMPTY_WATCHLIST = "EMPTY_WATCHLIST"
+    NO_RECENT_NEWS = "NO_RECENT_NEWS"
 
 # =============================================================================
 # AI 브리핑 (Gemini - 시장 Top3 이슈 종목)
@@ -262,29 +279,30 @@ async def _get_top_issues(
     db: AsyncSession, 
     current_user: User, 
     top_n: int = 3
-) -> list[IssueStock] | IssueError:
+) -> tuple[ list[IssueStock], TopIssueStatus ]:
     now = datetime.now(timezone.utc)
     past_7_days = now - timedelta(days=7)
 
     # 1. 사용자의 관심종목 리스트 가져오기
     watchlist_query = select(Watchlist.stock_id).where(Watchlist.user_id == current_user.id)
     watchlist_result = await db.execute(watchlist_query)
-    watchlist_ids = watchlist_result.scalars().all()
+    watchlist_ids = list(watchlist_result.scalars().all())
 
     if not watchlist_ids:
-        return IssueError.NO_WATCHLIST
+        return [], TopIssueStatus.EMPTY_WATCHLIST
 
     # 2. 관심종목들의 최근 7일간 뉴스 통계 조회 (이슈지수 계산용)
     # FilteredNews와 NewsStockMapping을 조인하여 관심종목(watchlist_ids)에 해당하는 데이터만 필터링
     query_vol = (
         select(
             Stock.stock_id,
-            Stock.stock_name,
+            func.coalesce(Stock.stock_name, Stock.stock_id).label("stock_name"),
             func.count(FilteredNews.news_id).label('recent_news_count')
         )
-        .select_from(Stock)
-        .join(NewsStockMapping, Stock.stock_id == NewsStockMapping.stock_id)
+        .select_from(StockSummaryCache)
+        .join(NewsStockMapping, StockSummaryCache.stock_id == NewsStockMapping.stock_id)
         .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
+        .join(Stock, StockSummaryCache.stock_id == Stock.stock_id)
         .where(
             Stock.stock_id.in_(watchlist_ids),
             FilteredNews.created_at >= past_7_days,
@@ -297,7 +315,7 @@ async def _get_top_issues(
     recent_vol_stats = result_vol.all()
 
     if not recent_vol_stats:
-        return IssueError.NO_RECENT_NEWS
+        return [], TopIssueStatus.NO_RECENT_NEWS
 
     # 3. 감성 점수 계산 (7일간 평균)
     sentiment_score_expr = case(
@@ -313,9 +331,10 @@ async def _get_top_issues(
             Stock.stock_id,
             func.avg(sentiment_score_expr).label('avg_sentiment')
         )
-        .select_from(Stock)
-        .join(NewsStockMapping, Stock.stock_id == NewsStockMapping.stock_id)
+        .select_from(StockSummaryCache)
+        .join(NewsStockMapping, StockSummaryCache.stock_id == NewsStockMapping.stock_id)
         .join(FilteredNews, NewsStockMapping.news_id == FilteredNews.news_id)
+        .join(Stock, StockSummaryCache.stock_id == Stock.stock_id)
         .where(
             Stock.stock_id.in_(issue_stock_ids),
             FilteredNews.created_at >= past_7_days,
@@ -335,7 +354,7 @@ async def _get_top_issues(
     processed_stocks = []
     for stat in recent_vol_stats:
         sid = stat.stock_id
-        sname = stat.stock_name
+        sname = stat.stock_name or sid
         recent_count = stat.recent_news_count
         
         raw_sentiment = sentiment_dict.get(sid, 0.0)
@@ -356,7 +375,7 @@ async def _get_top_issues(
 
     # 5. 정렬 후 Top N 반환
     top_issues = sorted(processed_stocks, key=lambda x: x.issue_index, reverse=True)[:top_n]
-    return top_issues
+    return top_issues, TopIssueStatus.SUCCESS
 
 async def _call_gemini_briefing(combined_summaries: str) -> str:
     """3개 종목의 개별 요약문을 받아, 하나의 자연스러운 종합 브리핑으로 묶어줍니다."""
@@ -403,10 +422,10 @@ async def get_watchlist_briefing(
 ):
     logger.info(f"유저 {current_user.id}: 실시간 AI 브리핑 생성을 시작합니다.")
 
-    top_issues = await _get_top_issues(db, current_user, top_n=3)
-    if top_issues == IssueError.NO_WATCHLIST:
+    top_issues, status = await _get_top_issues(db, current_user, top_n=3)
+    if status == TopIssueStatus.EMPTY_WATCHLIST:
         return IssueRankingResponse(text="선택하신 관심종목이 존재하지 않습니다.", top_issues=[])
-    if top_issues == IssueError.NO_RECENT_NEWS:
+    if status == TopIssueStatus.NO_RECENT_NEWS:
         return IssueRankingResponse(text="관심종목에 대해 최근 7일간 발생한 뉴스가 없습니다.", top_issues=[])
 
     summaries_text_list = []
@@ -414,13 +433,20 @@ async def get_watchlist_briefing(
     for issue in top_issues:
         stock_name = issue.stock_name
         try:
-            stock_id_result = await db.execute(
-                select(Stock.stock_id).where(Stock.stock_name == stock_name)
-            )
-            stock_id = stock_id_result.scalar_one_or_none()
-            if not stock_id:
+            stock_ids = (
+                await db.execute(
+                    select(Stock.stock_id)
+                    .where((Stock.stock_id == stock_name) | (Stock.stock_name == stock_name))
+                    .limit(2)
+                )
+            ).scalars().all()
+            if not stock_ids:
                 logger.warning("종목 ID 조회 실패, 건너뜀: %s", stock_name)
                 continue
+            if len(stock_ids) > 1:
+                logger.warning("동일 이름 종목 다건 매칭, 건너뜀: %s", stock_name)
+                continue
+            stock_id = stock_ids[0]
             single_summary_text = await get_or_update_summary(
                 stock_id=stock_id,
                 db=db,
@@ -510,6 +536,10 @@ async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str
         stock_res = await db.execute(stock_stmt)
         stock_name = stock_res.scalar_one_or_none() or stock_id
 
+    # 캐시 레코드가 없으면 생성
+    if not cache:
+        cache = StockSummaryCache(stock_id=stock_id, stock_name=stock_name, summary_text="")
+        db.add(cache)
 
     # 3. 최신 뉴스 10개 ID 확인
     news_stmt = (
@@ -544,22 +574,10 @@ async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str
     new_summary = await call_gemini_summary(stock_name, len(news_summaries), combined_text)
 
     if new_summary:
-        stmt = pg_insert(StockSummaryCache).values(
-            stock_id=stock_id,
-            stock_name=stock_name,
-            summary_text=new_summary,
-            latest_news_id=latest_news_id,
-            created_at=datetime.now(timezone.utc),
-        )
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["stock_id"],
-            set_={
-                "stock_name": stock_name,
-                "summary_text": new_summary,
-                "latest_news_id": latest_news_id,
-                "created_at": datetime.now(timezone.utc),
-            },
-        )
-        await db.execute(stmt)
+        cache.latest_news_id = latest_news_id
+        cache.summary_text = new_summary
+        cache.stock_name = stock_name # 이름 업데이트
+        cache.created_at = datetime.now(timezone.utc)
+        return new_summary
     
     return cache.summary_text or "요약 생성에 실패했습니다."

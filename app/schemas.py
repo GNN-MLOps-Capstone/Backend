@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime,time
 import re
+from enum import Enum
 
 from app.models import InteractionEventType
 
@@ -356,3 +357,24 @@ class IssueStock(BaseModel):
 class IssueRankingResponse(BaseModel):
     text: str
     top_issues: List[IssueStock]
+
+class WeatherType(str, Enum):
+    THUNDERSTORM = "THUNDERSTORM"
+    RAINY = "RAINY"
+    CLOUDY = "CLOUDY"
+    PARTLY_CLOUDY = "PARTLY_CLOUDY"
+    SUNNY = "SUNNY"
+
+class AITrendResponse(BaseModel):
+    rank: int
+    code: str
+    name: str
+    weather: WeatherType
+    score: int
+    last_price: int | None = None
+    change_rate: float | None = None
+    news_count: int
+    avg_sentiment: float | None
+
+class StockWeatherResponse(BaseModel):
+    weather: WeatherType
