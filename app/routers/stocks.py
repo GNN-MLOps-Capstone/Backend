@@ -50,7 +50,7 @@ async def _require_stock_ws_user(websocket: WebSocket) -> User | None:
     token = ""
     if auth_header.lower().startswith("bearer "):
         token = auth_header[7:].strip()
-    if not token:
+    if not token and settings.debug:
         token = (websocket.query_params.get("access_token") or "").strip()
     if not token:
         return None
@@ -84,6 +84,39 @@ def _ensure_kis_ok(data: dict) -> None:
             status_code=200,
             code=data.get("msg_cd"),
         )
+
+
+async def _fetch_stock_overview(code: str) -> dict:
+    cache_key = f"overview:{code}"
+    cached = await cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    data = await client.request(
+        "GET",
+        "/uapi/domestic-stock/v1/quotations/inquire-price",
+        tr_id="FHKST01010100",  # KIS: 주식현재가 시세
+        params={
+            "FID_COND_MRKT_DIV_CODE": "J",
+            "FID_INPUT_ISCD": code,
+        },
+    )
+    _ensure_kis_ok(data)
+    overview = transform_overview(data, code)
+    if (overview.get("last_price") or 0) <= 0:
+        # 일부 종목(우선주/비유동 종목)에서 현재가가 0으로 내려올 때 최근 유효 일봉으로 보정
+        try:
+            latest = await _fetch_latest_daily_point(code)
+        except KISError:
+            latest = None
+        if latest is not None:
+            overview["last_price"] = int(latest.get("c") or 0)
+            overview["open"] = int(latest.get("o") or 0)
+            overview["high"] = int(latest.get("h") or 0)
+            overview["low"] = int(latest.get("l") or 0)
+            overview["volume"] = int(latest.get("v") or 0)
+    await cache.set(cache_key, overview, ttl_seconds=3)
+    return overview
 
 
 def _is_kis_transient_error(exc: KISError) -> bool:
@@ -847,37 +880,8 @@ async def get_stock_overview(
     """
     종목 상단 카드용 현재가 요약 정보.
     """
-    cache_key = f"overview:{code}"
-    cached = await cache.get(cache_key)
-    if cached is not None:
-        return cached
-
     try:
-        data = await client.request(
-            "GET",
-            "/uapi/domestic-stock/v1/quotations/inquire-price",
-            tr_id="FHKST01010100",  # KIS: 주식현재가 시세
-            params={
-                "FID_COND_MRKT_DIV_CODE": "J",
-                "FID_INPUT_ISCD": code,
-            },
-        )
-        _ensure_kis_ok(data)
-        overview = transform_overview(data, code)
-        if (overview.get("last_price") or 0) <= 0:
-            # 일부 종목(우선주/비유동 종목)에서 현재가가 0으로 내려올 때 최근 유효 일봉으로 보정
-            try:
-                latest = await _fetch_latest_daily_point(code)
-            except KISError:
-                latest = None
-            if latest is not None:
-                overview["last_price"] = int(latest.get("c") or 0)
-                overview["open"] = int(latest.get("o") or 0)
-                overview["high"] = int(latest.get("h") or 0)
-                overview["low"] = int(latest.get("l") or 0)
-                overview["volume"] = int(latest.get("v") or 0)
-        await cache.set(cache_key, overview, ttl_seconds=3)
-        return overview
+        return await _fetch_stock_overview(code)
     except KISError as exc:
         _raise_kis_http_error(exc)
 
@@ -1225,7 +1229,7 @@ async def read_ai_trends(
  
         async def _fetch_overview_safe(code: str) -> dict | None:
             try:
-                return await get_stock_overview(code, current_user)
+                return await _fetch_stock_overview(code)
             except (HTTPException, KISError):
                 raise
             except Exception as e:
@@ -1330,7 +1334,7 @@ async def get_stock_weather(
     avg_sentiment: float | None = result.scalar_one_or_none()
  
     # 3. 등락률 조회 (캐시 우선)
-    overview = await get_stock_overview(stock_id, current_user)
+    overview = await _fetch_stock_overview(stock_id)
     change_rate: float | None = overview.get("change_rate")
  
     return get_weather(change_rate, avg_sentiment)

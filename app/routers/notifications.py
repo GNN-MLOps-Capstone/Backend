@@ -232,5 +232,5 @@ async def create_notification(
         return {"success": True, "id": new_noti.id}
     except Exception as e:
         await db.rollback()
-        logger.exception("알림 저장 실패: user_id=%s", current_user.google_id)
-        raise HTTPException(status_code=400, detail="알림 저장 실패") from e
+        logger.exception("알림 저장 실패: user_id=%s", current_user.id)
+        raise HTTPException(status_code=500, detail="알림 저장 실패") from e

@@ -116,7 +116,7 @@ class UserLoginRequest(BaseModel):
     id_token: str
     nickname: Optional[str] = None
     img_url: Optional[str] = None
-    onesignal_id: Optional[str] = None
+    onesignal_id: Optional[str] = Field(None, max_length=255)
 
 
 class DevLoginRequest(BaseModel):
@@ -124,7 +124,11 @@ class DevLoginRequest(BaseModel):
     email: str = Field(..., min_length=3, max_length=255)
     nickname: Optional[str] = Field(None, max_length=255)
     img_url: Optional[str] = None
-    onesignal_id: Optional[str] = None
+    onesignal_id: Optional[str] = Field(None, max_length=255)
+
+
+class GoogleLoginConfigResponse(BaseModel):
+    client_id: str
 
 class UserUpdateRequest(BaseModel):
     """

@@ -23,6 +23,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from google.auth.exceptions import TransportError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +37,7 @@ from app.models import User, UserSettings
 from app.schemas import (
     UserLoginRequest,
     DevLoginRequest,
+    GoogleLoginConfigResponse,
     AuthResponse,
     UserUpdateRequest,
     UserResponse,
@@ -91,6 +93,11 @@ async def verify_google_login_token(login_token: str) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="유효하지 않은 Google ID 토큰입니다.",
         ) from exc
+    except TransportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google 토큰 검증 서버에 연결할 수 없습니다.",
+        ) from exc
 
     issuer = token_info.get("iss")
     if issuer not in {"accounts.google.com", "https://accounts.google.com"}:
@@ -103,7 +110,7 @@ async def verify_google_login_token(login_token: str) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Google 토큰에 사용자 식별자(sub)가 없습니다.",
         )
-    if token_info.get("email_verified") is False:
+    if token_info.get("email_verified") is not True:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Google 이메일 인증이 확인되지 않았습니다.",
@@ -142,7 +149,7 @@ async def _upsert_user_for_login(
     img_url: str | None,
     onesignal_id: str | None,
 ) -> User:
-    query = select(User).where(User.google_id == google_id)
+    query = select(User).options(selectinload(User.settings)).where(User.google_id == google_id)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
@@ -180,6 +187,9 @@ async def _upsert_user_for_login(
             await db.commit()
             await db.refresh(user)
             return user
+
+    if user.settings is None:
+        user.settings = UserSettings()
 
     user.email = email
     user.nickname = nickname
@@ -258,7 +268,11 @@ async def dev_login(req: DevLoginRequest, db: AsyncSession = Depends(get_db)):
     }
 
 
-@router.get("/google-login-config", include_in_schema=False)
+@router.get(
+    "/google-login-config",
+    response_model=GoogleLoginConfigResponse,
+    include_in_schema=False,
+)
 async def get_google_login_config():
     client_id = settings.google_client_id.strip()
     if not client_id:
