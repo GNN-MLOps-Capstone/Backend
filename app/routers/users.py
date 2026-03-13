@@ -18,19 +18,31 @@ API 엔드포인트:
 ==============================================================================
 """
 
+import asyncio
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from google.auth.exceptions import TransportError
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
 from sqlalchemy.orm import selectinload
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from jose import jwt, JWTError
-from datetime import datetime, timedelta
 
 from app.database import get_db
 from app.models import User, UserSettings
-from app.schemas import UserLoginRequest, AuthResponse, UserUpdateRequest, UserResponse, SettingResponse
+from app.schemas import (
+    UserLoginRequest,
+    DevLoginRequest,
+    GoogleLoginConfigResponse,
+    AuthResponse,
+    UserUpdateRequest,
+    UserResponse,
+    SettingResponse,
+)
 from app.config import get_settings
 
 router = APIRouter(
@@ -50,31 +62,68 @@ def create_access_token(data: dict):
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
     return encoded_jwt
 
-async def get_current_user(
-    token_obj: HTTPAuthorizationCredentials = Depends(security), 
-    db: AsyncSession = Depends(get_db)
-):
-    # 인증 실패 시 뱉을 에러 미리 정의
+
+def decode_access_token(token: str) -> str:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="자격 증명을 확인할 수 없습니다.",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # 토큰 추출
-    token = token_obj.credentials
-
     try:
-        # 토큰 해독 (디코드)
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        google_id: str = payload.get("sub")
-        
-        if google_id is None:
+        google_id: str | None = payload.get("sub")
+        if not google_id:
             raise credentials_exception
-            
-    except JWTError:
-        # 서명이 안 맞거나 유효기간이 지났을 때
-        raise credentials_exception
+        return google_id
+    except JWTError as exc:
+        raise credentials_exception from exc
+
+
+async def verify_google_login_token(login_token: str) -> dict:
+    try:
+        token_info = await asyncio.to_thread(
+            id_token.verify_oauth2_token,
+            login_token,
+            requests.Request(),
+            settings.google_client_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="유효하지 않은 Google ID 토큰입니다.",
+        ) from exc
+    except TransportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google 토큰 검증 서버에 연결할 수 없습니다.",
+        ) from exc
+
+    issuer = token_info.get("iss")
+    if issuer not in {"accounts.google.com", "https://accounts.google.com"}:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="신뢰할 수 없는 Google 토큰 발급자입니다.",
+        )
+    if not token_info.get("sub"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google 토큰에 사용자 식별자(sub)가 없습니다.",
+        )
+    if token_info.get("email_verified") is not True:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google 이메일 인증이 확인되지 않았습니다.",
+        )
+
+    return token_info
+
+async def get_current_user(
+    token_obj: HTTPAuthorizationCredentials = Depends(security), 
+    db: AsyncSession = Depends(get_db)
+):
+    token = token_obj.credentials
+    google_id = decode_access_token(token)
     
     # 해독된 google_id를 가진 유저가 진짜 DB에 있는지 확인합니다.
     query = select(User).options(selectinload(User.settings)).where(User.google_id == google_id)
@@ -82,9 +131,74 @@ async def get_current_user(
     user = result.scalar_one_or_none()
 
     if user is None:
-        # 토큰은 멀쩡한데 DB에 유저가 없는 경우 (탈퇴 등)
-        raise credentials_exception
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="자격 증명을 확인할 수 없습니다.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
         
+    return user
+
+
+async def _upsert_user_for_login(
+    *,
+    db: AsyncSession,
+    google_id: str,
+    email: str,
+    nickname: str,
+    img_url: str | None,
+    onesignal_id: str | None,
+) -> User:
+    query = select(User).options(selectinload(User.settings)).where(User.google_id == google_id)
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        user = User(
+            google_id=google_id,
+            email=email,
+            nickname=nickname,
+            img_url=img_url,
+            onesignal_id=onesignal_id,
+        )
+        user.settings = UserSettings()
+        db.add(user)
+        try:
+            await db.commit()
+            await db.refresh(user)
+            return user
+        except IntegrityError:
+            await db.rollback()
+            result = await db.execute(
+                select(User).options(selectinload(User.settings)).where(User.google_id == google_id)
+            )
+            user = result.scalar_one_or_none()
+            if user is None:
+                raise
+
+            user.email = email
+            user.nickname = nickname
+            user.img_url = img_url
+            if onesignal_id is not None:
+                user.onesignal_id = onesignal_id
+            if user.settings is None:
+                user.settings = UserSettings()
+
+            await db.commit()
+            await db.refresh(user)
+            return user
+
+    if user.settings is None:
+        user.settings = UserSettings()
+
+    user.email = email
+    user.nickname = nickname
+    user.img_url = img_url
+    if onesignal_id is not None:
+        user.onesignal_id = onesignal_id
+
+    await db.commit()
+    await db.refresh(user)
     return user
 
 # =============================================================================
@@ -96,45 +210,30 @@ async def get_current_user(
 #
 @router.post("/login", response_model=AuthResponse)
 async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
+    token_info = await verify_google_login_token(req.id_token)
 
-    google_id = req.google_id
-    email = req.email
-    nickname = req.nickname
-    img_url = req.img_url
+    google_id = token_info.get("sub")
+    email = token_info.get("email")
+    nickname = token_info.get("name") or req.nickname
+    img_url = token_info.get("picture") or req.img_url
     onesignal_id = req.onesignal_id
 
-    # DB 조회 및 저장
-    query = select(User).where(User.google_id == google_id)
-    result = await db.execute(query)
-    user = result.scalar_one_or_none()
-
-    if not user:
-        # 새로운 로그인
-        user = User(
-            google_id=google_id,
-            email=email,
-            nickname=nickname,         
-            img_url=img_url,
-            onesignal_id=onesignal_id
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google 토큰에 이메일 정보가 없습니다.",
         )
+    if not nickname:
+        nickname = email.split("@")[0]
 
-        user.settings = UserSettings()
-
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
-    
-    else:
-        # 기존 회원
-        user.email = email
-        user.nickname = nickname
-        user.img_url = img_url
-        if req.onesignal_id is not None:
-            user.onesignal_id = req.onesignal_id
-            print(f"DEBUG: User {user.nickname}의 OneSignal ID 업데이트 시도: {user.onesignal_id}")
-        
-        await db.commit()
-        await db.refresh(user)
+    user = await _upsert_user_for_login(
+        db=db,
+        google_id=google_id,
+        email=email,
+        nickname=nickname,
+        img_url=img_url,
+        onesignal_id=onesignal_id,
+    )
 
     # Access Token 발급
     access_token = create_access_token(data={"sub": user.google_id})
@@ -144,6 +243,41 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
         "token_type": "Bearer",
         "user": user
     }
+
+
+@router.post("/dev-login", response_model=AuthResponse, include_in_schema=False)
+async def dev_login(req: DevLoginRequest, db: AsyncSession = Depends(get_db)):
+    if not settings.debug or not settings.dev_bypass_login:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    nickname = req.nickname or req.email.split("@")[0]
+    user = await _upsert_user_for_login(
+        db=db,
+        google_id=req.google_id,
+        email=req.email,
+        nickname=nickname,
+        img_url=req.img_url,
+        onesignal_id=req.onesignal_id,
+    )
+    access_token = create_access_token(data={"sub": user.google_id})
+
+    return {
+        "access_token": access_token,
+        "token_type": "Bearer",
+        "user": user,
+    }
+
+
+@router.get(
+    "/google-login-config",
+    response_model=GoogleLoginConfigResponse,
+    include_in_schema=False,
+)
+async def get_google_login_config():
+    client_id = settings.google_client_id.strip()
+    if not client_id:
+        raise HTTPException(status_code=503, detail="GOOGLE_CLIENT_ID is not configured")
+    return {"client_id": client_id}
 
 
 # =============================================================================

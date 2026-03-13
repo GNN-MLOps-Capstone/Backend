@@ -124,6 +124,60 @@ alembic -c alembic.ini revision --autogenerate -m "describe-change"
 
 ---
 
+## 로그인 테스트
+
+현재 사용자 API는 `POST /api/users/login`을 제외하면 모두 인증이 필요합니다. 로그인 테스트 방법은 아래 2가지입니다.
+
+### 1. Google ID Token으로 실제 로그인 테스트
+
+1. `.env`에 `GOOGLE_CLIENT_ID`를 설정합니다.
+2. 서버 실행 후 `http://localhost:8000/static/google-login-test.html`을 브라우저로 엽니다.
+3. Google 로그인 버튼을 눌러 `id_token`과 `/api/users/login` 응답을 확인합니다.
+4. 필요하면 Swagger의 `POST /api/users/login`에 아래 형태로 직접 요청합니다.
+
+```json
+{
+  "id_token": "GOOGLE_ID_TOKEN",
+  "nickname": "optional",
+  "img_url": null,
+  "onesignal_id": null
+}
+```
+
+5. 응답의 `access_token`을 Swagger 우측 상단 `Authorize`에 `Bearer <access_token>` 형태로 넣고 나머지 API를 테스트합니다.
+
+### 2. 개발 전용 우회 로그인 테스트
+
+Google 토큰 없이 백엔드만 빠르게 테스트하려면 개발 우회를 사용할 수 있습니다.
+
+`.env` 예시:
+
+```env
+DEBUG=true
+DEV_BYPASS_LOGIN=true
+GOOGLE_CLIENT_ID=dummy-client-id-for-local-dev
+```
+
+개발 우회 엔드포인트:
+
+```bash
+curl -X POST "http://localhost:8000/api/users/dev-login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "google_id": "dev-user-1",
+    "email": "dev1@example.com",
+    "nickname": "dev1"
+  }'
+```
+
+- `POST /api/users/dev-login`은 `DEBUG=true` 이고 `DEV_BYPASS_LOGIN=true`일 때만 동작합니다.
+- 현재 서버 설정상 `GOOGLE_CLIENT_ID`는 개발 우회 로그인만 사용할 때도 필수입니다.
+- 로컬 테스트 전용이면 실제 Google OAuth Client ID 대신 더미 문자열을 넣어도 서버 기동은 가능합니다.
+- Swagger 문서에는 노출하지 않았습니다.
+- 응답으로 받은 `access_token`을 일반 로그인과 동일하게 사용하면 됩니다.
+
+---
+
 ## 추가 문서
 
 - [docs/README.md](docs/README.md): `docs` 운영 원칙과 남겨둔 문서 목록
@@ -133,6 +187,10 @@ alembic -c alembic.ini revision --autogenerate -m "describe-change"
 ---
 
 ## API 엔드포인트
+
+기본 정책:
+- `POST /api/users/login`을 제외한 사용자용 API는 모두 인증이 필요합니다.
+- 예시 `curl`에는 생략된 경우를 제외하고 `Authorization: Bearer <access_token>` 헤더를 포함해야 합니다.
 
 ### 뉴스 목록 조회
 
@@ -152,13 +210,12 @@ GET /api/news
 
 ```bash
 # 전체 목록
-curl http://localhost:8000/api/news
+curl "http://localhost:8000/api/news/simple" \
+  -H "Authorization: Bearer <access_token>"
 
 # 검색
-curl "http://localhost:8000/api/news?search=삼성전자"
-
-# 긍정 뉴스만
-curl "http://localhost:8000/api/news?sentiment=긍정"
+curl "http://localhost:8000/api/news/simple?search=삼성전자" \
+  -H "Authorization: Bearer <access_token>"
 ```
 
 ---
@@ -177,7 +234,8 @@ GET /api/news/simple
 예시:
 
 ```bash
-curl "http://localhost:8000/api/news/simple?limit=20"
+curl "http://localhost:8000/api/news/simple?limit=20" \
+  -H "Authorization: Bearer <access_token>"
 ```
 
 ---
@@ -191,7 +249,8 @@ GET /api/news/{news_id}
 예시:
 
 ```bash
-curl http://localhost:8000/api/news/1
+curl http://localhost:8000/api/news/1 \
+  -H "Authorization: Bearer <access_token>"
 ```
 
 ---
@@ -357,7 +416,8 @@ GET /api/stocks/{code}/overview
 예시:
 
 ```bash
-curl http://localhost:8000/api/stocks/005930/overview
+curl http://localhost:8000/api/stocks/005930/overview \
+  -H "Authorization: Bearer <access_token>"
 ```
 
 ### 기간별 시세 (그래프용)
@@ -370,13 +430,16 @@ GET /api/stocks/{code}/series?range=1d|1w|1m
 
 ```bash
 # 당일 분봉 (기본 5분 간격으로 변환)
-curl "http://localhost:8000/api/stocks/005930/series?range=1d"
+curl "http://localhost:8000/api/stocks/005930/series?range=1d" \
+  -H "Authorization: Bearer <access_token>"
 
 # 최근 1주 일봉
-curl "http://localhost:8000/api/stocks/005930/series?range=1w"
+curl "http://localhost:8000/api/stocks/005930/series?range=1w" \
+  -H "Authorization: Bearer <access_token>"
 
 # 최근 1달 일봉
-curl "http://localhost:8000/api/stocks/005930/series?range=1m"
+curl "http://localhost:8000/api/stocks/005930/series?range=1m" \
+  -H "Authorization: Bearer <access_token>"
 ```
 
 ### 실시간 현재가 (WebSocket)
@@ -384,6 +447,9 @@ curl "http://localhost:8000/api/stocks/005930/series?range=1m"
 ```
 GET ws://localhost:8000/api/stocks/ws/current?code=005930
 ```
+
+- WebSocket도 인증이 필요합니다.
+- `Authorization: Bearer <access_token>` 헤더 또는 `?access_token=<access_token>` 쿼리로 토큰을 전달합니다.
 
 응답 예시:
 
@@ -416,6 +482,10 @@ DATABASE_URL=postgresql+asyncpg://사용자:비밀번호@서버주소:5432/DB이
 HOST=0.0.0.0
 PORT=8000
 DEBUG=True
+SECRET_KEY=change-me
+ALGORITHM=HS256
+GOOGLE_CLIENT_ID=실제_구글_OAuth_Web_Client_ID
+DEV_BYPASS_LOGIN=false
 
 # CORS 허용 출처 (쉼표로 구분)
 CORS_ORIGINS=http://localhost:3000,http://localhost:51151
@@ -429,6 +499,8 @@ KIS_WS_PATH=/tryitout
 ```
 
 > KIS APP_KEY/APP_SECRET은 반드시 backend/.env에서만 관리하세요. (클라이언트 노출 금지)
+> `GOOGLE_CLIENT_ID`는 Google 로그인 검증에 사용하는 OAuth Client ID입니다.
+> `DEV_BYPASS_LOGIN=true`는 개발용 우회 로그인 테스트에서만 사용하세요.
 
 ### 데이터베이스 연결
 

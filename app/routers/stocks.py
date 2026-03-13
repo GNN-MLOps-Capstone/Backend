@@ -15,14 +15,15 @@ from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.database import AsyncSessionLocal, get_db
 from app.kis.cache import TTLCache
 from app.kis.client import KISClient
 from app.kis.errors import KISError
 from app.kis.transformers import transform_overview, transform_series_time, transform_series_daily, KST
 from app.kis.ws_client import KISWSClient
+from app.models import User, Stock, StockSummaryCache, FilteredNews, NewsStockMapping
+from app.routers.users import decode_access_token, get_current_user
 from app.schemas import StockOverviewResponse, StockSeriesResponse, StockSeriesQuery, AITrendResponse, StockWeatherResponse
-from app.models import Stock, StockSummaryCache, FilteredNews, NewsStockMapping
-from app.database import get_db
 
 
 router = APIRouter(
@@ -44,6 +45,26 @@ async def shutdown_stocks_resources() -> None:
     await client.aclose()
 
 
+async def _require_stock_ws_user(websocket: WebSocket) -> User | None:
+    auth_header = websocket.headers.get("authorization") or ""
+    token = ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+    if not token and settings.debug:
+        token = (websocket.query_params.get("access_token") or "").strip()
+    if not token:
+        return None
+
+    try:
+        google_id = decode_access_token(token)
+    except HTTPException:
+        return None
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User).where(User.google_id == google_id))
+        return result.scalar_one_or_none()
+
+
 def _raise_kis_http_error(exc: KISError) -> None:
     raise HTTPException(
         status_code=502,
@@ -63,6 +84,39 @@ def _ensure_kis_ok(data: dict) -> None:
             status_code=200,
             code=data.get("msg_cd"),
         )
+
+
+async def _fetch_stock_overview(code: str) -> dict:
+    cache_key = f"overview:{code}"
+    cached = await cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    data = await client.request(
+        "GET",
+        "/uapi/domestic-stock/v1/quotations/inquire-price",
+        tr_id="FHKST01010100",  # KIS: 주식현재가 시세
+        params={
+            "FID_COND_MRKT_DIV_CODE": "J",
+            "FID_INPUT_ISCD": code,
+        },
+    )
+    _ensure_kis_ok(data)
+    overview = transform_overview(data, code)
+    if (overview.get("last_price") or 0) <= 0:
+        # 일부 종목(우선주/비유동 종목)에서 현재가가 0으로 내려올 때 최근 유효 일봉으로 보정
+        try:
+            latest = await _fetch_latest_daily_point(code)
+        except KISError:
+            latest = None
+        if latest is not None:
+            overview["last_price"] = int(latest.get("c") or 0)
+            overview["open"] = int(latest.get("o") or 0)
+            overview["high"] = int(latest.get("h") or 0)
+            overview["low"] = int(latest.get("l") or 0)
+            overview["volume"] = int(latest.get("v") or 0)
+    await cache.set(cache_key, overview, ttl_seconds=3)
+    return overview
 
 
 def _is_kis_transient_error(exc: KISError) -> bool:
@@ -768,6 +822,11 @@ async def stream_current_price(
         await websocket.close(code=1008)
         return
 
+    current_user = await _require_stock_ws_user(websocket)
+    if current_user is None:
+        await websocket.close(code=1008)
+        return
+
     await websocket.accept()
 
     async def _send(payload: dict) -> None:
@@ -816,41 +875,13 @@ async def stream_current_price(
 @router.get("/{code}/overview", response_model=StockOverviewResponse)
 async def get_stock_overview(
     code: str = Path(..., pattern=r"^[A-Za-z0-9]{6}$", description="종목코드 (6자리)"),
+    current_user: User = Depends(get_current_user),
 ):
     """
     종목 상단 카드용 현재가 요약 정보.
     """
-    cache_key = f"overview:{code}"
-    cached = await cache.get(cache_key)
-    if cached is not None:
-        return cached
-
     try:
-        data = await client.request(
-            "GET",
-            "/uapi/domestic-stock/v1/quotations/inquire-price",
-            tr_id="FHKST01010100",  # KIS: 주식현재가 시세
-            params={
-                "FID_COND_MRKT_DIV_CODE": "J",
-                "FID_INPUT_ISCD": code,
-            },
-        )
-        _ensure_kis_ok(data)
-        overview = transform_overview(data, code)
-        if (overview.get("last_price") or 0) <= 0:
-            # 일부 종목(우선주/비유동 종목)에서 현재가가 0으로 내려올 때 최근 유효 일봉으로 보정
-            try:
-                latest = await _fetch_latest_daily_point(code)
-            except KISError:
-                latest = None
-            if latest is not None:
-                overview["last_price"] = int(latest.get("c") or 0)
-                overview["open"] = int(latest.get("o") or 0)
-                overview["high"] = int(latest.get("h") or 0)
-                overview["low"] = int(latest.get("l") or 0)
-                overview["volume"] = int(latest.get("v") or 0)
-        await cache.set(cache_key, overview, ttl_seconds=3)
-        return overview
+        return await _fetch_stock_overview(code)
     except KISError as exc:
         _raise_kis_http_error(exc)
 
@@ -860,6 +891,7 @@ async def get_stock_series(
     request: Request,
     query: StockSeriesQuery = Depends(),
     code: str = Path(..., pattern=r"^[A-Za-z0-9]{6}$", description="종목코드 (6자리)"),
+    current_user: User = Depends(get_current_user),
 ):
     """
     기간별 시세 (1d/1w/1m).
@@ -1180,7 +1212,8 @@ async def get_ai_trends(db: AsyncSession, top_n: int = 3) -> list[dict]:
 @router.get("/trends", response_model=list[AITrendResponse])
 async def read_ai_trends(
     db: AsyncSession = Depends(get_db),
-    top_n: int = Query(3, ge=1, le=20)
+    top_n: int = Query(3, ge=1, le=20),
+    current_user: User = Depends(get_current_user),
 ):
     """
     오늘의 AI 트렌드 종목 조회
@@ -1196,7 +1229,7 @@ async def read_ai_trends(
  
         async def _fetch_overview_safe(code: str) -> dict | None:
             try:
-                return await get_stock_overview(code)
+                return await _fetch_stock_overview(code)
             except (HTTPException, KISError):
                 raise
             except Exception as e:
@@ -1244,6 +1277,7 @@ async def get_stock_weather(
     *,
     stock_id: str | None = None,
     stock_name: str | None = None,
+    current_user: User,
 ) -> str:
     """
     종목코드(stock_id) 또는 종목명(stock_name)으로 날씨 코드 반환.
@@ -1300,7 +1334,7 @@ async def get_stock_weather(
     avg_sentiment: float | None = result.scalar_one_or_none()
  
     # 3. 등락률 조회 (캐시 우선)
-    overview = await get_stock_overview(stock_id)
+    overview = await _fetch_stock_overview(stock_id)
     change_rate: float | None = overview.get("change_rate")
  
     return get_weather(change_rate, avg_sentiment)
@@ -1353,6 +1387,7 @@ async def get_stock_weather_endpoint(
     db: AsyncSession = Depends(get_db),
     stock_id: str | None = Query(None, description="종목코드 (6자리)"),
     stock_name: str | None = Query(None, description="종목명"),
+    current_user: User = Depends(get_current_user),
 ):
     """
     종목코드 또는 종목명으로 날씨 코드 반환.
@@ -1362,5 +1397,10 @@ async def get_stock_weather_endpoint(
     if stock_id is None and stock_name is None:
         raise HTTPException(status_code=400, detail="stock_id 또는 stock_name 중 하나는 필수입니다.")
 
-    weather = await get_stock_weather(db, stock_id=stock_id, stock_name=stock_name)
+    weather = await get_stock_weather(
+        db,
+        stock_id=stock_id,
+        stock_name=stock_name,
+        current_user=current_user,
+    )
     return {"weather": weather}
