@@ -45,8 +45,9 @@ async def shutdown_stocks_resources() -> None:
 
 
 def _raise_kis_http_error(exc: KISError) -> None:
+    http_status = int(exc.status_code) if exc.status_code and int(exc.status_code) >= 400 else 502
     raise HTTPException(
-        status_code=502,
+        status_code=http_status,
         detail={
             "status_code": exc.status_code,
             "code": exc.code,
@@ -825,16 +826,28 @@ async def get_stock_overview(
     if cached is not None:
         return cached
 
+    # 총 재시도 예산 캡: 토큰 재발급·KIS 재시도 중첩으로 지연이 과도해지지 않도록 제한
+    _OVERVIEW_TOTAL_TIMEOUT = 8.0
     try:
-        data = await client.request(
-            "GET",
-            "/uapi/domestic-stock/v1/quotations/inquire-price",
-            tr_id="FHKST01010100",  # KIS: 주식현재가 시세
-            params={
-                "FID_COND_MRKT_DIV_CODE": "J",
-                "FID_INPUT_ISCD": code,
-            },
-        )
+        try:
+            data = await asyncio.wait_for(
+                client.request(
+                    "GET",
+                    "/uapi/domestic-stock/v1/quotations/inquire-price",
+                    tr_id="FHKST01010100",  # KIS: 주식현재가 시세
+                    params={
+                        "FID_COND_MRKT_DIV_CODE": "J",
+                        "FID_INPUT_ISCD": code,
+                    },
+                    retries=3,
+                ),
+                timeout=_OVERVIEW_TOTAL_TIMEOUT,
+            )
+        except asyncio.TimeoutError as exc:
+            raise KISError(
+                f"overview request timed out after {_OVERVIEW_TOTAL_TIMEOUT}s",
+                status_code=504,
+            ) from exc
         _ensure_kis_ok(data)
         overview = transform_overview(data, code)
         if (overview.get("last_price") or 0) <= 0:
@@ -1016,10 +1029,9 @@ async def get_stock_series(
                                     "v": int(latest.get("v") or 0),
                                 }
                             ]
+            await cache.set(cache_key, series, ttl_seconds=120)
             if bypass_cache:
                 await _record_series_bypass_cooldown(request, code, range_label)
-            else:
-                await cache.set(cache_key, series, ttl_seconds=15)
             return series
         except KISError as exc:
             _raise_kis_http_error(exc)
@@ -1069,10 +1081,9 @@ async def get_stock_series(
             )
             _ensure_kis_ok(data)
             series = transform_series_daily(data, code, range_label)
+            await cache.set(cache_key, series, ttl_seconds=120)
             if bypass_cache:
                 await _record_series_bypass_cooldown(request, code, range_label)
-            else:
-                await cache.set(cache_key, series, ttl_seconds=120)
             return series
         except KISError as exc:
             _raise_kis_http_error(exc)
