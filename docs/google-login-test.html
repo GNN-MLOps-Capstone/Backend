@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Google Login Test Client</title>
+    <style>
+      :root {
+        --bg: #f4efe6;
+        --panel: #fffaf2;
+        --text: #1d1b16;
+        --accent: #0f766e;
+        --border: #d8cdbd;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Noto Sans KR", sans-serif;
+        background: linear-gradient(180deg, #efe5d5 0%, var(--bg) 100%);
+        color: var(--text);
+      }
+
+      main {
+        max-width: 760px;
+        margin: 48px auto;
+        padding: 24px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 20px 40px rgba(29, 27, 22, 0.08);
+      }
+
+      h1 {
+        margin-top: 0;
+        font-size: 28px;
+      }
+
+      p,
+      li,
+      label {
+        line-height: 1.6;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: 8px;
+        margin-bottom: 16px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        font: inherit;
+        background: #fff;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 18px;
+        background: var(--accent);
+        color: #fff;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      pre {
+        white-space: pre-wrap;
+        word-break: break-all;
+        background: #f8f3ea;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        min-height: 120px;
+      }
+
+      .muted {
+        color: #5f5a52;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="panel">
+        <h1>Google ID Token Test Client</h1>
+        <p>
+          서버 설정의 <code>GOOGLE_CLIENT_ID</code>를 자동으로 사용해 Google 로그인과
+          백엔드 로그인 API를 한 번에 검증합니다.
+        </p>
+        <p class="muted">
+          Google Cloud Console의 승인된 JavaScript 출처에 <code>http://localhost:8000</code>
+          이 등록되어 있어야 합니다.
+        </p>
+
+        <div id="google-button" style="margin: 20px 0"></div>
+
+        <label for="token-output">Google ID Token</label>
+        <textarea id="token-output" rows="10" readonly></textarea>
+
+        <label for="server-output">Backend Login Response</label>
+        <textarea id="server-output" rows="12" readonly></textarea>
+
+        <button id="copy-button" type="button">서버 Access Token 복사</button>
+
+        <ol>
+          <li>페이지가 서버 설정에서 Google Client ID를 자동으로 읽습니다.</li>
+          <li>Google 로그인 버튼으로 인증합니다.</li>
+          <li>성공 시 <code>/api/users/login</code> 호출 결과가 함께 출력됩니다.</li>
+        </ol>
+      </div>
+    </main>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+      const tokenOutput = document.getElementById("token-output");
+      const serverOutput = document.getElementById("server-output");
+      const buttonContainer = document.getElementById("google-button");
+      let backendAccessToken = "";
+
+      async function handleCredentialResponse(response) {
+        tokenOutput.value = response.credential || "";
+        serverOutput.value = "백엔드 로그인 요청 중...";
+        backendAccessToken = "";
+
+        try {
+          const loginResponse = await fetch("/api/users/login", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              id_token: response.credential || "",
+            }),
+          });
+
+          const data = await loginResponse.json();
+          serverOutput.value = JSON.stringify(data, null, 2);
+          if (loginResponse.ok) {
+            backendAccessToken = data.access_token || "";
+          }
+        } catch (error) {
+          serverOutput.value = `요청 실패: ${error}`;
+        }
+      }
+
+      async function initializeGoogleLogin() {
+        if (!window.google || !google.accounts || !google.accounts.id) {
+          window.setTimeout(initializeGoogleLogin, 200);
+          return;
+        }
+
+        const configResponse = await fetch("/api/users/google-login-config");
+        const config = await configResponse.json();
+        if (!configResponse.ok || !config.client_id) {
+          serverOutput.value = JSON.stringify(config, null, 2);
+          return;
+        }
+
+        buttonContainer.innerHTML = "";
+        google.accounts.id.initialize({
+          client_id: config.client_id,
+          callback: handleCredentialResponse,
+          auto_select: false,
+        });
+        google.accounts.id.renderButton(buttonContainer, {
+          theme: "outline",
+          size: "large",
+          width: 280,
+        });
+      }
+
+      initializeGoogleLogin();
+
+      document.getElementById("copy-button").addEventListener("click", async () => {
+        if (!backendAccessToken) {
+          alert("복사할 토큰이 없습니다.");
+          return;
+        }
+        await navigator.clipboard.writeText(backendAccessToken);
+      });
+    </script>
+  </body>
+</html>
