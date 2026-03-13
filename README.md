@@ -59,7 +59,10 @@ pip install -r requirements.txt
 cp .env.example .env
 # .env 파일에서 DATABASE_URL 설정
 
-# 5. 서버 실행
+# 5. 마이그레이션 적용
+alembic -c alembic.ini upgrade head
+
+# 6. 서버 실행
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -73,14 +76,37 @@ cd Backend
 cp .env.example .env
 # .env 파일에서 DATABASE_URL 설정
 
-# 3. Docker Compose로 실행
-docker-compose up -d --build
+# 3. 외부 Docker 네트워크 준비(최초 1회)
+docker network inspect crawling_news-network >/dev/null 2>&1 || docker network create crawling_news-network
+# proxy-net을 함께 쓰는 환경이면 추가 생성
+docker network inspect proxy-net >/dev/null 2>&1 || docker network create proxy-net
 
-# 4. 로그 확인
-docker-compose logs -f news-api
+# 4. 이미지 빌드
+docker compose build
 
-# 5. 중지
-docker-compose down
+# 5. 앱 실행
+# 마이그레이션이 필요하면 MIGRATE_ON_STARTUP=true를 함께 지정해 1회만 실행
+docker compose up -d
+# 예시: MIGRATE_ON_STARTUP=true docker compose up -d
+
+# 6. 로그 확인
+docker compose logs -f news-api
+
+# 7. 중지
+docker compose down
+```
+
+### Alembic 마이그레이션 명령어
+
+```bash
+# 최신 스키마로 업그레이드
+alembic -c alembic.ini upgrade head
+
+# 현재 리비전 확인
+alembic -c alembic.ini current
+
+# 신규 리비전 생성(자동감지)
+alembic -c alembic.ini revision --autogenerate -m "describe-change"
 ```
 
 ---
@@ -95,6 +121,14 @@ docker-compose down
 | http://localhost:8000/docs   | API 문서 (Swagger UI) |
 | http://localhost:8000/redoc  | API 문서 (ReDoc)      |
 | http://localhost:8000/health | 서버 상태 확인        |
+
+---
+
+## 추가 문서
+
+- [docs/README.md](docs/README.md): `docs` 운영 원칙과 남겨둔 문서 목록
+- [docs/recommendation-logging.md](docs/recommendation-logging.md): 추천/상호작용 로깅 기준 문서
+- [docs/recommender-api.md](docs/recommender-api.md): 외부 추천 서버 연동 스펙
 
 ---
 
@@ -159,6 +193,138 @@ GET /api/news/{news_id}
 ```bash
 curl http://localhost:8000/api/news/1
 ```
+
+---
+
+### 개인화 뉴스 추천 목록
+
+```http
+GET /api/news/recommendations
+```
+
+| 파라미터 | 타입    | 설명                                 | 기본값 |
+| -------- | ------- | ------------------------------------ | ------ |
+| user_id  | int     | 호환용 사용자 ID. 전달 시 인증 사용자와 같아야 함 | - |
+| limit    | int     | 호환용 파라미터(서버는 항상 20개 고정 반환) | 20 |
+| page     | int     | 무한 스크롤 페이지(1부터 시작)        | 1      |
+| cursor   | string  | 다음 페이지 커서(전달 시 page 우선순위보다 높음) | - |
+| request_id | string | 추천 요청 추적 ID(없으면 서버 생성)   | -      |
+| screen_session_id | string | 추천 탭 세션 ID(로깅 연계용) | -      |
+| app_session_id | string | 앱 세션 ID(선택)                 | -      |
+| log_served | bool  | 추천 응답 DB 로깅 여부                | true   |
+
+예시:
+
+```bash
+curl "http://localhost:8000/api/news/recommendations?page=1&screen_session_id=screen-s1" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+- 인증 필수 엔드포인트입니다.
+- `RECOMMENDER_MOCK_MODE=false`에서 2페이지 이상 조회할 때는 반드시 직전 응답의 `next_cursor`를 전달해야 합니다.
+
+응답 예시:
+
+```json
+{
+  "user_id": 1,
+  "request_id": "req-5f8b0d...",
+  "source": "recommender",
+  "page": 1,
+  "next_cursor": "eyJ2IjoxLCJwYWdlIjoyLCJvZmZzZXQiOjEwLCJsaW1pdCI6MTB9",
+  "served_count": 20,
+  "logged": true,
+  "items": [
+    {
+      "news_id": 1,
+      "title": "기사 제목",
+      "summary": "기사 요약",
+      "pub_date": "2026-02-25T12:34:56",
+      "path": "A1"
+    }
+  ]
+}
+```
+
+---
+
+### 추천 로그 수집 (탭/뉴스 체류시간)
+
+```http
+POST /api/interactions/events
+```
+
+- `events`에는 아래 `event_type`을 사용합니다.
+- 추천 탭: `screen_view`, `screen_heartbeat`, `screen_leave`
+- 뉴스 상세: `content_open`, `content_heartbeat`, `content_leave`
+- 추천 요청/응답: `recommendation_request`, `recommendation_response`
+- 추천 스크롤: `scroll_depth`
+
+현재 운영 가이드 기준으로는 추천 목록 노출은 `recommendation_serves`로 판단하므로 `recommendation_impression`은 기본적으로 사용하지 않습니다.
+
+예시:
+
+```bash
+curl -X POST "http://localhost:8000/api/interactions/events" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access_token>" \
+  -d '{
+    "events": [
+      {
+        "event_id": "evt-1",
+        "user_id": 1,
+        "event_type": "screen_view",
+        "screen_session_id": "screen-s1",
+        "request_id": "req-1"
+      },
+      {
+        "event_id": "evt-2",
+        "user_id": 1,
+        "event_type": "scroll_depth",
+        "screen_session_id": "screen-s1",
+        "request_id": "req-1",
+        "scroll_depth": 62.5,
+        "page": 1
+      },
+      {
+        "event_id": "evt-3",
+        "user_id": 1,
+        "event_type": "content_open",
+        "screen_session_id": "screen-s1",
+        "content_session_id": "content-c1",
+        "request_id": "req-1",
+        "news_id": 101,
+        "position": 3
+      },
+      {
+        "event_id": "evt-4",
+        "user_id": 1,
+        "event_type": "content_leave",
+        "content_session_id": "content-c1",
+        "news_id": 101
+      },
+      {
+        "event_id": "evt-5",
+        "user_id": 1,
+        "event_type": "screen_leave",
+        "screen_session_id": "screen-s1"
+      }
+    ]
+  }'
+```
+
+추천 목록 로깅은 `GET /api/news/recommendations`의 `log_served=true`(기본값)로도 자동 저장됩니다.
+저장 테이블:
+- `recommendation_serves`: 요청 단위(요청 ID, 페이지, source, served_count, `served_items`)
+- `interaction_events`: 추천 요청/응답/스크롤/콘텐츠 이벤트 원본 로그
+
+현재 운영 권장안:
+- `content_open`에는 `request_id`와 `news_id`를 반드시 포함
+- `content_leave`에도 같은 `news_id`를 함께 포함
+
+`POST /api/interactions/events` 응답 필드:
+- `accepted`: 저장된 이벤트 수
+- `duplicated`: `event_id` 중복으로 스킵된 이벤트 수
 
 ---
 

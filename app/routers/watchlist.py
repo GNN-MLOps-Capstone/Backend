@@ -25,6 +25,7 @@ from datetime import datetime, timedelta, timezone
 import logging
 from google.genai import types
 from google import genai
+from enum import Enum, auto
 
 from app.database import get_db
 

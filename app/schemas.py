@@ -13,11 +13,13 @@ API 스키마 정의 (schemas.py)
 ==============================================================================
 """
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime,time
 import re
 from enum import Enum
+
+from app.models import InteractionEventType
 
 class NewsSimpleResponse(BaseModel):
     """
@@ -76,6 +78,25 @@ class NewsDetailResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class NewsRecommendationItem(BaseModel):
+    news_id: int
+    title: str
+    summary: Optional[str] = None
+    pub_date: Optional[datetime] = None
+    path: Optional[str] = None
+
+
+class NewsRecommendationResponse(BaseModel):
+    user_id: int
+    request_id: str
+    source: str
+    page: int
+    next_cursor: Optional[str] = None
+    served_count: int
+    logged: bool
+    items: List[NewsRecommendationItem]
+
 
 class StockSummaryResponse(BaseModel):
     """
@@ -199,6 +220,31 @@ class NotificationCountResponse(BaseModel):
     처리가 끝난 후 남은 '안 읽은 알림 개수'를 반환합니다.
     """
     unread_count: int
+
+
+class InteractionEventIn(BaseModel):
+    event_id: str = Field(..., min_length=1, max_length=64)
+    user_id: int = Field(..., ge=1)
+    event_type: InteractionEventType
+    device_id: Optional[str] = Field(None, max_length=255)
+    app_session_id: Optional[str] = Field(None, max_length=255)
+    screen_session_id: Optional[str] = Field(None, max_length=64)
+    content_session_id: Optional[str] = Field(None, max_length=64)
+    news_id: Optional[int] = None
+    request_id: Optional[str] = Field(None, max_length=128)
+    position: Optional[int] = None
+    page: Optional[int] = None
+    scroll_depth: Optional[float] = None
+    event_ts_client: Optional[datetime] = None
+
+
+class InteractionEventBatchRequest(BaseModel):
+    events: List[InteractionEventIn]
+
+
+class InteractionIngestResponse(BaseModel):
+    accepted: int
+    duplicated: int
 
 # =============================================================================
 # 주식 API 스키마
