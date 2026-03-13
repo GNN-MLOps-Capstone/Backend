@@ -369,3 +369,6 @@ class AITrendResponse(BaseModel):
     change_rate: float | None = None
     news_count: int
     avg_sentiment: float | None
+
+class StockWeatherResponse(BaseModel):
+    weather: WeatherType

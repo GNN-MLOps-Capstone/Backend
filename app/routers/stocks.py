@@ -20,7 +20,7 @@ from app.kis.client import KISClient
 from app.kis.errors import KISError
 from app.kis.transformers import transform_overview, transform_series_time, transform_series_daily, KST
 from app.kis.ws_client import KISWSClient
-from app.schemas import StockOverviewResponse, StockSeriesResponse, StockSeriesQuery, AITrendResponse
+from app.schemas import StockOverviewResponse, StockSeriesResponse, StockSeriesQuery, AITrendResponse, StockWeatherResponse
 from app.models import Stock, FilteredNews, NewsStockMapping
 from app.database import get_db
 
@@ -1308,7 +1308,7 @@ def get_weather(change_rate: float | None, avg_sentiment: float | None) -> str:
     """
     주가 등락률 + 감성 평균으로 날씨 코드 반환.
 
-    주가 점수: -5% 이하=-2, -4%~-1%=-1, -1%~+1%=0, +1%~+5%=+1, +5% 초과=+2
+    주가 점수: -5% 이하=-2, -5% 초과~-1% 이하=-1, -1% 초과~+1% 미만=0, +1% 이상~+5% 미만=+1, +5% 이상=+2
     감성 점수: 부정(avg<0)=-1, 중립(None or 0)=0, 긍정(avg>0)=+1
     합산:      <= -2=THUNDERSTORM, -1=RAINY, 0=CLOUDY, +1=PARTLY_CLOUDY, >= +2=SUNNY
     """
@@ -1346,7 +1346,7 @@ def get_weather(change_rate: float | None, avg_sentiment: float | None) -> str:
         return "PARTLY_CLOUDY"
     return "SUNNY"
 
-@router.get("/weather", response_model=dict)
+@router.get("/weather", response_model=StockWeatherResponse)
 async def get_stock_weather_endpoint(
     db: AsyncSession = Depends(get_db),
     stock_id: str | None = Query(None, description="종목코드 (6자리)"),
