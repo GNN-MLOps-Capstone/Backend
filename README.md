@@ -155,6 +155,7 @@ Google 토큰 없이 백엔드만 빠르게 테스트하려면 개발 우회를 
 ```env
 DEBUG=true
 DEV_BYPASS_LOGIN=true
+GOOGLE_CLIENT_ID=dummy-client-id-for-local-dev
 ```
 
 개발 우회 엔드포인트:
@@ -170,6 +171,8 @@ curl -X POST "http://localhost:8000/api/users/dev-login" \
 ```
 
 - `POST /api/users/dev-login`은 `DEBUG=true` 이고 `DEV_BYPASS_LOGIN=true`일 때만 동작합니다.
+- 현재 서버 설정상 `GOOGLE_CLIENT_ID`는 개발 우회 로그인만 사용할 때도 필수입니다.
+- 로컬 테스트 전용이면 실제 Google OAuth Client ID 대신 더미 문자열을 넣어도 서버 기동은 가능합니다.
 - Swagger 문서에는 노출하지 않았습니다.
 - 응답으로 받은 `access_token`을 일반 로그인과 동일하게 사용하면 됩니다.
 
