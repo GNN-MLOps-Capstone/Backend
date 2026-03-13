@@ -1298,25 +1298,8 @@ async def get_stock_weather(
     avg_sentiment: float | None = result.scalar_one_or_none()
  
     # 3. 등락률 조회 (캐시 우선)
-    change_rate: float | None = None
-    try:
-        overview = await cache.get(f"overview:{stock_id}")
-        if overview is None:
-            data = await client.request(
-                "GET",
-                "/uapi/domestic-stock/v1/quotations/inquire-price",
-                tr_id="FHKST01010100",
-                params={
-                    "FID_COND_MRKT_DIV_CODE": "J",
-                    "FID_INPUT_ISCD": stock_id,
-                },
-            )
-            _ensure_kis_ok(data)
-            overview = transform_overview(data, stock_id)
-            await cache.set(f"overview:{stock_id}", overview, ttl_seconds=3)
-        change_rate = overview.get("change_rate")
-    except KISError as e:
-        _raise_kis_http_error(e)
+    overview = await get_stock_overview(stock_id)
+    change_rate: float | None = overview.get("change_rate")
  
     return get_weather(change_rate, avg_sentiment)
  

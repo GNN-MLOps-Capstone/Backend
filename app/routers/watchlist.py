@@ -138,9 +138,18 @@ async def get_watchlist(
 
     # 제미나이만 호출
     if ai_tasks_payload:
+        semaphore = asyncio.Semaphore(5)
+
+        async def _call_gemini_bounded(payload: dict) -> str | None:
+            async with semaphore:
+                return await call_gemini_summary(
+                    payload["stock_name"],
+                    payload["news_count"],
+                    payload["combined_text"],
+                )
         # call_gemini_summary는 순수 I/O 작업이므로 병렬 처리가 가장 효율적입니다.
         gemini_results = await asyncio.gather(*[
-            call_gemini_summary(p["stock_name"], p["news_count"], p["combined_text"])
+            _call_gemini_bounded(p)
             for p in ai_tasks_payload
         ], return_exceptions=True)
 
@@ -421,13 +430,20 @@ async def get_watchlist_briefing(
     for issue in top_issues:
         stock_name = issue.stock_name
         try:
-            stock_id_result = await db.execute(
-                select(Stock.stock_id).where(Stock.stock_name == stock_name).limit(1)
-            )
-            stock_id = stock_id_result.scalar()
-            if not stock_id:
+            stock_ids = (
+                await db.execute(
+                    select(Stock.stock_id)
+                    .where((Stock.stock_id == stock_name) | (Stock.stock_name == stock_name))
+                    .limit(2)
+                )
+            ).scalars().all()
+            if not stock_ids:
                 logger.warning("종목 ID 조회 실패, 건너뜀: %s", stock_name)
                 continue
+            if len(stock_ids) > 1:
+                logger.warning("동일 이름 종목 다건 매칭, 건너뜀: %s", stock_name)
+                continue
+            stock_id = stock_ids[0]
             single_summary_text = await get_or_update_summary(
                 stock_id=stock_id,
                 db=db,
