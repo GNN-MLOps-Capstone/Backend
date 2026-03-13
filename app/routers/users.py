@@ -188,10 +188,15 @@ async def update_settings(
 
     # 현재 로그인한 유저(current_user) 정보를 수정
     for key, value in update_data.items():
-        setattr(current_user, key, value)
+        if hasattr(settings_obj, key):
+            setattr(settings_obj, key, value)
 
-    await db.commit()
-    await db.refresh(settings_obj)
+    try:
+        await db.commit()
+        await db.refresh(settings_obj)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"저장 중 오류가 발생했습니다: {str(e)}")
     
     return settings_obj
 
