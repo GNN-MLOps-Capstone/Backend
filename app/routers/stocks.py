@@ -821,17 +821,28 @@ async def get_stock_overview(
     if cached is not None:
         return cached
 
+    # 총 재시도 예산 캡: 토큰 재발급·KIS 재시도 중첩으로 지연이 과도해지지 않도록 제한
+    _OVERVIEW_TOTAL_TIMEOUT = 8.0
     try:
-        data = await client.request(
-            "GET",
-            "/uapi/domestic-stock/v1/quotations/inquire-price",
-            tr_id="FHKST01010100",  # KIS: 주식현재가 시세
-            params={
-                "FID_COND_MRKT_DIV_CODE": "J",
-                "FID_INPUT_ISCD": code,
-            },
-            retries=3,
-        )
+        try:
+            data = await asyncio.wait_for(
+                client.request(
+                    "GET",
+                    "/uapi/domestic-stock/v1/quotations/inquire-price",
+                    tr_id="FHKST01010100",  # KIS: 주식현재가 시세
+                    params={
+                        "FID_COND_MRKT_DIV_CODE": "J",
+                        "FID_INPUT_ISCD": code,
+                    },
+                    retries=3,
+                ),
+                timeout=_OVERVIEW_TOTAL_TIMEOUT,
+            )
+        except asyncio.TimeoutError as exc:
+            raise KISError(
+                f"overview request timed out after {_OVERVIEW_TOTAL_TIMEOUT}s",
+                status_code=504,
+            ) from exc
         _ensure_kis_ok(data)
         overview = transform_overview(data, code)
         if (overview.get("last_price") or 0) <= 0:
