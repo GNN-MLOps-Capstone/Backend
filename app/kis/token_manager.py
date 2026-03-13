@@ -72,7 +72,7 @@ class TokenManager:
         headers = {"content-type": "application/json; charset=utf-8"}
 
         last_exc: KISError | None = None
-        for attempt in range(cls._TOKEN_MAX_RETRIES):
+        for attempt in range(cls._TOKEN_MAX_RETRIES + 1):
             try:
                 async with httpx.AsyncClient(timeout=settings.kis_timeout) as client:
                     resp = await client.post(url, json=payload, headers=headers)
@@ -86,7 +86,7 @@ class TokenManager:
                 f"KIS token request HTTP {resp.status_code}",
                 status_code=resp.status_code,
             )
-            if attempt < cls._TOKEN_MAX_RETRIES - 1 and resp.status_code in cls._RETRYABLE_TOKEN_STATUS:
+            if attempt < cls._TOKEN_MAX_RETRIES and resp.status_code in cls._RETRYABLE_TOKEN_STATUS:
                 await asyncio.sleep(cls._TOKEN_BACKOFF_SECONDS * (attempt + 1))
                 continue
             raise last_exc
