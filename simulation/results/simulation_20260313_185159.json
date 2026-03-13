@@ -1,0 +1,4113 @@
+{
+  "simulation_id": "20260313_185159",
+  "run_at": "2026-03-13T18:51:59.915149",
+  "elapsed_sec": 878.57,
+  "total_personas": 19,
+  "success_count": 11,
+  "summary": {
+    "total_served": 1280,
+    "total_clicks": 82,
+    "ctr": 0.0641,
+    "avg_satisfaction": 2.36,
+    "avg_freshness": 3.18,
+    "avg_relevance": 2.55,
+    "avg_diversity": 3.36
+  },
+  "results": [
+    {
+      "persona_id": "9001",
+      "persona_name": "반도체 장비 투자자 지훈",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDIiLCJleHAiOjE3NzU5ODM3MDF9.j7xYj2iP38MgjnOrKl3dyADx7JYu-S_VOZmsEPSWrZI",
+      "error": ""
+    },
+    {
+      "persona_id": "9002",
+      "persona_name": "배터리 산업 투자자 태호",
+      "google_id": "test03",
+      "email": "test03@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDMiLCJleHAiOjE3NzU5ODM3MDF9.XQ9hhuAwK3Y7qlBRkKU2gGVpz6WPcataxwWfGpqITNE",
+      "context": {
+        "attitude": "적극적",
+        "time_slot": "점심시간",
+        "time_slot_description": "여유 있게 읽을 수 있음. 관심 있으면 꼼꼼히 읽음.",
+        "condition": "약간 피곤함. 흥미로운 뉴스만 읽을 것 같음.",
+        "fatigue": 1,
+        "random_seed": 9556
+      },
+      "app_session_id": "sim-app-9002-854f17e8",
+      "screen_session_id": "sim-screen-9002-6720db33",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9002-a98bf935",
+          "source": "mock",
+          "news_ids": [
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542,
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9002-61a5564e",
+          "source": "mock",
+          "news_ids": [
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510,
+            233509,
+            233508,
+            233507,
+            233506,
+            233505,
+            233503,
+            233501,
+            233500,
+            233499,
+            233498,
+            233497,
+            233496,
+            233494
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233542,
+          "title": "[Y인사이트] 배터리 열폭주 위험 줄여주는 '폭연 방산구'의 위력",
+          "url": "https://www.thelec.kr/news/articleView.html?idxno=53475",
+          "dwell_time_sec": 39.33,
+          "read_type": "full",
+          "after_action": "back",
+          "after_reason": "배터리 열폭주 관련 기술에 대한 정보를 얻었으니, 다른 2차전지 관련 뉴스도 더 찾아보고 싶습니다."
+        },
+        {
+          "news_id": 233533,
+          "title": "이재명 대통령 “2차 공공기관 이전, 흩뿌리듯 안 된다…집중 필요”",
+          "url": "http://www.segyebiz.com/newsView/20260313512363?OutUrl=naver",
+          "dwell_time_sec": 11.69,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "2차전지 투자자인 나에게 직접적인 관련성이 낮은 정치 뉴스라고 판단됨."
+        }
+      ],
+      "actions": [
+        {
+          "type": "select",
+          "reason": "배터리 열폭주 위험을 줄여주는 기술에 대한 기사라서 관심이 갑니다.",
+          "fetch": 1
+        },
+        {
+          "type": "after_read_back",
+          "news_id": 233542,
+          "reason": "배터리 열폭주 관련 기술에 대한 정보를 얻었으니, 다른 2차전지 관련 뉴스도 더 찾아보고 싶습니다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "이재명 대통령이 공공기관 이전에 대해 언급했는데, 2차 전지 관련 기관 이전 가능성이 있을지 궁금함.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233533,
+          "reason": "2차전지 투자자인 나에게 직접적인 관련성이 낮은 정치 뉴스라고 판단됨.",
+          "fetch": 1
+        },
+        {
+          "type": "next",
+          "reason": "2차전지 관련 뉴스는 보이지 않네요. 다음 페이지를 기대합니다.",
+          "fetch": 1
+        },
+        {
+          "type": "exit",
+          "reason": "유가 충격 관련 뉴스가 있지만, 지금은 피곤해서 더 찾아보지 않고 종료합니다.",
+          "fetch": 2
+        }
+      ],
+      "next_count": 1,
+      "total_served": 40,
+      "exit_reason": "유가 충격 관련 뉴스가 있지만, 지금은 피곤해서 더 찾아보지 않고 종료합니다.",
+      "evaluation": {
+        "satisfaction": 2,
+        "freshness": 3,
+        "relevance": 3,
+        "diversity": 2,
+        "comment": "배터리 관련 뉴스 하나는 흥미로웠지만, 전체적으로 피로한 상태에서 유가를 포함한 다양한 뉴스에 대한 관심이 떨어져 종료했습니다."
+      },
+      "total_session_time_sec": 154.96
+    },
+    {
+      "persona_id": "9003",
+      "persona_name": "전기차 매니아 수진",
+      "google_id": "test04",
+      "email": "test04@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDQiLCJleHAiOjE3NzU5ODM3MDF9.Z8az0-rud-YQWWGIFF_ZCnYaxTiS8MtwxNdjTA9pOO4",
+      "context": {
+        "attitude": "적극적",
+        "time_slot": "주말 오전",
+        "time_slot_description": "여유롭게 여러 뉴스를 천천히 탐색.",
+        "condition": "매우 바쁨. 훑어보고 빠르게 종료할 가능성 높음.",
+        "fatigue": 4,
+        "random_seed": 5028
+      },
+      "app_session_id": "sim-app-9003-fee428b4",
+      "screen_session_id": "sim-screen-9003-f965a4aa",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9003-5077f88b",
+          "source": "mock",
+          "news_ids": [
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542,
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9003-650cbdbd",
+          "source": "mock",
+          "news_ids": [
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510,
+            233509,
+            233508,
+            233507,
+            233506,
+            233505,
+            233503,
+            233501,
+            233500,
+            233499,
+            233498,
+            233497,
+            233496,
+            233494
+          ]
+        },
+        {
+          "fetch": 3,
+          "request_id": "sim-req-9003-3267b0dd",
+          "source": "mock",
+          "news_ids": [
+            233493,
+            233492,
+            233490,
+            233488,
+            233487,
+            233486,
+            233481,
+            233480,
+            233478,
+            233477,
+            233475,
+            233474,
+            233473,
+            233472,
+            233471,
+            233470,
+            233468,
+            233467,
+            233466,
+            233465
+          ]
+        },
+        {
+          "fetch": 4,
+          "request_id": "sim-req-9003-5e394615",
+          "source": "mock",
+          "news_ids": [
+            233464,
+            233463,
+            233462,
+            233461,
+            233459,
+            233458,
+            233455,
+            233454,
+            233453,
+            233451,
+            233450,
+            233449,
+            233447,
+            233446,
+            233445,
+            233444,
+            233443,
+            233441,
+            233440,
+            233439
+          ]
+        },
+        {
+          "fetch": 5,
+          "request_id": "sim-req-9003-a7e7c599",
+          "source": "mock",
+          "news_ids": [
+            233438,
+            233437,
+            233436,
+            233435,
+            233434,
+            233433,
+            233430,
+            233429,
+            233427,
+            233426,
+            233425,
+            233421,
+            233420,
+            233419,
+            233417,
+            233416,
+            233415,
+            233412,
+            233409,
+            233408
+          ]
+        },
+        {
+          "fetch": 6,
+          "request_id": "sim-req-9003-d21d690f",
+          "source": "mock",
+          "news_ids": [
+            233407,
+            233406,
+            233405,
+            233404,
+            233403,
+            233402,
+            233401,
+            233399,
+            233394,
+            233393,
+            233392,
+            233391,
+            233390,
+            233387,
+            233386,
+            233384,
+            233383,
+            233382,
+            233381,
+            233376
+          ]
+        },
+        {
+          "fetch": 7,
+          "request_id": "sim-req-9003-ab789d89",
+          "source": "mock",
+          "news_ids": [
+            233375,
+            233374,
+            233373,
+            233371,
+            233369,
+            233368,
+            233367,
+            233365,
+            233363,
+            233360,
+            233357,
+            233353,
+            233351,
+            233350,
+            233349,
+            233348,
+            233346,
+            233345,
+            233343,
+            233340
+          ]
+        },
+        {
+          "fetch": 8,
+          "request_id": "sim-req-9003-dcc9e948",
+          "source": "mock",
+          "news_ids": [
+            233338,
+            233337,
+            233336,
+            233330,
+            233329,
+            233328,
+            233327,
+            233325,
+            233322,
+            233321,
+            233320,
+            233319,
+            233318,
+            233317,
+            233314,
+            233312,
+            233310,
+            233309,
+            233307,
+            233303
+          ]
+        },
+        {
+          "fetch": 9,
+          "request_id": "sim-req-9003-c5e9a8ea",
+          "source": "mock",
+          "news_ids": [
+            233302,
+            233301,
+            233299,
+            233298,
+            233295,
+            233294,
+            233290,
+            233288,
+            233286,
+            233285,
+            233284,
+            233283,
+            233282,
+            233281,
+            233279,
+            233278,
+            233277,
+            233275,
+            233274,
+            233273
+          ]
+        },
+        {
+          "fetch": 10,
+          "request_id": "sim-req-9003-069f7604",
+          "source": "mock",
+          "news_ids": [
+            233272,
+            233271,
+            233269,
+            233268,
+            233266,
+            233265,
+            233264,
+            233262,
+            233260,
+            233256,
+            233253,
+            233252,
+            233251,
+            233250,
+            233249,
+            233247,
+            233243,
+            233241,
+            233240,
+            233239
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233542,
+          "title": "[Y인사이트] 배터리 열폭주 위험 줄여주는 '폭연 방산구'의 위력",
+          "url": "https://www.thelec.kr/news/articleView.html?idxno=53475",
+          "dwell_time_sec": 80.92,
+          "read_type": "full",
+          "after_action": "back",
+          "after_reason": "배터리 기술 관련 뉴스는 흥미로워. 다른 관련 뉴스도 찾아봐야지!"
+        },
+        {
+          "news_id": 233481,
+          "title": "부산진해경자청, 美 명문대 방문… 두동 정주 개선 논의",
+          "url": "https://www.ziksir.com/news/articleView.html?idxno=127030",
+          "dwell_time_sec": 13.87,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "두동 정주 개선은 나의 관심사와 거리가 멀다."
+        },
+        {
+          "news_id": 233459,
+          "title": "대통령 전기차 보조금 정책 질타에 중국산 전기버스 판매 30% 급락",
+          "url": "https://www.autodaily.co.kr/news/articleView.html?idxno=542339",
+          "dwell_time_sec": 64.98,
+          "read_type": "full",
+          "after_action": "back",
+          "after_reason": "전기차 보조금 정책 관련 뉴스를 봐서 다른 관련 뉴스를 더 보고 싶어졌어요."
+        },
+        {
+          "news_id": 233419,
+          "title": "\"졸릴 수 있어요\" \"한 알도 안돼요?\" 지그재그 약물 운전, 기준이 없다?",
+          "url": "https://n.news.naver.com/mnews/article/052/0002326806?sid=102",
+          "dwell_time_sec": 15.86,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "전기차나 자율주행 관련 내용이 아닌 것 같아서 바로 나갑니다."
+        },
+        {
+          "news_id": 233421,
+          "title": "[브리프] KB금융 BNK금융 KB국민은행 하나은행 우리은행 농협은행 外",
+          "url": "http://www.biztribune.co.kr/news/articleView.html?idxno=350446",
+          "dwell_time_sec": 16.0,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "전기차나 자율주행 관련 내용이 아닌 금융 보안 관련 내용이라 관심도가 낮습니다."
+        },
+        {
+          "news_id": 233406,
+          "title": "삼성, '지구를 위한 갤럭시' 비전 제시...\"쓴 물의 110% 돌려준다\"",
+          "url": "https://www.insightkorea.co.kr/news/articleView.html?idxno=242714",
+          "dwell_time_sec": 16.49,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "전기차/자율주행 관련 내용이 아닌 환경 관련 내용이라 관심도가 떨어진다."
+        },
+        {
+          "news_id": 233349,
+          "title": "이재용, 유럽 출장서 귀국… 글로벌 완성차에 직접 '배터리 세일즈'",
+          "url": "https://www.financialpost.co.kr/news/articleView.html?idxno=251302",
+          "dwell_time_sec": 83.38,
+          "read_type": "full",
+          "after_action": "back",
+          "after_reason": "이재용 회장의 배터리 세일즈 관련 뉴스는 흥미롭지만, 제 관심사인 전기차 자체나 자율주행 기술에 대한 직접적인 내용은 아니어서 다른 뉴스를 더 찾아보고 싶어요."
+        },
+        {
+          "news_id": 233336,
+          "title": "[자막뉴스] 기뢰밭된 호르무즈, 닿기만 해도 '펑'…\"거의 격침\"했다는데...",
+          "url": "https://n.news.naver.com/mnews/article/055/0001340092?sid=104",
+          "dwell_time_sec": 8.71,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "전기차, 자율주행과 관련 없는 국제 정세 뉴스이므로 바로 종료."
+        },
+        {
+          "news_id": 233260,
+          "title": "구글, 제미나이 기반 '지도에 물어보기' 출시...3D 내비게이션도 강화",
+          "url": "https://www.aitimes.com/news/articleView.html?idxno=207826",
+          "dwell_time_sec": 117.83,
+          "read_type": "full",
+          "after_action": "exit",
+          "after_reason": "4개나 읽었고, 컨디션도 안 좋아서 이제 그만 봐야겠어."
+        }
+      ],
+      "actions": [
+        {
+          "type": "select",
+          "reason": "배터리 열폭주 위험을 줄여준다는 기술에 관심이 가서 클릭.",
+          "fetch": 1
+        },
+        {
+          "type": "after_read_back",
+          "news_id": 233542,
+          "reason": "배터리 기술 관련 뉴스는 흥미로워. 다른 관련 뉴스도 찾아봐야지!",
+          "fetch": 1
+        },
+        {
+          "type": "next",
+          "reason": "전기차나 자율주행 관련 뉴스는 없지만, 혹시나 다음 페이지에 있을까 싶어 더 보겠습니다.",
+          "fetch": 1
+        },
+        {
+          "type": "next",
+          "reason": "전기차나 자율주행 관련 뉴스는 아직 안보이네요.",
+          "fetch": 2
+        },
+        {
+          "type": "select",
+          "reason": "부산진해경자청에서 미국 명문대 방문해서 두동 정주 개선 논의하는 내용이 흥미롭네요. 미래 모빌리티와 연관될 수도 있을 것 같아서 클릭해봅니다.",
+          "fetch": 3
+        },
+        {
+          "type": "bounce",
+          "news_id": 233481,
+          "reason": "두동 정주 개선은 나의 관심사와 거리가 멀다.",
+          "fetch": 3
+        },
+        {
+          "type": "next",
+          "reason": "전기차나 자율주행 관련 뉴스는 없지만, 혹시 다음 페이지에 있을 수도 있으니 확인해보고 싶다.",
+          "fetch": 3
+        },
+        {
+          "type": "select",
+          "reason": "대통령 전기차 보조금 정책 질타에 중국산 전기버스 판매 급락이라니, 전기차 시장에 어떤 영향을 미칠지 궁금하네요.",
+          "fetch": 4
+        },
+        {
+          "type": "after_read_back",
+          "news_id": 233459,
+          "reason": "전기차 보조금 정책 관련 뉴스를 봐서 다른 관련 뉴스를 더 보고 싶어졌어요.",
+          "fetch": 4
+        },
+        {
+          "type": "next",
+          "reason": "전기차나 자율주행 관련 뉴스가 없어서 다음 페이지를 보고 싶다.",
+          "fetch": 4
+        },
+        {
+          "type": "select",
+          "reason": "약물 운전 기준에 대한 기사라 자율주행 기술 발전에 따른 운전 관련 법규 변화에 참고가 될 것 같아서.",
+          "fetch": 5
+        },
+        {
+          "type": "bounce",
+          "news_id": 233419,
+          "reason": "전기차나 자율주행 관련 내용이 아닌 것 같아서 바로 나갑니다.",
+          "fetch": 5
+        },
+        {
+          "type": "select",
+          "reason": "KB금융의 AI 보안 가이드라인 마련 계획이 디지털 금융 환경 변화에 대한 대응이라는 점에서 흥미롭다.",
+          "fetch": 5
+        },
+        {
+          "type": "bounce",
+          "news_id": 233421,
+          "reason": "전기차나 자율주행 관련 내용이 아닌 금융 보안 관련 내용이라 관심도가 낮습니다.",
+          "fetch": 5
+        },
+        {
+          "type": "next",
+          "reason": "전기차나 자율주행 관련 뉴스는 없지만, 더 볼 만한 뉴스가 있을 수도 있다고 생각한다.",
+          "fetch": 5
+        },
+        {
+          "type": "select",
+          "reason": "삼성의 '지구를 위한 갤럭시' 비전이 전기차 배터리 등 친환경 모빌리티 기술과 연관될 수 있을 것 같아서 관심이 간다.",
+          "fetch": 6
+        },
+        {
+          "type": "bounce",
+          "news_id": 233406,
+          "reason": "전기차/자율주행 관련 내용이 아닌 환경 관련 내용이라 관심도가 떨어진다.",
+          "fetch": 6
+        },
+        {
+          "type": "next",
+          "reason": "전기차 관련 뉴스가 없어서 다음 페이지를 보고 싶다.",
+          "fetch": 6
+        },
+        {
+          "type": "select",
+          "reason": "이재용 회장의 유럽 출장 내용이 배터리, 전장 사업과 관련되어 있어 관심이 간다.",
+          "fetch": 7
+        },
+        {
+          "type": "after_read_back",
+          "news_id": 233349,
+          "reason": "이재용 회장의 배터리 세일즈 관련 뉴스는 흥미롭지만, 제 관심사인 전기차 자체나 자율주행 기술에 대한 직접적인 내용은 아니어서 다른 뉴스를 더 찾아보고 싶어요.",
+          "fetch": 7
+        },
+        {
+          "type": "next",
+          "reason": "전기차, 자율주행 관련 뉴스는 없지만, 다른 흥미로운 뉴스가 있을 수도 있어서 다음 페이지를 보겠다.",
+          "fetch": 7
+        },
+        {
+          "type": "select",
+          "reason": "호르무즈 해협 기뢰 관련 뉴스는 세계 경제에 영향을 줄 수 있어서 관심이 갑니다.",
+          "fetch": 8
+        },
+        {
+          "type": "bounce",
+          "news_id": 233336,
+          "reason": "전기차, 자율주행과 관련 없는 국제 정세 뉴스이므로 바로 종료.",
+          "fetch": 8
+        },
+        {
+          "type": "next",
+          "reason": "전기차나 자율주행 관련 뉴스는 아직 안 보이네요.",
+          "fetch": 8
+        },
+        {
+          "type": "next",
+          "reason": "전기차나 자율주행 관련 뉴스는 없지만, 그래도 혹시나 다음 페이지에 있을까 싶어 더 볼게요.",
+          "fetch": 9
+        },
+        {
+          "type": "select",
+          "reason": "구글이 지도에 AI 기능을 통합했다니, 자율주행에 어떤 영향을 줄지 궁금하다.",
+          "fetch": 10
+        },
+        {
+          "type": "after_read_exit",
+          "news_id": 233260,
+          "reason": "4개나 읽었고, 컨디션도 안 좋아서 이제 그만 봐야겠어.",
+          "fetch": 10
+        }
+      ],
+      "next_count": 9,
+      "total_served": 200,
+      "exit_reason": "4개나 읽었고, 컨디션도 안 좋아서 이제 그만 봐야겠어.",
+      "evaluation": {
+        "satisfaction": 3,
+        "freshness": 4,
+        "relevance": 3,
+        "diversity": 4,
+        "comment": "전기차 관련 뉴스가 몇 개 있어서 좋았지만, 관심 분야 외의 뉴스가 많아서 피로도가 빨리 올라왔어요."
+      },
+      "total_session_time_sec": 716.74
+    },
+    {
+      "persona_id": "9004",
+      "persona_name": "친환경 에너지 관심 유진",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDUiLCJleHAiOjE3NzU5ODM3MDF9.tRYF7HApp_L5iCUj0U7MLQI6aN8SwGda02XdXcM_P7I",
+      "error": ""
+    },
+    {
+      "persona_id": "9005",
+      "persona_name": "거시경제 분석가 준호",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDYiLCJleHAiOjE3NzU5ODM3MDF9.QEQhTSD2qKzZomKxgX_YsNpGFolUBjf9JgVjrqqu5H8",
+      "error": ""
+    },
+    {
+      "persona_id": "9006",
+      "persona_name": "배당주 투자자 영수",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDciLCJleHAiOjE3NzU5ODM3MDF9.WocmwAoG-Ao8liUCd6oU9uvS_nlLhL5qZrcrgGuFVM0",
+      "error": ""
+    },
+    {
+      "persona_id": "9007",
+      "persona_name": "글로벌 경제 관심 지민",
+      "google_id": "test08",
+      "email": "test08@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDgiLCJleHAiOjE3NzU5ODM3MDF9.BB7w3CIju_PT6DaGRkPWw-N9LqxwTfYe5yRQyJ6vUkE",
+      "context": {
+        "attitude": "소극적",
+        "time_slot": "퇴근 후 저녁",
+        "time_slot_description": "피곤하지만 관심 있는 뉴스는 끝까지 읽음.",
+        "condition": "약간 피곤함. 흥미로운 뉴스만 읽을 것 같음.",
+        "fatigue": 4,
+        "random_seed": 8170
+      },
+      "app_session_id": "sim-app-9007-a0f973ab",
+      "screen_session_id": "sim-screen-9007-503d5539",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9007-8e1982e1",
+          "source": "mock",
+          "news_ids": [
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542,
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9007-bf12cd2e",
+          "source": "mock",
+          "news_ids": [
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510,
+            233509,
+            233508,
+            233507,
+            233506,
+            233505,
+            233503,
+            233501,
+            233500,
+            233499,
+            233498,
+            233497,
+            233496,
+            233494
+          ]
+        },
+        {
+          "fetch": 3,
+          "request_id": "sim-req-9007-d97d583b",
+          "source": "mock",
+          "news_ids": [
+            233493,
+            233492,
+            233490,
+            233488,
+            233487,
+            233486,
+            233481,
+            233480,
+            233478,
+            233477,
+            233475,
+            233474,
+            233473,
+            233472,
+            233471,
+            233470,
+            233468,
+            233467,
+            233466,
+            233465
+          ]
+        },
+        {
+          "fetch": 4,
+          "request_id": "sim-req-9007-9a4ca9c2",
+          "source": "mock",
+          "news_ids": [
+            233464,
+            233463,
+            233462,
+            233461,
+            233459,
+            233458,
+            233455,
+            233454,
+            233453,
+            233451,
+            233450,
+            233449,
+            233447,
+            233446,
+            233445,
+            233444,
+            233443,
+            233441,
+            233440,
+            233439
+          ]
+        },
+        {
+          "fetch": 5,
+          "request_id": "sim-req-9007-aa2a927d",
+          "source": "mock",
+          "news_ids": [
+            233438,
+            233437,
+            233436,
+            233435,
+            233434,
+            233433,
+            233430,
+            233429,
+            233427,
+            233426,
+            233425,
+            233421,
+            233420,
+            233419,
+            233417,
+            233416,
+            233415,
+            233412,
+            233409,
+            233408
+          ]
+        },
+        {
+          "fetch": 6,
+          "request_id": "sim-req-9007-5b4a7b78",
+          "source": "mock",
+          "news_ids": [
+            233407,
+            233406,
+            233405,
+            233404,
+            233403,
+            233402,
+            233401,
+            233399,
+            233394,
+            233393,
+            233392,
+            233391,
+            233390,
+            233387,
+            233386,
+            233384,
+            233383,
+            233382,
+            233381,
+            233376
+          ]
+        },
+        {
+          "fetch": 7,
+          "request_id": "sim-req-9007-0d9389e1",
+          "source": "mock",
+          "news_ids": [
+            233375,
+            233374,
+            233373,
+            233371,
+            233369,
+            233368,
+            233367,
+            233365,
+            233363,
+            233360,
+            233357,
+            233353,
+            233351,
+            233350,
+            233349,
+            233348,
+            233346,
+            233345,
+            233343,
+            233340
+          ]
+        },
+        {
+          "fetch": 8,
+          "request_id": "sim-req-9007-4569dbaa",
+          "source": "mock",
+          "news_ids": [
+            233480,
+            233478,
+            233477,
+            233475,
+            233474,
+            233473,
+            233472,
+            233471,
+            233470,
+            233468,
+            233467,
+            233466,
+            233465,
+            233464,
+            233463,
+            233462,
+            233461,
+            233459,
+            233458,
+            233455
+          ]
+        },
+        {
+          "fetch": 9,
+          "request_id": "sim-req-9007-0a16c23c",
+          "source": "mock",
+          "news_ids": [
+            233454,
+            233453,
+            233451,
+            233450,
+            233449,
+            233447,
+            233446,
+            233445,
+            233444,
+            233443,
+            233441,
+            233440,
+            233439,
+            233438,
+            233437,
+            233436,
+            233435,
+            233434,
+            233433,
+            233430
+          ]
+        },
+        {
+          "fetch": 10,
+          "request_id": "sim-req-9007-9bb301b2",
+          "source": "mock",
+          "news_ids": [
+            233429,
+            233427,
+            233426,
+            233425,
+            233421,
+            233420,
+            233419,
+            233417,
+            233416,
+            233415,
+            233412,
+            233409,
+            233408,
+            233407,
+            233406,
+            233405,
+            233404,
+            233403,
+            233402,
+            233401
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233532,
+          "title": "주요주주 국민연금공단, 한화비전 주식 10.01% 보유 신규 보고",
+          "url": "https://www.digitaltoday.co.kr/news/articleView.html?idxno=640885",
+          "dwell_time_sec": 13.22,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "삼성전자, 나스닥, 환율, Fed 등 관심 키워드와 관련 없어 보임."
+        },
+        {
+          "news_id": 233513,
+          "title": "유가 충격에 코스피 1.7% 내려…‘삼전닉스’ 동반 2% 하락",
+          "url": "https://n.news.naver.com/mnews/article/032/0003433161?sid=101",
+          "dwell_time_sec": 89.82,
+          "read_type": "full",
+          "after_action": "back",
+          "after_reason": "유가 충격에 대한 뉴스를 읽었으니, 관련해서 Fed의 움직임이나 환율 관련 뉴스를 더 보고 싶다."
+        },
+        {
+          "news_id": 233506,
+          "title": "코스피, 유가 충격에 1.7% 하락… 5480선 후퇴",
+          "url": "https://it.chosun.com/news/articleView.html?idxno=2023092158600",
+          "dwell_time_sec": 13.04,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "유가 급등 자체는 흥미롭지만, 코스피 하락에 대한 뉴스는 지금 당장 깊게 읽고 싶지 않다."
+        },
+        {
+          "news_id": 233497,
+          "title": "'휴전 보따리' 꺼낸 이란...\"핵 개발 인정\" 요구, 美 받을까 [Y녹취록]",
+          "url": "https://n.news.naver.com/mnews/article/052/0002326849?sid=104",
+          "dwell_time_sec": 12.74,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "글로벌 경제 및 증시 관심사와 거리가 멀고 피로도도 있어 바로 종료합니다."
+        },
+        {
+          "news_id": 233493,
+          "title": "[이슈 ON] 2주째 불타는 중동...모즈타바 \"피의 복수\" 초강경 메시지",
+          "url": "https://n.news.naver.com/mnews/article/052/0002326854?sid=104",
+          "dwell_time_sec": 16.86,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "중동 정세 관련 뉴스는 현재 관심사와 거리가 멀고, 피로도도 있어 바로 종료합니다."
+        },
+        {
+          "news_id": 233462,
+          "title": "美 셰일·북미 비료·유럽 정유…이란 전쟁 수혜주에 쏠린 눈",
+          "url": "https://n.news.naver.com/mnews/article/015/0005262087?sid=104",
+          "dwell_time_sec": 16.4,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "이란 전쟁 수혜주 관련 기사는 지금 당장 투자에 활용하기 어렵고 피로한 상태에서 깊이 있게 보기 힘들 것 같음."
+        },
+        {
+          "news_id": 233433,
+          "title": "'집단소송제' 도입 요구 갈수록 높지만, 입법화는 기약없이 표류 ?",
+          "url": "http://www.nongaek.com/news/articleView.html?idxno=94690",
+          "dwell_time_sec": 18.96,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "퇴근 후 피곤한데, 지금 관심 있는 분야(해외 증시, 글로벌 경제)와 거리가 멀어 보임."
+        },
+        {
+          "news_id": 233438,
+          "title": "[자막뉴스] \"오늘 무슨 일 생기는지 봐라\" 트럼프가 올린 의미심장 글",
+          "url": "https://n.news.naver.com/mnews/article/055/0001340113?sid=104",
+          "dwell_time_sec": 105.54,
+          "read_type": "full",
+          "after_action": "back",
+          "after_reason": "트럼프 관련 뉴스는 흥미롭지만, 지금은 경제 뉴스를 더 보고 싶다."
+        },
+        {
+          "news_id": 233349,
+          "title": "이재용, 유럽 출장서 귀국… 글로벌 완성차에 직접 '배터리 세일즈'",
+          "url": "https://www.financialpost.co.kr/news/articleView.html?idxno=251302",
+          "dwell_time_sec": 107.53,
+          "read_type": "full",
+          "after_action": "back",
+          "after_reason": "이재용 회장의 유럽 출장 관련 뉴스는 삼성전자에 간접적인 영향을 줄 수 있다고 생각해서 다른 뉴스를 더 보고 싶습니다."
+        },
+        {
+          "news_id": 233365,
+          "title": "아랍 언론 \"가장 섬뜩한 경고\"...전세계 올스톱 위기 [이슈톺]",
+          "url": "https://n.news.naver.com/mnews/article/052/0002326824?sid=104",
+          "dwell_time_sec": 15.51,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "피곤한데 아랍 언론 관련 뉴스는 지금 당장 흥미롭지 않음. 경제 뉴스가 아니기도 하고."
+        },
+        {
+          "news_id": 233415,
+          "title": "알 듯 모르는 손가락 이름들",
+          "url": "https://www.ppss.kr/news/articleView.html?idxno=288143",
+          "dwell_time_sec": 6.76,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "경제 뉴스에 관심 있는데, 손가락 이름 관련 내용은 흥미롭지 않음."
+        },
+        {
+          "news_id": 233406,
+          "title": "삼성, '지구를 위한 갤럭시' 비전 제시...\"쓴 물의 110% 돌려준다\"",
+          "url": "https://www.insightkorea.co.kr/news/articleView.html?idxno=242714",
+          "dwell_time_sec": 8.72,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "삼성전자 자체의 친환경 노력은 긍정적이지만, 경제 뉴스에 대한 나의 니즈와는 거리가 멀다고 판단됨."
+        },
+        {
+          "news_id": 233403,
+          "title": "커지는 미 사모대출 뇌관…'거품 붕괴' 막는 조건은 [미다스의 손]",
+          "url": "https://n.news.naver.com/mnews/article/215/0001245087?sid=101",
+          "dwell_time_sec": 119.7,
+          "read_type": "full",
+          "after_action": "exit",
+          "after_reason": "미국 사모대출 관련 뉴스는 흥미롭지만, 4개나 읽어서 피로도가 높고 퇴근 후 휴식이 필요함."
+        }
+      ],
+      "actions": [
+        {
+          "type": "select",
+          "reason": "주요주주 국민연금공단, 한화비전 주식 보유 관련 내용이라 관심이 간다.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233532,
+          "reason": "삼성전자, 나스닥, 환율, Fed 등 관심 키워드와 관련 없어 보임.",
+          "fetch": 1
+        },
+        {
+          "type": "next",
+          "reason": "퇴근 후 피곤하지만, 아직 흥미로운 뉴스가 더 있을 것 같아서",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "유가, 코스피, 삼성전자 모두 관련되어 있어서 관심이 간다.",
+          "fetch": 2
+        },
+        {
+          "type": "after_read_back",
+          "news_id": 233513,
+          "reason": "유가 충격에 대한 뉴스를 읽었으니, 관련해서 Fed의 움직임이나 환율 관련 뉴스를 더 보고 싶다.",
+          "fetch": 2
+        },
+        {
+          "type": "select",
+          "reason": "코스피 하락, 삼성전자 약세 관련 뉴스라 관심이 간다.",
+          "fetch": 2
+        },
+        {
+          "type": "bounce",
+          "news_id": 233506,
+          "reason": "유가 급등 자체는 흥미롭지만, 코스피 하락에 대한 뉴스는 지금 당장 깊게 읽고 싶지 않다.",
+          "fetch": 2
+        },
+        {
+          "type": "select",
+          "reason": "이란과 이스라엘 휴전 가능성에 대한 분석이라 현재 국제정세 및 환율에 영향을 줄 수 있을 것 같아서",
+          "fetch": 2
+        },
+        {
+          "type": "bounce",
+          "news_id": 233497,
+          "reason": "글로벌 경제 및 증시 관심사와 거리가 멀고 피로도도 있어 바로 종료합니다.",
+          "fetch": 2
+        },
+        {
+          "type": "next",
+          "reason": "재미있는 뉴스가 없네요. 다음 페이지를 기대해봅니다.",
+          "fetch": 2
+        },
+        {
+          "type": "select",
+          "reason": "2주째 불타는 중동... 지정학적 리스크는 경제에 큰 영향을 주니까 봐야겠다.",
+          "fetch": 3
+        },
+        {
+          "type": "bounce",
+          "news_id": 233493,
+          "reason": "중동 정세 관련 뉴스는 현재 관심사와 거리가 멀고, 피로도도 있어 바로 종료합니다.",
+          "fetch": 3
+        },
+        {
+          "type": "next",
+          "reason": "아직 흥미로운 뉴스가 안 보인다.",
+          "fetch": 3
+        },
+        {
+          "type": "select",
+          "reason": "미국 셰일, 유럽 정유 등 이란 전쟁 수혜주 관련 내용이 흥미롭다.",
+          "fetch": 4
+        },
+        {
+          "type": "bounce",
+          "news_id": 233462,
+          "reason": "이란 전쟁 수혜주 관련 기사는 지금 당장 투자에 활용하기 어렵고 피로한 상태에서 깊이 있게 보기 힘들 것 같음.",
+          "fetch": 4
+        },
+        {
+          "type": "next",
+          "reason": "정치, 사회면 뉴스 위주라 관심가는 경제 뉴스는 없네요.",
+          "fetch": 4
+        },
+        {
+          "type": "select",
+          "reason": "집단소송제 도입이 경제에 미치는 영향에 관심이 있어서.",
+          "fetch": 5
+        },
+        {
+          "type": "bounce",
+          "news_id": 233433,
+          "reason": "퇴근 후 피곤한데, 지금 관심 있는 분야(해외 증시, 글로벌 경제)와 거리가 멀어 보임.",
+          "fetch": 5
+        },
+        {
+          "type": "select",
+          "reason": "트럼프 관련 뉴스는 국제 정세에 영향을 줄 수 있어서 관심이 갑니다.",
+          "fetch": 5
+        },
+        {
+          "type": "after_read_back",
+          "news_id": 233438,
+          "reason": "트럼프 관련 뉴스는 흥미롭지만, 지금은 경제 뉴스를 더 보고 싶다.",
+          "fetch": 5
+        },
+        {
+          "type": "next",
+          "reason": "유효하지 않은 news_id 반환 (id=233427)",
+          "fetch": 5
+        },
+        {
+          "type": "next",
+          "reason": "유효하지 않은 news_id 반환 (id=233406)",
+          "fetch": 6
+        },
+        {
+          "type": "select",
+          "reason": "이재용 회장의 유럽 출장과 배터리 세일즈 소식은 삼성전자 주주로서 관심이 간다.",
+          "fetch": 7
+        },
+        {
+          "type": "after_read_back",
+          "news_id": 233349,
+          "reason": "이재용 회장의 유럽 출장 관련 뉴스는 삼성전자에 간접적인 영향을 줄 수 있다고 생각해서 다른 뉴스를 더 보고 싶습니다.",
+          "fetch": 7
+        },
+        {
+          "type": "select",
+          "reason": "아랍 언론의 '전세계 올스톱 위기' 경고는 경제에 큰 영향을 줄 수 있으므로 관심이 간다.",
+          "fetch": 7
+        },
+        {
+          "type": "bounce",
+          "news_id": 233365,
+          "reason": "피곤한데 아랍 언론 관련 뉴스는 지금 당장 흥미롭지 않음. 경제 뉴스가 아니기도 하고.",
+          "fetch": 7
+        },
+        {
+          "type": "next",
+          "reason": "흥미로운 뉴스가 아직 없는 것 같아서 다음 페이지를 확인해보고 싶다.",
+          "fetch": 7
+        },
+        {
+          "type": "next",
+          "reason": "흥미로운 뉴스가 없지만, 다음 페이지에 혹시나 하는 마음에",
+          "fetch": 8
+        },
+        {
+          "type": "next",
+          "reason": "아직 흥미로운 뉴스가 없네요.",
+          "fetch": 9
+        },
+        {
+          "type": "select",
+          "reason": "알 듯 모르는 손가락 이름들? 이런 소소한 이야기가 갑자기 궁금해지네.",
+          "fetch": 10
+        },
+        {
+          "type": "bounce",
+          "news_id": 233415,
+          "reason": "경제 뉴스에 관심 있는데, 손가락 이름 관련 내용은 흥미롭지 않음.",
+          "fetch": 10
+        },
+        {
+          "type": "select",
+          "reason": "삼성, '지구를 위한 갤럭시' 비전 제시...삼성전자 주주로서 ESG 경영에 대한 관심이 갑자기 솟아오른다.",
+          "fetch": 10
+        },
+        {
+          "type": "bounce",
+          "news_id": 233406,
+          "reason": "삼성전자 자체의 친환경 노력은 긍정적이지만, 경제 뉴스에 대한 나의 니즈와는 거리가 멀다고 판단됨.",
+          "fetch": 10
+        },
+        {
+          "type": "select",
+          "reason": "미국 사모대출 뇌관 관련, 나스닥/뉴욕증시에 영향을 줄 수 있는 내용 같아서",
+          "fetch": 10
+        },
+        {
+          "type": "after_read_exit",
+          "news_id": 233403,
+          "reason": "미국 사모대출 관련 뉴스는 흥미롭지만, 4개나 읽어서 피로도가 높고 퇴근 후 휴식이 필요함.",
+          "fetch": 10
+        }
+      ],
+      "next_count": 9,
+      "total_served": 200,
+      "exit_reason": "미국 사모대출 관련 뉴스는 흥미롭지만, 4개나 읽어서 피로도가 높고 퇴근 후 휴식이 필요함.",
+      "evaluation": {
+        "satisfaction": 3,
+        "freshness": 4,
+        "relevance": 4,
+        "diversity": 3,
+        "comment": "피곤한 와중에도 글로벌 경제 이슈와 삼성전자 관련 뉴스를 챙겨봤지만, 미국 사모대출 관련 뉴스가 과도하게 추천되어 피로도가 높아진 세션"
+      },
+      "total_session_time_sec": 874.89
+    },
+    {
+      "persona_id": "9008",
+      "persona_name": "플랫폼 산업 분석가 지은",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDkiLCJleHAiOjE3NzU5ODM3MDF9.A0GSyCXoDKo6Hd_Cr5-BgD7Le9sOIIyEERg7KBD2O0o",
+      "error": ""
+    },
+    {
+      "persona_id": "9009",
+      "persona_name": "AI 스타트업 덕후 서연",
+      "google_id": "test10",
+      "email": "test10@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTAiLCJleHAiOjE3NzU5ODM3MDF9.LGEm7_p2s2QFG2UnAUkFd21CTvaf3EGgIGMLOa1T1So",
+      "context": {
+        "attitude": "무관심",
+        "time_slot": "주말 오전",
+        "time_slot_description": "여유롭게 여러 뉴스를 천천히 탐색.",
+        "condition": "매우 바쁨. 훑어보고 빠르게 종료할 가능성 높음.",
+        "fatigue": 0,
+        "random_seed": 6754
+      },
+      "app_session_id": "sim-app-9009-3f901a09",
+      "screen_session_id": "sim-screen-9009-60ee96a1",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9009-ec23b9df",
+          "source": "mock",
+          "news_ids": [
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542,
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9009-06d28634",
+          "source": "mock",
+          "news_ids": [
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510,
+            233509,
+            233508,
+            233507,
+            233506,
+            233505,
+            233503,
+            233501,
+            233500,
+            233499,
+            233498,
+            233497,
+            233496,
+            233494
+          ]
+        },
+        {
+          "fetch": 3,
+          "request_id": "sim-req-9009-bded83d2",
+          "source": "mock",
+          "news_ids": [
+            233493,
+            233492,
+            233490,
+            233488,
+            233487,
+            233486,
+            233481,
+            233480,
+            233478,
+            233477,
+            233475,
+            233474,
+            233473,
+            233472,
+            233471,
+            233470,
+            233468,
+            233467,
+            233466,
+            233465
+          ]
+        },
+        {
+          "fetch": 4,
+          "request_id": "sim-req-9009-c4a2b5d2",
+          "source": "mock",
+          "news_ids": [
+            233464,
+            233463,
+            233462,
+            233461,
+            233459,
+            233458,
+            233455,
+            233454,
+            233453,
+            233451,
+            233450,
+            233449,
+            233447,
+            233446,
+            233445,
+            233444,
+            233443,
+            233441,
+            233440,
+            233439
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233544,
+          "title": "그룹아이비, 공급망 공격 위협 고도화…\"사이버범죄, 암묵적 규칙도 깨...",
+          "url": "https://www.epnc.co.kr/news/articleView.html?idxno=329830",
+          "dwell_time_sec": 26.93,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "공급망 공격은 보안 이슈라 지금 관심 있는 분야와는 거리가 멉니다."
+        },
+        {
+          "news_id": 233478,
+          "title": "코스닥 신규 입성한 카나프테라퓨틱스 …경쟁력 실체는",
+          "url": "https://n.news.naver.com/mnews/article/296/0000098489?sid=101",
+          "dwell_time_sec": 15.83,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "AI 스타트업/IPO 관심사와 거리가 먼 바이오 기업 뉴스"
+        },
+        {
+          "news_id": 233445,
+          "title": "김포시, '김포형 교육모델' 구축에 속도",
+          "url": "https://ic.newdaily.co.kr/site/data/html/2026/03/13/2026031300335.html",
+          "dwell_time_sec": 15.18,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "AI/SW 언급은 있지만, 교육 모델 자체에는 큰 관심이 없음."
+        }
+      ],
+      "actions": [
+        {
+          "type": "select",
+          "reason": "사법 개혁 관련해서 어떤 내용인지 궁금하네요.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233544,
+          "reason": "공급망 공격은 보안 이슈라 지금 관심 있는 분야와는 거리가 멉니다.",
+          "fetch": 1
+        },
+        {
+          "type": "next",
+          "reason": "AI 관련 뉴스는 없지만, 혹시나 다음 페이지에 있을까 기대하며 넘어가본다.",
+          "fetch": 1
+        },
+        {
+          "type": "next",
+          "reason": "AI, 스타트업 관련 뉴스는 없지만, 그래도 좀 더 살펴보고 싶다.",
+          "fetch": 2
+        },
+        {
+          "type": "select",
+          "reason": "카나프테라퓨틱스 코스닥 신규 상장 소식은 IPO에 관심 있는 나에게 흥미로운 정보이다.",
+          "fetch": 3
+        },
+        {
+          "type": "bounce",
+          "news_id": 233478,
+          "reason": "AI 스타트업/IPO 관심사와 거리가 먼 바이오 기업 뉴스",
+          "fetch": 3
+        },
+        {
+          "type": "next",
+          "reason": "AI 관련 뉴스는 없지만, 경제자유구역 관련 논의가 있는지 더 보고 싶다.",
+          "fetch": 3
+        },
+        {
+          "type": "select",
+          "reason": "김포시, '김포형 교육모델' 구축에 속도...AI·SW 교과 개발 부분이 흥미롭다.",
+          "fetch": 4
+        },
+        {
+          "type": "bounce",
+          "news_id": 233445,
+          "reason": "AI/SW 언급은 있지만, 교육 모델 자체에는 큰 관심이 없음.",
+          "fetch": 4
+        },
+        {
+          "type": "exit",
+          "reason": "주말 오전이라 바쁘고, 현재 목록에서 AI, LLM, 스타트업, 챗봇, IPO 관련 뉴스는 보이지 않음.",
+          "fetch": 4
+        }
+      ],
+      "next_count": 3,
+      "total_served": 80,
+      "exit_reason": "주말 오전이라 바쁘고, 현재 목록에서 AI, LLM, 스타트업, 챗봇, IPO 관련 뉴스는 보이지 않음.",
+      "evaluation": {
+        "satisfaction": 1,
+        "freshness": 3,
+        "relevance": 1,
+        "diversity": 2,
+        "comment": "AI 스타트업 덕후인데, 관련된 뉴스가 하나도 없어서 너무 아쉬웠어요. 바쁜 주말 오전에 시간 낭비한 기분!"
+      },
+      "total_session_time_sec": 203.26
+    },
+    {
+      "persona_id": "9010",
+      "persona_name": "게임 산업 매니아 도윤",
+      "google_id": "test11",
+      "email": "test11@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTEiLCJleHAiOjE3NzU5ODM3MDF9.uhiZEoUFAUxu31ra1ewXU0jb51zJGv1yUFRgp0e7oyY",
+      "context": {
+        "attitude": "무관심",
+        "time_slot": "출근 전 아침",
+        "time_slot_description": "시간이 없어 빠르게 훑어봄. 핵심만 확인.",
+        "condition": "매우 바쁨. 훑어보고 빠르게 종료할 가능성 높음.",
+        "fatigue": 0,
+        "random_seed": 1881
+      },
+      "app_session_id": "sim-app-9010-0eee25f0",
+      "screen_session_id": "sim-screen-9010-c9061bfb",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9010-dfc183d2",
+          "source": "mock",
+          "news_ids": [
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542,
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9010-9f0e0c9e",
+          "source": "mock",
+          "news_ids": [
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510,
+            233509,
+            233508,
+            233507,
+            233506,
+            233505,
+            233503,
+            233501,
+            233500,
+            233499,
+            233498,
+            233497,
+            233496,
+            233494
+          ]
+        }
+      ],
+      "read_articles": [],
+      "actions": [
+        {
+          "type": "next",
+          "reason": "관심가는 뉴스가 아직 없네요.",
+          "fetch": 1
+        },
+        {
+          "type": "exit",
+          "reason": "출근 시간이 다가와서 더 이상 뉴스 탐색은 어렵습니다.",
+          "fetch": 2
+        }
+      ],
+      "next_count": 1,
+      "total_served": 40,
+      "exit_reason": "출근 시간이 다가와서 더 이상 뉴스 탐색은 어렵습니다.",
+      "evaluation": {
+        "satisfaction": 1,
+        "freshness": 3,
+        "relevance": 2,
+        "diversity": 3,
+        "comment": "출근 때문에 하나도 못 읽었으니 만족도는 최악, 추천 뉴스의 신선도, 관련성, 다양성은 제대로 평가 불가."
+      },
+      "total_session_time_sec": 108.61
+    },
+    {
+      "persona_id": "9011",
+      "persona_name": "K-팝 산업 관심 신유진",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTIiLCJleHAiOjE3NzU5ODM3MDF9.cudRst43AenPBUmk4IV5JOgC_Ds6eFXVMyFpNkL2IYk",
+      "error": ""
+    },
+    {
+      "persona_id": "9012",
+      "persona_name": "바이오 투자자 세진",
+      "google_id": "test13",
+      "email": "test13@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTMiLCJleHAiOjE3NzU5ODM3MDF9.0EH1XlyzYT5um4moPZH2Oy9boBy6u37qZ8IeyAviklg",
+      "context": {
+        "attitude": "소극적",
+        "time_slot": "출근 전 아침",
+        "time_slot_description": "시간이 없어 빠르게 훑어봄. 핵심만 확인.",
+        "condition": "여유로움. 다양한 뉴스를 탐색하고 싶음.",
+        "fatigue": 1,
+        "random_seed": 8760
+      },
+      "app_session_id": "sim-app-9012-389176ba",
+      "screen_session_id": "sim-screen-9012-a88beab9",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9012-2e54188f",
+          "source": "mock",
+          "news_ids": [
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542,
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9012-50ddc1cf",
+          "source": "mock",
+          "news_ids": [
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510,
+            233509,
+            233508,
+            233507,
+            233506,
+            233505,
+            233503,
+            233501,
+            233500,
+            233499,
+            233498,
+            233497,
+            233496,
+            233494
+          ]
+        },
+        {
+          "fetch": 3,
+          "request_id": "sim-req-9012-6f182ce4",
+          "source": "mock",
+          "news_ids": [
+            233493,
+            233492,
+            233490,
+            233488,
+            233487,
+            233486,
+            233481,
+            233480,
+            233478,
+            233477,
+            233475,
+            233474,
+            233473,
+            233472,
+            233471,
+            233470,
+            233468,
+            233467,
+            233466,
+            233465
+          ]
+        },
+        {
+          "fetch": 4,
+          "request_id": "sim-req-9012-1c74b81a",
+          "source": "mock",
+          "news_ids": [
+            233464,
+            233463,
+            233462,
+            233461,
+            233459,
+            233458,
+            233455,
+            233454,
+            233453,
+            233451,
+            233450,
+            233449,
+            233447,
+            233446,
+            233445,
+            233444,
+            233443,
+            233441,
+            233440,
+            233439
+          ]
+        },
+        {
+          "fetch": 5,
+          "request_id": "sim-req-9012-b9332a7f",
+          "source": "mock",
+          "news_ids": [
+            233438,
+            233437,
+            233436,
+            233435,
+            233434,
+            233433,
+            233430,
+            233429,
+            233427,
+            233426,
+            233425,
+            233421,
+            233420,
+            233419,
+            233417,
+            233416,
+            233415,
+            233412,
+            233409,
+            233408
+          ]
+        },
+        {
+          "fetch": 6,
+          "request_id": "sim-req-9012-97ace5f7",
+          "source": "mock",
+          "news_ids": [
+            233407,
+            233406,
+            233405,
+            233404,
+            233403,
+            233402,
+            233401,
+            233399,
+            233394,
+            233393,
+            233392,
+            233391,
+            233390,
+            233387,
+            233386,
+            233384,
+            233383,
+            233382,
+            233381,
+            233376
+          ]
+        },
+        {
+          "fetch": 7,
+          "request_id": "sim-req-9012-beb6ba83",
+          "source": "mock",
+          "news_ids": [
+            233375,
+            233374,
+            233373,
+            233371,
+            233369,
+            233368,
+            233367,
+            233365,
+            233363,
+            233360,
+            233357,
+            233353,
+            233351,
+            233350,
+            233349,
+            233348,
+            233346,
+            233345,
+            233343,
+            233340
+          ]
+        },
+        {
+          "fetch": 8,
+          "request_id": "sim-req-9012-fe96f348",
+          "source": "mock",
+          "news_ids": [
+            233338,
+            233337,
+            233336,
+            233330,
+            233329,
+            233328,
+            233327,
+            233325,
+            233322,
+            233321,
+            233320,
+            233319,
+            233318,
+            233317,
+            233314,
+            233312,
+            233310,
+            233309,
+            233307,
+            233303
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233478,
+          "title": "코스닥 신규 입성한 카나프테라퓨틱스 …경쟁력 실체는",
+          "url": "https://n.news.naver.com/mnews/article/296/0000098489?sid=101",
+          "dwell_time_sec": 70.32,
+          "read_type": "full",
+          "after_action": "back",
+          "after_reason": "카나프테라퓨틱스 경쟁력 분석은 흥미로웠지만, 다른 바이오 기업 소식도 빠르게 훑어보고 싶다."
+        },
+        {
+          "news_id": 233458,
+          "title": "이 대통령, 5극3특 추진에 \"대전·충남 통합...충북은 뭣이여\"",
+          "url": "http://www.enewstoday.co.kr/news/articleView.html?idxno=2405652",
+          "dwell_time_sec": 20.51,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "바이오 투자자인 내 관심사와 관련 없는 정치 뉴스"
+        },
+        {
+          "news_id": 233404,
+          "title": "에스티팜 최대주주 동아쏘시오홀딩스, 에스티팜 주식등의 수 8367주 감소…총 지분율 37.88%",
+          "url": "https://www.digitaltoday.co.kr/news/articleView.html?idxno=640824",
+          "dwell_time_sec": 9.56,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "에스티팜 소유 주식 변동은 큰 투자 결정에 영향을 줄 만한 정보는 아니라고 판단됨."
+        },
+        {
+          "news_id": 233349,
+          "title": "이재용, 유럽 출장서 귀국… 글로벌 완성차에 직접 '배터리 세일즈'",
+          "url": "https://www.financialpost.co.kr/news/articleView.html?idxno=251302",
+          "dwell_time_sec": 14.09,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "배터리 세일즈 뉴스는 바이오 투자와 직접적인 관련성이 낮아 보인다."
+        },
+        {
+          "news_id": 233336,
+          "title": "[자막뉴스] 기뢰밭된 호르무즈, 닿기만 해도 '펑'…\"거의 격침\"했다는데...",
+          "url": "https://n.news.naver.com/mnews/article/055/0001340092?sid=104",
+          "dwell_time_sec": 14.84,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "바이오 투자 관련 뉴스가 아니라서 흥미가 떨어진다."
+        }
+      ],
+      "actions": [
+        {
+          "type": "next",
+          "reason": "흥미로운 뉴스가 아직 없지만, 좀 더 살펴보고 싶다.",
+          "fetch": 1
+        },
+        {
+          "type": "next",
+          "reason": "바이오 관련 뉴스는 없지만, 국제 유가나 코스피 동향은 투자에 참고할 만할 것 같아 다음 목록을 확인해보고 싶다.",
+          "fetch": 2
+        },
+        {
+          "type": "select",
+          "reason": "코스닥 신규 상장한 바이오 기업 카나프테라퓨틱스 관련 내용이라 관심이 간다.",
+          "fetch": 3
+        },
+        {
+          "type": "after_read_back",
+          "news_id": 233478,
+          "reason": "카나프테라퓨틱스 경쟁력 분석은 흥미로웠지만, 다른 바이오 기업 소식도 빠르게 훑어보고 싶다.",
+          "fetch": 3
+        },
+        {
+          "type": "next",
+          "reason": "특별히 눈에 띄는 뉴스는 없지만, 좀 더 살펴보고 싶다.",
+          "fetch": 3
+        },
+        {
+          "type": "select",
+          "reason": "이재명 대통령이 바이오 산업 육성 언급. 어떤 내용인지 궁금",
+          "fetch": 4
+        },
+        {
+          "type": "bounce",
+          "news_id": 233458,
+          "reason": "바이오 투자자인 내 관심사와 관련 없는 정치 뉴스",
+          "fetch": 4
+        },
+        {
+          "type": "next",
+          "reason": "전반적으로 관심 가는 뉴스가 적고, 바이오 관련 뉴스는 보이지 않음.",
+          "fetch": 4
+        },
+        {
+          "type": "next",
+          "reason": "바이오 관련 뉴스는 없지만, 다른 분야 소식도 조금 더 둘러보고 싶다.",
+          "fetch": 5
+        },
+        {
+          "type": "select",
+          "reason": "에스티팜 최대주주 동아쏘시오홀딩스 지분 변동은 투자에 참고할 만한 정보",
+          "fetch": 6
+        },
+        {
+          "type": "bounce",
+          "news_id": 233404,
+          "reason": "에스티팜 소유 주식 변동은 큰 투자 결정에 영향을 줄 만한 정보는 아니라고 판단됨.",
+          "fetch": 6
+        },
+        {
+          "type": "next",
+          "reason": "아직 특별히 눈에 띄는 뉴스는 없지만, 좀 더 살펴보고 싶다.",
+          "fetch": 6
+        },
+        {
+          "type": "select",
+          "reason": "이재용 회장의 유럽 출장, 특히 배터리 사업 관련 내용이 흥미롭다.",
+          "fetch": 7
+        },
+        {
+          "type": "bounce",
+          "news_id": 233349,
+          "reason": "배터리 세일즈 뉴스는 바이오 투자와 직접적인 관련성이 낮아 보인다.",
+          "fetch": 7
+        },
+        {
+          "type": "next",
+          "reason": "아직 흥미로운 뉴스가 없지만, 더 탐색해보고 싶다.",
+          "fetch": 7
+        },
+        {
+          "type": "select",
+          "reason": "호르무즈 해협 기뢰 관련 뉴스는 세계 경제에 영향을 미칠 수 있어 확인해 볼 필요가 있음.",
+          "fetch": 8
+        },
+        {
+          "type": "bounce",
+          "news_id": 233336,
+          "reason": "바이오 투자 관련 뉴스가 아니라서 흥미가 떨어진다.",
+          "fetch": 8
+        },
+        {
+          "type": "exit",
+          "reason": "특별히 눈에 띄는 뉴스가 없음. 출근 준비해야 함.",
+          "fetch": 8
+        }
+      ],
+      "next_count": 7,
+      "total_served": 160,
+      "exit_reason": "특별히 눈에 띄는 뉴스가 없음. 출근 준비해야 함.",
+      "evaluation": {
+        "satisfaction": 3,
+        "freshness": 3,
+        "relevance": 2,
+        "diversity": 4,
+        "comment": "바이오 투자자로서 관련 뉴스 비중이 낮고, 관심 키워드와 직접적인 연관성이 부족하여 아쉬움이 남습니다."
+      },
+      "total_session_time_sec": 405.68
+    },
+    {
+      "persona_id": "9013",
+      "persona_name": "헬스케어 관심 지수",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTQiLCJleHAiOjE3NzU5ODM3MDF9.4yfxoC3T9AHf4c_rCsIL0hjVeGQ94LlFL8YqKydjZyA",
+      "error": ""
+    },
+    {
+      "persona_id": "9014",
+      "persona_name": "건설 인프라 투자자 동현",
+      "google_id": "test15",
+      "email": "test15@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTUiLCJleHAiOjE3NzU5ODM3MDF9.yBeHstcVx6_oISkows5HN7HqyQbfDgNCxNwj2zM9Hvs",
+      "context": {
+        "attitude": "소극적",
+        "time_slot": "출근 전 아침",
+        "time_slot_description": "시간이 없어 빠르게 훑어봄. 핵심만 확인.",
+        "condition": "매우 바쁨. 훑어보고 빠르게 종료할 가능성 높음.",
+        "fatigue": 1,
+        "random_seed": 4110
+      },
+      "app_session_id": "sim-app-9014-6d873315",
+      "screen_session_id": "sim-screen-9014-03963a11",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9014-8f1aa32e",
+          "source": "mock",
+          "news_ids": [
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542,
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9014-dfee2ad2",
+          "source": "mock",
+          "news_ids": [
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510,
+            233509,
+            233508,
+            233507,
+            233506,
+            233505,
+            233503,
+            233501,
+            233500,
+            233499,
+            233498,
+            233497,
+            233496,
+            233494
+          ]
+        },
+        {
+          "fetch": 3,
+          "request_id": "sim-req-9014-8bda5534",
+          "source": "mock",
+          "news_ids": [
+            233493,
+            233492,
+            233490,
+            233488,
+            233487,
+            233486,
+            233481,
+            233480,
+            233478,
+            233477,
+            233475,
+            233474,
+            233473,
+            233472,
+            233471,
+            233470,
+            233468,
+            233467,
+            233466,
+            233465
+          ]
+        },
+        {
+          "fetch": 4,
+          "request_id": "sim-req-9014-738e380a",
+          "source": "mock",
+          "news_ids": [
+            233464,
+            233463,
+            233462,
+            233461,
+            233459,
+            233458,
+            233455,
+            233454,
+            233453,
+            233451,
+            233450,
+            233449,
+            233447,
+            233446,
+            233445,
+            233444,
+            233443,
+            233441,
+            233440,
+            233439
+          ]
+        },
+        {
+          "fetch": 5,
+          "request_id": "sim-req-9014-44f6bc73",
+          "source": "mock",
+          "news_ids": [
+            233438,
+            233437,
+            233436,
+            233435,
+            233434,
+            233433,
+            233430,
+            233429,
+            233427,
+            233426,
+            233425,
+            233421,
+            233420,
+            233419,
+            233417,
+            233416,
+            233415,
+            233412,
+            233409,
+            233408
+          ]
+        },
+        {
+          "fetch": 6,
+          "request_id": "sim-req-9014-56b65d91",
+          "source": "mock",
+          "news_ids": [
+            233407,
+            233406,
+            233405,
+            233404,
+            233403,
+            233402,
+            233401,
+            233399,
+            233394,
+            233393,
+            233392,
+            233391,
+            233390,
+            233387,
+            233386,
+            233384,
+            233383,
+            233382,
+            233381,
+            233376
+          ]
+        },
+        {
+          "fetch": 7,
+          "request_id": "sim-req-9014-d7ce2650",
+          "source": "mock",
+          "news_ids": [
+            233375,
+            233374,
+            233373,
+            233371,
+            233369,
+            233368,
+            233367,
+            233365,
+            233363,
+            233360,
+            233357,
+            233353,
+            233351,
+            233350,
+            233349,
+            233348,
+            233346,
+            233345,
+            233343,
+            233340
+          ]
+        },
+        {
+          "fetch": 8,
+          "request_id": "sim-req-9014-8472d44f",
+          "source": "mock",
+          "news_ids": [
+            233338,
+            233337,
+            233336,
+            233330,
+            233329,
+            233328,
+            233327,
+            233325,
+            233322,
+            233321,
+            233320,
+            233319,
+            233318,
+            233317,
+            233314,
+            233312,
+            233310,
+            233309,
+            233307,
+            233303
+          ]
+        },
+        {
+          "fetch": 9,
+          "request_id": "sim-req-9014-dfc5db89",
+          "source": "mock",
+          "news_ids": [
+            233302,
+            233301,
+            233299,
+            233298,
+            233295,
+            233294,
+            233290,
+            233288,
+            233286,
+            233285,
+            233284,
+            233283,
+            233282,
+            233281,
+            233279,
+            233278,
+            233277,
+            233275,
+            233274,
+            233273
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233533,
+          "title": "이재명 대통령 “2차 공공기관 이전, 흩뿌리듯 안 된다…집중 필요”",
+          "url": "http://www.segyebiz.com/newsView/20260313512363?OutUrl=naver",
+          "dwell_time_sec": 13.71,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "공공기관 이전 관련 내용은 건설 투자에 직접적인 영향이 적다고 판단, 빠르게 다른 뉴스를 확인하는 것이 효율적이라고 생각됨."
+        },
+        {
+          "news_id": 233481,
+          "title": "부산진해경자청, 美 명문대 방문… 두동 정주 개선 논의",
+          "url": "https://www.ziksir.com/news/articleView.html?idxno=127030",
+          "dwell_time_sec": 15.86,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "정주 개선 논의는 해외수주나 큰 인프라 투자와는 거리가 멀어 빠르게 넘어가야겠다."
+        },
+        {
+          "news_id": 233490,
+          "title": "부산지법 서부지원, 시행사와 서구청 등 상대 태풍 침수피해 아파트 입주민들 일부 승소",
+          "url": "http://www.lawissue.co.kr/view.php?ud=2026031316252593439a8c8bf58f_12",
+          "dwell_time_sec": 9.8,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "개인 투자와 관련된 내용이 아니고, 관심 키워드와도 거리가 멀어 보입니다."
+        },
+        {
+          "news_id": 233462,
+          "title": "美 셰일·북미 비료·유럽 정유…이란 전쟁 수혜주에 쏠린 눈",
+          "url": "https://n.news.naver.com/mnews/article/015/0005262087?sid=104",
+          "dwell_time_sec": 10.64,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "이란 전쟁 관련 수혜주는 건설/인프라 투자와 직접적인 관련성이 낮다고 판단되어 시간 관계상 넘어갑니다."
+        },
+        {
+          "news_id": 233444,
+          "title": "李 \"충남·북과 대전 통합 행정 체계 고민해 봐야\"",
+          "url": "https://n.news.naver.com/mnews/article/448/0000596421?sid=100",
+          "dwell_time_sec": 13.93,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "건설/해외수주 투자자인 내 관심사와 직접적인 관련이 없어 보임."
+        },
+        {
+          "news_id": 233446,
+          "title": "이 대통령 \"대전·충남에 충북까지 통합 고민해봐야…공공기관 이전 흩뿌리지 않고 집중\"(종합)",
+          "url": "https://n.news.naver.com/mnews/article/003/0013821144?sid=100",
+          "dwell_time_sec": 19.21,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "지역 통합 이슈는 현재 관심 투자 분야와 직접적인 관련성이 낮다고 판단됨."
+        },
+        {
+          "news_id": 233439,
+          "title": "이재명 대통령 \"2차 공공기관 이전, 흩뿌리듯 할 순 없어…지역 중심 생...",
+          "url": "https://n.news.naver.com/mnews/article/008/0005329724?sid=100",
+          "dwell_time_sec": 11.18,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "공공기관 이전 관련 내용은 현재 관심 투자 분야와 직접적인 관련성이 낮다고 판단됨."
+        },
+        {
+          "news_id": 233365,
+          "title": "아랍 언론 \"가장 섬뜩한 경고\"...전세계 올스톱 위기 [이슈톺]",
+          "url": "https://n.news.naver.com/mnews/article/052/0002326824?sid=104",
+          "dwell_time_sec": 9.1,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "아랍 언론의 경고가 건설/해외수주와 직접적인 관련성이 낮아 보이고, 시간도 부족하여 우선순위가 낮다고 판단됨."
+        },
+        {
+          "news_id": 233303,
+          "title": "커가는 중동의 불길…세계의 시름 깊어간다 [화정인사이트 ⑯]",
+          "url": "https://n.news.naver.com/mnews/article/020/0003703886?sid=004",
+          "dwell_time_sec": 17.98,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "중동 불안정 관련 내용은 해외 수주에 영향을 줄 수 있지만, 지금 당장 현대건설, 삼성물산 투자에 직접적인 정보는 아닌 듯하여 빠르게 종료합니다."
+        },
+        {
+          "news_id": 233309,
+          "title": "이 대통령 “균형발전 흩뿌리듯 할 수 없어…2차 공공기관 이전 가급적 집중해서”",
+          "url": "https://n.news.naver.com/mnews/article/056/0012141483?sid=100",
+          "dwell_time_sec": 12.75,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "균형발전 관련 정책 방향은 중요하지만, 당장 건설/해외수주 투자에 직접적인 영향을 주는 내용은 아닌 듯하여 시간 관계상 넘어간다."
+        },
+        {
+          "news_id": 233318,
+          "title": "이 대통령 \"2차 공공기관 이전, 흩뿌리듯 분산 안돼…가급적 집중\"",
+          "url": "https://n.news.naver.com/mnews/article/003/0013820987?sid=100",
+          "dwell_time_sec": 18.93,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "공공기관 이전 관련 뉴스는 현재 나의 주요 관심사인 건설, 해외수주와 직접적인 연관성이 낮다고 판단되어 시간을 절약하기 위해 바로 종료합니다."
+        },
+        {
+          "news_id": 233317,
+          "title": "씨앤투스 최대주주 하춘욱, 씨앤투스 주식등의 수 5만7001주 증가…총 지분율 48.89%",
+          "url": "https://www.digitaltoday.co.kr/news/articleView.html?idxno=640872",
+          "dwell_time_sec": 13.09,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "건설/인프라 관련 뉴스가 아니고, 시간도 없으므로 바로 종료."
+        },
+        {
+          "news_id": 233307,
+          "title": "이원택 \"군산조선소 부활 시작…HJ중공업 인수는 결정적 전환점\"",
+          "url": "https://n.news.naver.com/mnews/article/421/0008824933?sid=102",
+          "dwell_time_sec": 12.87,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "군산 조선소 부활은 긍정적이지만, HJ중공업 인수 관련 내용이 투자 관점에서 즉각적인 정보가 아니라고 판단됨."
+        },
+        {
+          "news_id": 233302,
+          "title": "李 “2차 공기관 이전, 여러 군데 나누기보단 집중해야”",
+          "url": "https://n.news.naver.com/mnews/article/366/0001148303?sid=100",
+          "dwell_time_sec": 99.29,
+          "read_type": "full",
+          "after_action": "exit",
+          "after_reason": "공기관 이전 뉴스는 건설 투자 관점에서 핵심 정보가 부족하고, 시간이 없는 상황이라 빠르게 종료합니다."
+        }
+      ],
+      "actions": [
+        {
+          "type": "select",
+          "reason": "이재명 대통령의 2차 공공기관 이전 관련 뉴스는 건설 및 인프라 투자에 영향을 줄 수 있어 확인 필요.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233533,
+          "reason": "공공기관 이전 관련 내용은 건설 투자에 직접적인 영향이 적다고 판단, 빠르게 다른 뉴스를 확인하는 것이 효율적이라고 생각됨.",
+          "fetch": 1
+        },
+        {
+          "type": "next",
+          "reason": "관심있는 뉴스가 딱히 없지만, 더 볼만한 뉴스가 있을 수도 있으니 다음 페이지를 확인해본다.",
+          "fetch": 1
+        },
+        {
+          "type": "next",
+          "reason": "건설이나 인프라 관련 뉴스는 아직 안 보이네. 다음 페이지를 보자.",
+          "fetch": 2
+        },
+        {
+          "type": "select",
+          "reason": "부산진해경자청에서 두동 정주 개선 논의를 한다니, 인프라 투자 관점에서 관련 내용을 확인해봐야겠다.",
+          "fetch": 3
+        },
+        {
+          "type": "bounce",
+          "news_id": 233481,
+          "reason": "정주 개선 논의는 해외수주나 큰 인프라 투자와는 거리가 멀어 빠르게 넘어가야겠다.",
+          "fetch": 3
+        },
+        {
+          "type": "select",
+          "reason": "부산 아파트 태풍 침수 피해 관련 소송 뉴스는 부동산 투자 관점에서 확인해볼 필요가 있다고 생각됨.",
+          "fetch": 3
+        },
+        {
+          "type": "bounce",
+          "news_id": 233490,
+          "reason": "개인 투자와 관련된 내용이 아니고, 관심 키워드와도 거리가 멀어 보입니다.",
+          "fetch": 3
+        },
+        {
+          "type": "next",
+          "reason": "건설 관련 뉴스는 없지만, 경제자유구역 관련 소식이 있을 수도 있다는 생각에 다음 페이지를 확인해보고 싶습니다.",
+          "fetch": 3
+        },
+        {
+          "type": "select",
+          "reason": "미국-이란 전쟁 관련 국제 유가 및 원자재 가격 급등에 따른 건설 자재 가격 변동이 있을 수 있어 관심이 간다.",
+          "fetch": 4
+        },
+        {
+          "type": "bounce",
+          "news_id": 233462,
+          "reason": "이란 전쟁 관련 수혜주는 건설/인프라 투자와 직접적인 관련성이 낮다고 판단되어 시간 관계상 넘어갑니다.",
+          "fetch": 4
+        },
+        {
+          "type": "select",
+          "reason": "李 \"충남·북과 대전 통합 행정 체계 고민해 봐야\" - 건설 인프라 투자 관점에서 지역 통합은 장기적인 투자 환경에 영향을 줄 수 있어 관심이 갑니다.",
+          "fetch": 4
+        },
+        {
+          "type": "bounce",
+          "news_id": 233444,
+          "reason": "건설/해외수주 투자자인 내 관심사와 직접적인 관련이 없어 보임.",
+          "fetch": 4
+        },
+        {
+          "type": "select",
+          "reason": "이재명 대통령이 지역 통합 및 공공기관 이전에 대해 언급하는 내용이 건설 인프라 투자에 간접적으로 영향을 줄 수 있을 것 같아 관심이 간다.",
+          "fetch": 4
+        },
+        {
+          "type": "bounce",
+          "news_id": 233446,
+          "reason": "지역 통합 이슈는 현재 관심 투자 분야와 직접적인 관련성이 낮다고 판단됨.",
+          "fetch": 4
+        },
+        {
+          "type": "select",
+          "reason": "이재명 대통령이 공공기관 이전 관련 언급. 건설 인프라 투자에 영향 있을 수 있다고 판단.",
+          "fetch": 4
+        },
+        {
+          "type": "bounce",
+          "news_id": 233439,
+          "reason": "공공기관 이전 관련 내용은 현재 관심 투자 분야와 직접적인 관련성이 낮다고 판단됨.",
+          "fetch": 4
+        },
+        {
+          "type": "next",
+          "reason": "건설이나 인프라 관련 뉴스가 더 있을 것 같아서.",
+          "fetch": 4
+        },
+        {
+          "type": "next",
+          "reason": "건설 관련 뉴스는 아직 안보인다.",
+          "fetch": 5
+        },
+        {
+          "type": "next",
+          "reason": "건설, 인프라 관련 뉴스는 없지만, 다음 페이지에 있을 수도 있으니 확인해본다.",
+          "fetch": 6
+        },
+        {
+          "type": "select",
+          "reason": "아랍 언론의 경고, 전세계 올스톱 위기라는 내용이 해외 수주에 영향을 줄 수 있는 경제적 파장을 다룰 것 같아 관심이 갑니다.",
+          "fetch": 7
+        },
+        {
+          "type": "bounce",
+          "news_id": 233365,
+          "reason": "아랍 언론의 경고가 건설/해외수주와 직접적인 관련성이 낮아 보이고, 시간도 부족하여 우선순위가 낮다고 판단됨.",
+          "fetch": 7
+        },
+        {
+          "type": "next",
+          "reason": "건설, 부동산, 인프라, 해외수주 관련 뉴스가 아직 안보임. 다음 페이지 기대.",
+          "fetch": 7
+        },
+        {
+          "type": "select",
+          "reason": "중동 불안이 건설 및 해외수주에 미칠 영향이 궁금하다.",
+          "fetch": 8
+        },
+        {
+          "type": "bounce",
+          "news_id": 233303,
+          "reason": "중동 불안정 관련 내용은 해외 수주에 영향을 줄 수 있지만, 지금 당장 현대건설, 삼성물산 투자에 직접적인 정보는 아닌 듯하여 빠르게 종료합니다.",
+          "fetch": 8
+        },
+        {
+          "type": "select",
+          "reason": "2차 공공기관 이전, 건설/부동산/인프라에 관련된 중요한 이슈라고 판단됨.",
+          "fetch": 8
+        },
+        {
+          "type": "bounce",
+          "news_id": 233309,
+          "reason": "균형발전 관련 정책 방향은 중요하지만, 당장 건설/해외수주 투자에 직접적인 영향을 주는 내용은 아닌 듯하여 시간 관계상 넘어간다.",
+          "fetch": 8
+        },
+        {
+          "type": "select",
+          "reason": "이 대통령의 2차 공공기관 이전 관련 발언은 건설 및 인프라 투자에 영향을 줄 수 있어 관심이 갑니다.",
+          "fetch": 8
+        },
+        {
+          "type": "bounce",
+          "news_id": 233318,
+          "reason": "공공기관 이전 관련 뉴스는 현재 나의 주요 관심사인 건설, 해외수주와 직접적인 연관성이 낮다고 판단되어 시간을 절약하기 위해 바로 종료합니다.",
+          "fetch": 8
+        },
+        {
+          "type": "select",
+          "reason": "씨앤투스 최대주주가 주식을 추가 매입했다는 소식은 기업의 성장 가능성을 보여주는 지표가 될 수 있어 관심이 갑니다.",
+          "fetch": 8
+        },
+        {
+          "type": "bounce",
+          "news_id": 233317,
+          "reason": "건설/인프라 관련 뉴스가 아니고, 시간도 없으므로 바로 종료.",
+          "fetch": 8
+        },
+        {
+          "type": "select",
+          "reason": "군산조선소 부활, HJ중공업 인수는 건설 및 해외수주와 관련된 중요한 전환점으로 판단됨.",
+          "fetch": 8
+        },
+        {
+          "type": "bounce",
+          "news_id": 233307,
+          "reason": "군산 조선소 부활은 긍정적이지만, HJ중공업 인수 관련 내용이 투자 관점에서 즉각적인 정보가 아니라고 판단됨.",
+          "fetch": 8
+        },
+        {
+          "type": "next",
+          "reason": "해외수주 관련 뉴스가 더 있을지 기대하며 다음 페이지를 봅니다.",
+          "fetch": 8
+        },
+        {
+          "type": "select",
+          "reason": "2차 공공기관 이전, 건설 및 부동산 시장에 영향이 있을 수 있어 확인 필요.",
+          "fetch": 9
+        },
+        {
+          "type": "after_read_exit",
+          "news_id": 233302,
+          "reason": "공기관 이전 뉴스는 건설 투자 관점에서 핵심 정보가 부족하고, 시간이 없는 상황이라 빠르게 종료합니다.",
+          "fetch": 9
+        }
+      ],
+      "next_count": 8,
+      "total_served": 180,
+      "exit_reason": "공기관 이전 뉴스는 건설 투자 관점에서 핵심 정보가 부족하고, 시간이 없는 상황이라 빠르게 종료합니다.",
+      "evaluation": {
+        "satisfaction": 2,
+        "freshness": 3,
+        "relevance": 2,
+        "diversity": 3,
+        "comment": "공공기관 이전 관련 뉴스가 너무 많고, 건설 투자자 관점에서 핵심 정보가 부족하여 시간 낭비가 컸음."
+      },
+      "total_session_time_sec": 640.23
+    },
+    {
+      "persona_id": "9015",
+      "persona_name": "철강 산업 분석가 성민",
+      "google_id": "test16",
+      "email": "test16@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTYiLCJleHAiOjE3NzU5ODM3MDF9.E2RvFhV9qULgV6XfPflbjSp25r3f92oSu0-dhSE2-Nk",
+      "context": {
+        "attitude": "무관심",
+        "time_slot": "퇴근 후 저녁",
+        "time_slot_description": "피곤하지만 관심 있는 뉴스는 끝까지 읽음.",
+        "condition": "여유로움. 다양한 뉴스를 탐색하고 싶음.",
+        "fatigue": 1,
+        "random_seed": 2796
+      },
+      "app_session_id": "sim-app-9015-bcdfcc57",
+      "screen_session_id": "sim-screen-9015-2ea2c262",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9015-0a2db6d6",
+          "source": "mock",
+          "news_ids": [
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542,
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9015-7c1f94c6",
+          "source": "mock",
+          "news_ids": [
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510,
+            233509,
+            233508,
+            233507,
+            233506,
+            233505,
+            233503,
+            233501,
+            233500,
+            233499,
+            233498,
+            233497,
+            233496,
+            233494
+          ]
+        },
+        {
+          "fetch": 3,
+          "request_id": "sim-req-9015-1ca8172d",
+          "source": "mock",
+          "news_ids": [
+            233493,
+            233492,
+            233490,
+            233488,
+            233487,
+            233486,
+            233481,
+            233480,
+            233478,
+            233477,
+            233475,
+            233474,
+            233473,
+            233472,
+            233471,
+            233470,
+            233468,
+            233467,
+            233466,
+            233465
+          ]
+        },
+        {
+          "fetch": 4,
+          "request_id": "sim-req-9015-552b7ff2",
+          "source": "mock",
+          "news_ids": [
+            233464,
+            233463,
+            233462,
+            233461,
+            233459,
+            233458,
+            233455,
+            233454,
+            233453,
+            233451,
+            233450,
+            233449,
+            233447,
+            233446,
+            233445,
+            233444,
+            233443,
+            233441,
+            233440,
+            233439
+          ]
+        },
+        {
+          "fetch": 5,
+          "request_id": "sim-req-9015-952e8362",
+          "source": "mock",
+          "news_ids": [
+            233438,
+            233437,
+            233436,
+            233435,
+            233434,
+            233433,
+            233430,
+            233429,
+            233427,
+            233426,
+            233425,
+            233421,
+            233420,
+            233419,
+            233417,
+            233416,
+            233415,
+            233412,
+            233409,
+            233408
+          ]
+        },
+        {
+          "fetch": 6,
+          "request_id": "sim-req-9015-7abd0531",
+          "source": "mock",
+          "news_ids": [
+            233407,
+            233406,
+            233405,
+            233404,
+            233403,
+            233402,
+            233401,
+            233399,
+            233394,
+            233393,
+            233392,
+            233391,
+            233390,
+            233387,
+            233386,
+            233384,
+            233383,
+            233382,
+            233381,
+            233376
+          ]
+        },
+        {
+          "fetch": 7,
+          "request_id": "sim-req-9015-e150ac9c",
+          "source": "mock",
+          "news_ids": [
+            233375,
+            233374,
+            233373,
+            233371,
+            233369,
+            233368,
+            233367,
+            233365,
+            233363,
+            233360,
+            233357,
+            233353,
+            233351,
+            233350,
+            233349,
+            233348,
+            233346,
+            233345,
+            233343,
+            233340
+          ]
+        },
+        {
+          "fetch": 8,
+          "request_id": "sim-req-9015-04671081",
+          "source": "mock",
+          "news_ids": [
+            233338,
+            233337,
+            233336,
+            233330,
+            233329,
+            233328,
+            233327,
+            233325,
+            233322,
+            233321,
+            233320,
+            233319,
+            233318,
+            233317,
+            233314,
+            233312,
+            233310,
+            233309,
+            233307,
+            233303
+          ]
+        },
+        {
+          "fetch": 9,
+          "request_id": "sim-req-9015-474a196c",
+          "source": "mock",
+          "news_ids": [
+            233302,
+            233301,
+            233299,
+            233298,
+            233295,
+            233294,
+            233290,
+            233288,
+            233286,
+            233285,
+            233284,
+            233283,
+            233282,
+            233281,
+            233279,
+            233278,
+            233277,
+            233275,
+            233274,
+            233273
+          ]
+        },
+        {
+          "fetch": 10,
+          "request_id": "sim-req-9015-f7abaa07",
+          "source": "mock",
+          "news_ids": [
+            233272,
+            233271,
+            233269,
+            233268,
+            233266,
+            233265,
+            233264,
+            233262,
+            233260,
+            233256,
+            233253,
+            233252,
+            233251,
+            233250,
+            233249,
+            233247,
+            233243,
+            233241,
+            233240,
+            233239
+          ]
+        },
+        {
+          "fetch": 11,
+          "request_id": "sim-req-9015-91ebc9a4",
+          "source": "mock",
+          "news_ids": [
+            233236,
+            233235,
+            233233,
+            233232,
+            233231,
+            233230,
+            233226,
+            233225,
+            233222,
+            233221,
+            233218,
+            233215,
+            233212,
+            233211,
+            233210,
+            233208,
+            233207,
+            233206,
+            233205,
+            233204
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233513,
+          "title": "유가 충격에 코스피 1.7% 내려…‘삼전닉스’ 동반 2% 하락",
+          "url": "https://n.news.naver.com/mnews/article/032/0003433161?sid=101",
+          "dwell_time_sec": 10.74,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "유가와 환율 급등은 철강 업계에 간접적인 영향을 줄 수 있지만, 제목과 요약만으로는 직접적인 연관성을 찾기 어렵고 현재 피로도가 낮더라도 관련된 더 중요한 뉴스를 찾아보는 것이 효율적이라고 판단됨."
+        },
+        {
+          "news_id": 233468,
+          "title": "허진수 비등기임원, 신스틸 주식 30만주 감소",
+          "url": "https://www.digitaltoday.co.kr/news/articleView.html?idxno=640906",
+          "dwell_time_sec": 14.48,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "신스틸은 관심 종목이 아니고, 비등기임원의 주식 변동은 분석에 큰 의미가 없다고 판단됨."
+        },
+        {
+          "news_id": 233462,
+          "title": "美 셰일·북미 비료·유럽 정유…이란 전쟁 수혜주에 쏠린 눈",
+          "url": "https://n.news.naver.com/mnews/article/015/0005262087?sid=104",
+          "dwell_time_sec": 17.07,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "철강/원자재 공급망 분석 관점에서 크게 관련 없어 보임."
+        },
+        {
+          "news_id": 233459,
+          "title": "대통령 전기차 보조금 정책 질타에 중국산 전기버스 판매 30% 급락",
+          "url": "https://www.autodaily.co.kr/news/articleView.html?idxno=542339",
+          "dwell_time_sec": 90.92,
+          "read_type": "full",
+          "after_action": "back",
+          "after_reason": "전기차 보조금 정책 뉴스는 철강 산업과 직접적인 연관성은 떨어지지만, 중국 관련 이슈이므로 공급망 관점에서 다른 뉴스를 더 살펴보고 싶습니다."
+        },
+        {
+          "news_id": 233446,
+          "title": "이 대통령 \"대전·충남에 충북까지 통합 고민해봐야…공공기관 이전 흩뿌리지 않고 집중\"(종합)",
+          "url": "https://n.news.naver.com/mnews/article/003/0013821144?sid=100",
+          "dwell_time_sec": 11.76,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "철강/원자재 공급망 분석가로서 관심 있는 내용이 아니고, 지역 통합 관련 뉴스는 피로도가 있는 상태에서 읽을 필요성을 느끼지 못함."
+        },
+        {
+          "news_id": 233427,
+          "title": "폐점이 출점 앞섰다···더본코리아, 백종원표 해외 전략 해법 될까",
+          "url": "https://www.sisajournal-e.com/news/articleView.html?idxno=419788",
+          "dwell_time_sec": 14.46,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "철강, 원자재, 공급망 관련 내용이 전혀 없어 관심 분야와 거리가 멀다."
+        },
+        {
+          "news_id": 233365,
+          "title": "아랍 언론 \"가장 섬뜩한 경고\"...전세계 올스톱 위기 [이슈톺]",
+          "url": "https://n.news.naver.com/mnews/article/052/0002326824?sid=104",
+          "dwell_time_sec": 11.51,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "아랍 언론 관련 내용이 철강 산업 및 공급망 분석과 직접적인 연관성이 낮아 보임."
+        },
+        {
+          "news_id": 233349,
+          "title": "이재용, 유럽 출장서 귀국… 글로벌 완성차에 직접 '배터리 세일즈'",
+          "url": "https://www.financialpost.co.kr/news/articleView.html?idxno=251302",
+          "dwell_time_sec": 19.04,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "배터리 세일즈는 철강/원자재 공급망 분석과는 거리가 멀어 보임."
+        },
+        {
+          "news_id": 233371,
+          "title": "\"저렴한 주유소 찾기? 다 의미 없어\" 기름값에 우는 택배기사들",
+          "url": "https://n.news.naver.com/mnews/article/047/0002507970?sid=102",
+          "dwell_time_sec": 12.82,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "택배 기사 기름값 문제는 흥미롭지만, 철강/원자재 공급망 분석가로서의 관심사와는 거리가 멀어 보입니다."
+        },
+        {
+          "news_id": 233336,
+          "title": "[자막뉴스] 기뢰밭된 호르무즈, 닿기만 해도 '펑'…\"거의 격침\"했다는데...",
+          "url": "https://n.news.naver.com/mnews/article/055/0001340092?sid=104",
+          "dwell_time_sec": 9.82,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "호르무즈 해협 관련 뉴스는 지정학적 리스크를 다루지만, 철강 산업 및 공급망에 직접적인 연관성은 낮다고 판단되어 시간을 투자할 가치가 적다고 생각됨."
+        },
+        {
+          "news_id": 233236,
+          "title": "\"유가 상승 느껴져…전쟁 길어지면 체감 커질 것\" [美 기름값 르포]",
+          "url": "https://n.news.naver.com/mnews/article/277/0005734062?sid=101",
+          "dwell_time_sec": 8.18,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "철강 산업 분석가로서 유가 상승이 간접적인 영향을 줄 수는 있지만, 주요 관심사인 철강, 원자재 공급망, 중국 이슈와는 거리가 멀어 보인다."
+        },
+        {
+          "news_id": 233204,
+          "title": "주유소 가격 인하 시동...\"큰 폭 조정은 시간 필요\"",
+          "url": "https://n.news.naver.com/mnews/article/052/0002326787?sid=102",
+          "dwell_time_sec": 8.25,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "철강/공급망 관련 내용이 아니라 관심 분야와 거리가 멉니다."
+        }
+      ],
+      "actions": [
+        {
+          "type": "next",
+          "reason": "유효하지 않은 news_id 반환 (id=233544)",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "유가 충격과 코스피 하락은 철강업에 간접적인 영향을 줄 수 있으므로 확인해봐야겠다.",
+          "fetch": 2
+        },
+        {
+          "type": "bounce",
+          "news_id": 233513,
+          "reason": "유가와 환율 급등은 철강 업계에 간접적인 영향을 줄 수 있지만, 제목과 요약만으로는 직접적인 연관성을 찾기 어렵고 현재 피로도가 낮더라도 관련된 더 중요한 뉴스를 찾아보는 것이 효율적이라고 판단됨.",
+          "fetch": 2
+        },
+        {
+          "type": "next",
+          "reason": "유효하지 않은 news_id 반환 (id=233506)",
+          "fetch": 2
+        },
+        {
+          "type": "select",
+          "reason": "신스틸 주식 감소 뉴스는 철강 업계 동향 파악에 도움이 될 것 같다.",
+          "fetch": 3
+        },
+        {
+          "type": "bounce",
+          "news_id": 233468,
+          "reason": "신스틸은 관심 종목이 아니고, 비등기임원의 주식 변동은 분석에 큰 의미가 없다고 판단됨.",
+          "fetch": 3
+        },
+        {
+          "type": "next",
+          "reason": "아직 특별히 눈에 띄는 뉴스는 없지만, 더 살펴보고 싶다.",
+          "fetch": 3
+        },
+        {
+          "type": "select",
+          "reason": "미국 셰일, 북미 비료, 유럽 정유 등 원자재 관련 내용이라 관심이 간다.",
+          "fetch": 4
+        },
+        {
+          "type": "bounce",
+          "news_id": 233462,
+          "reason": "철강/원자재 공급망 분석 관점에서 크게 관련 없어 보임.",
+          "fetch": 4
+        },
+        {
+          "type": "select",
+          "reason": "대통령 전기차 보조금 정책 질타에 중국산 전기버스 판매 급락, 철강 산업과 연관된 중국 시장 및 정책 변화에 대한 내용이라 관심이 간다.",
+          "fetch": 4
+        },
+        {
+          "type": "after_read_back",
+          "news_id": 233459,
+          "reason": "전기차 보조금 정책 뉴스는 철강 산업과 직접적인 연관성은 떨어지지만, 중국 관련 이슈이므로 공급망 관점에서 다른 뉴스를 더 살펴보고 싶습니다.",
+          "fetch": 4
+        },
+        {
+          "type": "select",
+          "reason": "이 대통령 발언 중에 '대전·충남에 충북까지 통합 고민'이라는 부분이 철강 산업에 미칠 영향이 있을지 궁금하다.",
+          "fetch": 4
+        },
+        {
+          "type": "bounce",
+          "news_id": 233446,
+          "reason": "철강/원자재 공급망 분석가로서 관심 있는 내용이 아니고, 지역 통합 관련 뉴스는 피로도가 있는 상태에서 읽을 필요성을 느끼지 못함.",
+          "fetch": 4
+        },
+        {
+          "type": "next",
+          "reason": "정치, 사회면 뉴스 위주라 다음 페이지를 보고 싶다.",
+          "fetch": 4
+        },
+        {
+          "type": "select",
+          "reason": "더본코리아의 해외 전략에 대한 기사. 철강 산업과는 직접적인 관련은 없지만, 해외 시장 동향을 파악하는 데 도움이 될 수 있다고 판단됨.",
+          "fetch": 5
+        },
+        {
+          "type": "bounce",
+          "news_id": 233427,
+          "reason": "철강, 원자재, 공급망 관련 내용이 전혀 없어 관심 분야와 거리가 멀다.",
+          "fetch": 5
+        },
+        {
+          "type": "next",
+          "reason": "유효하지 않은 news_id 반환 (id=233417)",
+          "fetch": 5
+        },
+        {
+          "type": "next",
+          "reason": "유효하지 않은 news_id 반환 (id=233407)",
+          "fetch": 6
+        },
+        {
+          "type": "select",
+          "reason": "아랍 언론에서 전세계 올스톱 위기를 경고했다는 내용이 공급망에 어떤 영향을 미칠지 궁금함.",
+          "fetch": 7
+        },
+        {
+          "type": "bounce",
+          "news_id": 233365,
+          "reason": "아랍 언론 관련 내용이 철강 산업 및 공급망 분석과 직접적인 연관성이 낮아 보임.",
+          "fetch": 7
+        },
+        {
+          "type": "select",
+          "reason": "이재용 회장의 유럽 출장, 글로벌 완성차 배터리 세일즈 관련 내용이 철강 수요와 간접적으로 연관될 수 있다고 생각됨.",
+          "fetch": 7
+        },
+        {
+          "type": "bounce",
+          "news_id": 233349,
+          "reason": "배터리 세일즈는 철강/원자재 공급망 분석과는 거리가 멀어 보임.",
+          "fetch": 7
+        },
+        {
+          "type": "select",
+          "reason": "미국-이란 전쟁으로 인한 유가 급등은 철강 원자재 가격 및 물류에 영향을 줄 수 있으므로 확인해봐야겠다.",
+          "fetch": 7
+        },
+        {
+          "type": "bounce",
+          "news_id": 233371,
+          "reason": "택배 기사 기름값 문제는 흥미롭지만, 철강/원자재 공급망 분석가로서의 관심사와는 거리가 멀어 보입니다.",
+          "fetch": 7
+        },
+        {
+          "type": "next",
+          "reason": "흥미로운 뉴스가 아직 안 보인다.",
+          "fetch": 7
+        },
+        {
+          "type": "select",
+          "reason": "호르무즈 해협 기뢰 관련 뉴스는 철강 원자재 물류에 큰 영향을 줄 수 있으므로 확인 필요.",
+          "fetch": 8
+        },
+        {
+          "type": "bounce",
+          "news_id": 233336,
+          "reason": "호르무즈 해협 관련 뉴스는 지정학적 리스크를 다루지만, 철강 산업 및 공급망에 직접적인 연관성은 낮다고 판단되어 시간을 투자할 가치가 적다고 생각됨.",
+          "fetch": 8
+        },
+        {
+          "type": "next",
+          "reason": "유효하지 않은 news_id 반환 (id=233303)",
+          "fetch": 8
+        },
+        {
+          "type": "next",
+          "reason": "유효하지 않은 news_id 반환 (id=233273)",
+          "fetch": 9
+        },
+        {
+          "type": "next",
+          "reason": "현재 목록에서는 특별히 관심 가는 뉴스가 없습니다.",
+          "fetch": 10
+        },
+        {
+          "type": "select",
+          "reason": "유가 상승이 철강 원자재 가격에 영향을 줄 수 있으므로 확인해봐야겠다.",
+          "fetch": 11
+        },
+        {
+          "type": "bounce",
+          "news_id": 233236,
+          "reason": "철강 산업 분석가로서 유가 상승이 간접적인 영향을 줄 수는 있지만, 주요 관심사인 철강, 원자재 공급망, 중국 이슈와는 거리가 멀어 보인다.",
+          "fetch": 11
+        },
+        {
+          "type": "select",
+          "reason": "주유소 가격 인하 뉴스는 철강 원자재 물류 관점에서 연관될 수 있어 확인해보고 싶다.",
+          "fetch": 11
+        },
+        {
+          "type": "bounce",
+          "news_id": 233204,
+          "reason": "철강/공급망 관련 내용이 아니라 관심 분야와 거리가 멉니다.",
+          "fetch": 11
+        },
+        {
+          "type": "next",
+          "reason": "철강 관련 뉴스는 없지만, 정치/사회 이슈도 가끔은 궁금하다.",
+          "fetch": 11
+        }
+      ],
+      "next_count": 11,
+      "total_served": 220,
+      "exit_reason": "",
+      "evaluation": {
+        "satisfaction": 3,
+        "freshness": 3,
+        "relevance": 3,
+        "diversity": 4,
+        "comment": "유가, 전쟁 관련 뉴스에 치중된 감이 있지만, 그 외에 관심 가질 만한 다양한 분야의 뉴스가 섞여 있어 보통 만족스러운 세션이었다."
+      },
+      "total_session_time_sec": 580.16
+    },
+    {
+      "persona_id": "9016",
+      "persona_name": "소비 트렌드 관찰자 나연",
+      "google_id": "test17",
+      "email": "test17@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTciLCJleHAiOjE3NzU5ODM3MDF9.RzbjzUVR7YWbzB9Kw31aRYfsav14cbeZeSIExra0aUE",
+      "context": {
+        "attitude": "무관심",
+        "time_slot": "주말 오전",
+        "time_slot_description": "여유롭게 여러 뉴스를 천천히 탐색.",
+        "condition": "약간 피곤함. 흥미로운 뉴스만 읽을 것 같음.",
+        "fatigue": 1,
+        "random_seed": 1163
+      },
+      "app_session_id": "sim-app-9016-d86bdcc1",
+      "screen_session_id": "sim-screen-9016-1b61984a",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9016-88b526c3",
+          "source": "mock",
+          "news_ids": [
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542,
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9016-675e4d61",
+          "source": "mock",
+          "news_ids": [
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510,
+            233509,
+            233508,
+            233507,
+            233506,
+            233505,
+            233503,
+            233501,
+            233500,
+            233499,
+            233498,
+            233497,
+            233496,
+            233494
+          ]
+        },
+        {
+          "fetch": 3,
+          "request_id": "sim-req-9016-99202ebb",
+          "source": "mock",
+          "news_ids": [
+            233493,
+            233492,
+            233490,
+            233488,
+            233487,
+            233486,
+            233481,
+            233480,
+            233478,
+            233477,
+            233475,
+            233474,
+            233473,
+            233472,
+            233471,
+            233470,
+            233468,
+            233467,
+            233466,
+            233465
+          ]
+        },
+        {
+          "fetch": 4,
+          "request_id": "sim-req-9016-a58ef827",
+          "source": "mock",
+          "news_ids": [
+            233464,
+            233463,
+            233462,
+            233461,
+            233459,
+            233458,
+            233455,
+            233454,
+            233453,
+            233451,
+            233450,
+            233449,
+            233447,
+            233446,
+            233445,
+            233444,
+            233443,
+            233441,
+            233440,
+            233439
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233537,
+          "title": "[유프로의 AI 픽] \"다이소 3000원 립밤 오픈런·긱시크 안경\"…패션·뷰...",
+          "url": "https://www.mediapen.com/news/view/1086863",
+          "dwell_time_sec": 69.09,
+          "read_type": "full",
+          "after_action": "back",
+          "after_reason": "다이소 립밤 오픈런 같은 흥미로운 소비 트렌드 뉴스를 더 보고 싶다."
+        },
+        {
+          "news_id": 233509,
+          "title": "BTS 공연 앞둔 광화문광장은 기념촬영 관광객으로 북적북적... \"만세\" [한...",
+          "url": "https://n.news.naver.com/mnews/article/022/0004112568?sid=103",
+          "dwell_time_sec": 11.23,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "BTS 관련 뉴스지만, K뷰티나 소비 트렌드와는 거리가 멀어서 흥미가 떨어진다."
+        },
+        {
+          "news_id": 233492,
+          "title": "지금 당장 페트병에 치약을 넣어보세요…일상이 훨씬 편해질 겁니다",
+          "url": "https://www.wikitree.co.kr/articles/1124738",
+          "dwell_time_sec": 6.9,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "K뷰티나 소비 트렌드와는 거리가 먼 생활 꿀팁이라 흥미가 떨어진다."
+        },
+        {
+          "news_id": 233478,
+          "title": "코스닥 신규 입성한 카나프테라퓨틱스 …경쟁력 실체는",
+          "url": "https://n.news.naver.com/mnews/article/296/0000098489?sid=101",
+          "dwell_time_sec": 9.66,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "K뷰티나 소비 트렌드와는 거리가 먼 바이오 관련 뉴스라 흥미가 떨어진다."
+        },
+        {
+          "news_id": 233459,
+          "title": "대통령 전기차 보조금 정책 질타에 중국산 전기버스 판매 30% 급락",
+          "url": "https://www.autodaily.co.kr/news/articleView.html?idxno=542339",
+          "dwell_time_sec": 12.15,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "전기차 뉴스는 관심사가 아니고, K뷰티나 소비 트렌드와는 거리가 멀다."
+        }
+      ],
+      "actions": [
+        {
+          "type": "select",
+          "reason": "다이소 립밤 품절 대란이라니, 요즘 뷰티 트렌드가 궁금하네요.",
+          "fetch": 1
+        },
+        {
+          "type": "after_read_back",
+          "news_id": 233537,
+          "reason": "다이소 립밤 오픈런 같은 흥미로운 소비 트렌드 뉴스를 더 보고 싶다.",
+          "fetch": 1
+        },
+        {
+          "type": "next",
+          "reason": "오늘은 딱히 눈에 띄는 뉴스가 없네요. 다음 페이지를 볼게요.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "BTS 공연 관련해서 광화문광장이 북적거린다는 내용이 흥미롭다. 뷰티 소비와도 연관될 수 있을 것 같고, 트렌드를 읽는 데 도움이 될 수도 있겠다.",
+          "fetch": 2
+        },
+        {
+          "type": "bounce",
+          "news_id": 233509,
+          "reason": "BTS 관련 뉴스지만, K뷰티나 소비 트렌드와는 거리가 멀어서 흥미가 떨어진다.",
+          "fetch": 2
+        },
+        {
+          "type": "next",
+          "reason": "오늘은 딱히 눈에 띄는 뉴스가 없네요. 다음 페이지를 볼게요.",
+          "fetch": 2
+        },
+        {
+          "type": "select",
+          "reason": "페트병으로 세정제를 만드는 살림법이라니, 주부로서 흥미롭다.",
+          "fetch": 3
+        },
+        {
+          "type": "bounce",
+          "news_id": 233492,
+          "reason": "K뷰티나 소비 트렌드와는 거리가 먼 생활 꿀팁이라 흥미가 떨어진다.",
+          "fetch": 3
+        },
+        {
+          "type": "select",
+          "reason": "코스닥 신규 상장한 회사가 어떤 경쟁력을 가지고 있는지 궁금하다. 뷰티 관련 회사는 아니지만 관련 산업 동향을 파악하는데 도움이 될 것 같다.",
+          "fetch": 3
+        },
+        {
+          "type": "bounce",
+          "news_id": 233478,
+          "reason": "K뷰티나 소비 트렌드와는 거리가 먼 바이오 관련 뉴스라 흥미가 떨어진다.",
+          "fetch": 3
+        },
+        {
+          "type": "next",
+          "reason": "오늘은 딱히 눈에 띄는 뉴스가 없네요. 다음 페이지를 볼게요.",
+          "fetch": 3
+        },
+        {
+          "type": "select",
+          "reason": "대통령 전기차 보조금 정책 질타에 중국산 전기버스 판매 급락이라니, 중국 시장과 관련된 내용이라 흥미롭다.",
+          "fetch": 4
+        },
+        {
+          "type": "bounce",
+          "news_id": 233459,
+          "reason": "전기차 뉴스는 관심사가 아니고, K뷰티나 소비 트렌드와는 거리가 멀다.",
+          "fetch": 4
+        },
+        {
+          "type": "exit",
+          "reason": "피곤해서 그런지 딱히 끌리는 뉴스가 없네요.",
+          "fetch": 4
+        }
+      ],
+      "next_count": 3,
+      "total_served": 80,
+      "exit_reason": "피곤해서 그런지 딱히 끌리는 뉴스가 없네요.",
+      "evaluation": {
+        "satisfaction": 2,
+        "freshness": 3,
+        "relevance": 3,
+        "diversity": 4,
+        "comment": "흥미로운 기사는 있었지만, 피로도가 높아 많은 뉴스를 보지 못하고 종료했어요."
+      },
+      "total_session_time_sec": 281.08
+    },
+    {
+      "persona_id": "9017",
+      "persona_name": "유통 산업 관심 민재",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTgiLCJleHAiOjE3NzU5ODM3MDF9.BdyikQviNJWKy7KaxM323yTkIew7EG9sv5mrkoKVJN4",
+      "error": ""
+    },
+    {
+      "persona_id": "9018",
+      "persona_name": "종합 뉴스 탐색가 승우",
+      "google_id": "test19",
+      "email": "test19@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTkiLCJleHAiOjE3NzU5ODM3MDF9.viw-cgayLUamdG5IgGt03VUGo-yeJRfRdMf1O_Yr79U",
+      "context": {
+        "attitude": "적극적",
+        "time_slot": "출근 전 아침",
+        "time_slot_description": "시간이 없어 빠르게 훑어봄. 핵심만 확인.",
+        "condition": "여유로움. 다양한 뉴스를 탐색하고 싶음.",
+        "fatigue": 4,
+        "random_seed": 7955
+      },
+      "app_session_id": "sim-app-9018-127ca6a7",
+      "screen_session_id": "sim-screen-9018-7060e0ca",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9018-58bf9a58",
+          "source": "mock",
+          "news_ids": [
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542,
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9018-dca6b1cc",
+          "source": "mock",
+          "news_ids": [
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510,
+            233509,
+            233508,
+            233507,
+            233506,
+            233505,
+            233503,
+            233501,
+            233500,
+            233499,
+            233498,
+            233497,
+            233496,
+            233494
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233533,
+          "title": "이재명 대통령 “2차 공공기관 이전, 흩뿌리듯 안 된다…집중 필요”",
+          "url": "http://www.segyebiz.com/newsView/20260313512363?OutUrl=naver",
+          "dwell_time_sec": 89.6,
+          "read_type": "full",
+          "after_action": "back",
+          "after_reason": "공공기관 이전 관련 뉴스는 지금 당장 투자에 직접적인 영향을 주는 정보는 아니라고 판단됨. 다른 경제, 실적, 증시 관련 뉴스를 더 찾아보고 싶음."
+        },
+        {
+          "news_id": 233532,
+          "title": "주요주주 국민연금공단, 한화비전 주식 10.01% 보유 신규 보고",
+          "url": "https://www.digitaltoday.co.kr/news/articleView.html?idxno=640885",
+          "dwell_time_sec": 123.77,
+          "read_type": "full",
+          "after_action": "back",
+          "after_reason": "국민연금 관련 뉴스는 흥미롭지만, 한화비전은 특별히 관심 있는 분야가 아니라 다른 경제 뉴스를 더 보고 싶습니다."
+        },
+        {
+          "news_id": 233524,
+          "title": "다 내리는데 혼자 '역주행'…KFC, 치킨메뉴 23종 가격 인상",
+          "url": "https://n.news.naver.com/mnews/article/008/0005329693?sid=101",
+          "dwell_time_sec": 9.88,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "경제 전반에 대한 관심이지, 특정 프랜차이즈 가격 인상 뉴스는 흥미롭지 않음."
+        },
+        {
+          "news_id": 233542,
+          "title": "[Y인사이트] 배터리 열폭주 위험 줄여주는 '폭연 방산구'의 위력",
+          "url": "https://www.thelec.kr/news/articleView.html?idxno=53475",
+          "dwell_time_sec": 17.69,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "ESS 관련 기술 뉴스는 현재 관심도가 낮음. 빠르게 다른 뉴스를 살펴보는 것이 효율적이라고 판단됨."
+        },
+        {
+          "news_id": 233536,
+          "title": "정명근의 '주유소 습격 사건'..\"단 1원 꼼수 인상도 용납 못해\"",
+          "url": "https://n.news.naver.com/mnews/article/018/0006234425?sid=100",
+          "dwell_time_sec": 20.16,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "경제 전반에 대한 관심사와는 거리가 있고, 특정 지역의 주유소 단속 관련 내용은 흥미롭지 않음."
+        },
+        {
+          "news_id": 233544,
+          "title": "그룹아이비, 공급망 공격 위협 고도화…\"사이버범죄, 암묵적 규칙도 깨...",
+          "url": "https://www.epnc.co.kr/news/articleView.html?idxno=329830",
+          "dwell_time_sec": 19.99,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "공급망 공격은 중요하지만, 지금 당장 경제/실적/증시/시장 키워드와는 거리가 멀다고 판단되어 시간을 아끼기 위해 넘어갑니다."
+        },
+        {
+          "news_id": 233531,
+          "title": "張-吳 벼랑 끝 대치에 이정현까지 사퇴…지선 앞 국힘 '쑥대밭'(종합)",
+          "url": "https://n.news.naver.com/mnews/article/001/0015957906?sid=162",
+          "dwell_time_sec": 17.74,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "정치 뉴스는 지금 관심사가 아님."
+        },
+        {
+          "news_id": 233545,
+          "title": "누구를 위하여 개혁의 종을 울리나 [쓴소리 곧은 소리]",
+          "url": "https://n.news.naver.com/mnews/article/586/0000124369?sid=102",
+          "dwell_time_sec": 15.27,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "경제 뉴스 탐색 중인데, 법조계 관련 내용이라 관심도가 떨어진다."
+        },
+        {
+          "news_id": 233513,
+          "title": "유가 충격에 코스피 1.7% 내려…‘삼전닉스’ 동반 2% 하락",
+          "url": "https://n.news.naver.com/mnews/article/032/0003433161?sid=101",
+          "dwell_time_sec": 85.99,
+          "read_type": "full",
+          "after_action": "back",
+          "after_reason": "유가 충격에 따른 코스피 하락 뉴스를 읽었으니, 다른 경제 뉴스도 빠르게 훑어보고 싶다."
+        },
+        {
+          "news_id": 233506,
+          "title": "코스피, 유가 충격에 1.7% 하락… 5480선 후퇴",
+          "url": "https://it.chosun.com/news/articleView.html?idxno=2023092158600",
+          "dwell_time_sec": 39.1,
+          "read_type": "full",
+          "after_action": "exit",
+          "after_reason": "4개 뉴스 확인했고, 출근 시간이라 종료합니다."
+        }
+      ],
+      "actions": [
+        {
+          "type": "select",
+          "reason": "이재명 대통령의 공공기관 이전 관련 발언은 경제 전반에 영향을 줄 수 있으므로 관심이 간다.",
+          "fetch": 1
+        },
+        {
+          "type": "after_read_back",
+          "news_id": 233533,
+          "reason": "공공기관 이전 관련 뉴스는 지금 당장 투자에 직접적인 영향을 주는 정보는 아니라고 판단됨. 다른 경제, 실적, 증시 관련 뉴스를 더 찾아보고 싶음.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "국민연금공단의 한화비전 주식 보유 보고는 증시 및 투자 관점에서 확인해볼 만한 내용이다.",
+          "fetch": 1
+        },
+        {
+          "type": "after_read_back",
+          "news_id": 233532,
+          "reason": "국민연금 관련 뉴스는 흥미롭지만, 한화비전은 특별히 관심 있는 분야가 아니라 다른 경제 뉴스를 더 보고 싶습니다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "다 내리는데 혼자 가격을 올리는 KFC의 결정이 흥미롭다. 시장 상황에 대한 분석이 궁금하다.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233524,
+          "reason": "경제 전반에 대한 관심이지, 특정 프랜차이즈 가격 인상 뉴스는 흥미롭지 않음.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "배터리 열폭주 관련 기술 뉴스는 경제적인 파급력이 있을 수 있다고 생각해서 클릭.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233542,
+          "reason": "ESS 관련 기술 뉴스는 현재 관심도가 낮음. 빠르게 다른 뉴스를 살펴보는 것이 효율적이라고 판단됨.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "주유소 가격 관련 뉴스, 물가에 관심이 있어서 클릭.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233536,
+          "reason": "경제 전반에 대한 관심사와는 거리가 있고, 특정 지역의 주유소 단속 관련 내용은 흥미롭지 않음.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "사법 개혁 관련 쓴소리, 곧은 소리 제목이 흥미롭다.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233544,
+          "reason": "공급망 공격은 중요하지만, 지금 당장 경제/실적/증시/시장 키워드와는 거리가 멀다고 판단되어 시간을 아끼기 위해 넘어갑니다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "지선 앞 국민의힘 상황이 어떻게 돌아가는지 궁금하다.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233531,
+          "reason": "정치 뉴스는 지금 관심사가 아님.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "개혁 관련 내용이 흥미롭고, 쓴소리 곧은 소리 코너는 평소에 관심있게 봤음.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233545,
+          "reason": "경제 뉴스 탐색 중인데, 법조계 관련 내용이라 관심도가 떨어진다.",
+          "fetch": 1
+        },
+        {
+          "type": "next",
+          "reason": "흥미로운 뉴스가 아직 없는 것 같습니다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "유가 충격에 코스피 하락 관련 내용이라 경제 상황 파악에 도움이 될 것 같음.",
+          "fetch": 2
+        },
+        {
+          "type": "after_read_back",
+          "news_id": 233513,
+          "reason": "유가 충격에 따른 코스피 하락 뉴스를 읽었으니, 다른 경제 뉴스도 빠르게 훑어보고 싶다.",
+          "fetch": 2
+        },
+        {
+          "type": "select",
+          "reason": "정명근 화성시장의 민생 관련 발언이 흥미롭다. 특히 주유소 폭리 엄단에 대한 내용이 궁금하다.",
+          "fetch": 2
+        },
+        {
+          "type": "after_read_exit",
+          "news_id": 233506,
+          "reason": "4개 뉴스 확인했고, 출근 시간이라 종료합니다.",
+          "fetch": 2
+        }
+      ],
+      "next_count": 1,
+      "total_served": 40,
+      "exit_reason": "4개 뉴스 확인했고, 출근 시간이라 종료합니다.",
+      "evaluation": {
+        "satisfaction": 4,
+        "freshness": 3,
+        "relevance": 4,
+        "diversity": 4,
+        "comment": "경제, 증시 관련 뉴스와 더불어 사회면, 정치면 뉴스도 적절히 섞여 있어 다양한 분야를 빠르게 훑어보기에 괜찮은 세션이었습니다."
+      },
+      "total_session_time_sec": 643.1
+    },
+    {
+      "persona_id": "9019",
+      "persona_name": "관심사 없는 유저 소영",
+      "google_id": "test20",
+      "email": "test20@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MjAiLCJleHAiOjE3NzU5ODM3MDF9.davrfFQa0_N3PWcBBVrT8UwqWAY7jX37_dpVkm88tcg",
+      "context": {
+        "attitude": "무관심",
+        "time_slot": "출근 전 아침",
+        "time_slot_description": "시간이 없어 빠르게 훑어봄. 핵심만 확인.",
+        "condition": "약간 피곤함. 흥미로운 뉴스만 읽을 것 같음.",
+        "fatigue": 1,
+        "random_seed": 8387
+      },
+      "app_session_id": "sim-app-9019-83a9245a",
+      "screen_session_id": "sim-screen-9019-d0c7c07e",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9019-7d45d7b1",
+          "source": "mock",
+          "news_ids": [
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542,
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9019-1eca3bcc",
+          "source": "mock",
+          "news_ids": [
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510,
+            233509,
+            233508,
+            233507,
+            233506,
+            233505,
+            233503,
+            233501,
+            233500,
+            233499,
+            233498,
+            233497,
+            233496,
+            233494
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233524,
+          "title": "다 내리는데 혼자 '역주행'…KFC, 치킨메뉴 23종 가격 인상",
+          "url": "https://n.news.naver.com/mnews/article/008/0005329693?sid=101",
+          "dwell_time_sec": 14.53,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "아침부터 가격 인상 소식은 보고 싶지 않음. 피곤함."
+        },
+        {
+          "news_id": 233548,
+          "title": "\"옆 방엔 적군이 자고 있는데 어떻게 그런 생각을\" 전쟁이 드러낸 인간...",
+          "url": "https://n.news.naver.com/mnews/article/052/0002326862?sid=102",
+          "dwell_time_sec": 11.51,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "라디오 대본 형식이어서 뉴스 같지 않고 흥미가 떨어진다."
+        },
+        {
+          "news_id": 233543,
+          "title": "수성구청 공무원 사망…구조 요청 있었지만 위치 파악 못한 소방",
+          "url": "https://n.news.naver.com/mnews/article/088/0001000921?sid=102",
+          "dwell_time_sec": 9.14,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "아침부터 우울한 소식이네요. 흥미롭지 않아요."
+        },
+        {
+          "news_id": 233541,
+          "title": "\"알고리즘이 계속 보여줘요\"...폭탄주 '술방' 보고 자란 아이들, 음주 시...",
+          "url": "https://radio.ytn.co.kr/program/?f=2&id=107803&s_mcd=0433&s_hcd=01",
+          "dwell_time_sec": 16.97,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "라디오 방송 대본 형식이라 딱딱하고 재미없을 것 같음."
+        },
+        {
+          "news_id": 233538,
+          "title": "민주당 광주광역시당, 기초의원 1차 경선 후보 40명 등록",
+          "url": "https://www.newscj.com/news/articleView.html?idxno=3384163",
+          "dwell_time_sec": 11.4,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "정치 뉴스는 별로 관심 없고, 기초의원 관련 뉴스는 더더욱 관심이 없다."
+        },
+        {
+          "news_id": 233537,
+          "title": "[유프로의 AI 픽] \"다이소 3000원 립밤 오픈런·긱시크 안경\"…패션·뷰...",
+          "url": "https://www.mediapen.com/news/view/1086863",
+          "dwell_time_sec": 14.37,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "흥미로운 뉴스를 찾는데, 뷰티 관련 기사는 관심이 없다."
+        },
+        {
+          "news_id": 233544,
+          "title": "그룹아이비, 공급망 공격 위협 고도화…\"사이버범죄, 암묵적 규칙도 깨...",
+          "url": "https://www.epnc.co.kr/news/articleView.html?idxno=329830",
+          "dwell_time_sec": 19.13,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "보안 관련 뉴스는 딱히 흥미롭지 않음."
+        },
+        {
+          "news_id": 233539,
+          "title": "다카이치 \"독도는 일본 땅\" 망언에…與 \"정부, 단호히 대응해야\"",
+          "url": "https://n.news.naver.com/mnews/article/586/0000124370?sid=100",
+          "dwell_time_sec": 20.06,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "정치 뉴스에 별로 관심 없고, 아침부터 피곤한데 굳이 읽고 싶지 않음."
+        },
+        {
+          "news_id": 233500,
+          "title": "남편이 무심코 켜놓은 채팅창을 본 아내... 10년 결혼생활이 무너졌다",
+          "url": "https://www.wikitree.co.kr/articles/1124756",
+          "dwell_time_sec": 125.18,
+          "read_type": "full",
+          "after_action": "exit",
+          "after_reason": "아침부터 자극적인 내용이라 피곤해서 더 보고 싶지 않네요."
+        }
+      ],
+      "actions": [
+        {
+          "type": "select",
+          "reason": "다 내리는데 혼자 가격을 올리는 KFC, 무슨 일인지 궁금하다.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233524,
+          "reason": "아침부터 가격 인상 소식은 보고 싶지 않음. 피곤함.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "'옆 방엔 적군이 자고 있는데 어떻게 그런 생각을' 전쟁이 드러낸 인간...' 제목이 흥미롭다.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233548,
+          "reason": "라디오 대본 형식이어서 뉴스 같지 않고 흥미가 떨어진다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "수성구청 공무원 사망 사건은 뭔가 싶어서 클릭해봄.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233543,
+          "reason": "아침부터 우울한 소식이네요. 흥미롭지 않아요.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "술방 보고 자란 아이들 이야기는 흥미롭네요. ",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233541,
+          "reason": "라디오 방송 대본 형식이라 딱딱하고 재미없을 것 같음.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "다이소 립밤 품절 대란이라니, 갑자기 궁금해진다.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233538,
+          "reason": "정치 뉴스는 별로 관심 없고, 기초의원 관련 뉴스는 더더욱 관심이 없다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "다이소 립밤 품절 대란이라니, 무슨 일인지 궁금하다.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233537,
+          "reason": "흥미로운 뉴스를 찾는데, 뷰티 관련 기사는 관심이 없다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "공급망 공격 위협이 고도화된다는 내용이 흥미롭다.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233544,
+          "reason": "보안 관련 뉴스는 딱히 흥미롭지 않음.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "다카이치 망언 관련 뉴스는 한번쯤 봐둬야 할 것 같아서.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233539,
+          "reason": "정치 뉴스에 별로 관심 없고, 아침부터 피곤한데 굳이 읽고 싶지 않음.",
+          "fetch": 1
+        },
+        {
+          "type": "next",
+          "reason": "흥미로운 뉴스가 아직 없는 것 같아서 다음 페이지를 기대해본다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "남편의 채팅창을 봤다는 내용이 흥미롭다.",
+          "fetch": 2
+        },
+        {
+          "type": "after_read_exit",
+          "news_id": 233500,
+          "reason": "아침부터 자극적인 내용이라 피곤해서 더 보고 싶지 않네요.",
+          "fetch": 2
+        }
+      ],
+      "next_count": 1,
+      "total_served": 40,
+      "exit_reason": "아침부터 자극적인 내용이라 피곤해서 더 보고 싶지 않네요.",
+      "evaluation": {
+        "satisfaction": 2,
+        "freshness": 3,
+        "relevance": 1,
+        "diversity": 4,
+        "comment": "아침부터 자극적인 뉴스들이 많고 관심 없는 정치/사회 이슈 위주라 피로도가 높았고, 개인 맞춤형 추천이라는 느낌은 전혀 받지 못했습니다."
+      },
+      "total_session_time_sec": 442.09
+    }
+  ]
+}

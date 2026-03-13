@@ -1,0 +1,154 @@
+[
+  {
+    "persona_id": "9001",
+    "persona_name": "반도체 장비 투자자 지훈",
+    "google_id": "test02",
+    "email": "test02@test.com",
+    "nickname": "반도체 장비 투자자 지훈",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDIiLCJleHAiOjE3NzU5ODM3MDF9.j7xYj2iP38MgjnOrKl3dyADx7JYu-S_VOZmsEPSWrZI"
+  },
+  {
+    "persona_id": "9002",
+    "persona_name": "배터리 산업 투자자 태호",
+    "google_id": "test03",
+    "email": "test03@test.com",
+    "nickname": "배터리 산업 투자자 태호",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDMiLCJleHAiOjE3NzU5ODM3MDF9.XQ9hhuAwK3Y7qlBRkKU2gGVpz6WPcataxwWfGpqITNE"
+  },
+  {
+    "persona_id": "9003",
+    "persona_name": "전기차 매니아 수진",
+    "google_id": "test04",
+    "email": "test04@test.com",
+    "nickname": "전기차 매니아 수진",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDQiLCJleHAiOjE3NzU5ODM3MDF9.Z8az0-rud-YQWWGIFF_ZCnYaxTiS8MtwxNdjTA9pOO4"
+  },
+  {
+    "persona_id": "9004",
+    "persona_name": "친환경 에너지 관심 유진",
+    "google_id": "test05",
+    "email": "test05@test.com",
+    "nickname": "친환경 에너지 관심 유진",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDUiLCJleHAiOjE3NzU5ODM3MDF9.tRYF7HApp_L5iCUj0U7MLQI6aN8SwGda02XdXcM_P7I"
+  },
+  {
+    "persona_id": "9005",
+    "persona_name": "거시경제 분석가 준호",
+    "google_id": "test06",
+    "email": "test06@test.com",
+    "nickname": "거시경제 분석가 준호",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDYiLCJleHAiOjE3NzU5ODM3MDF9.QEQhTSD2qKzZomKxgX_YsNpGFolUBjf9JgVjrqqu5H8"
+  },
+  {
+    "persona_id": "9006",
+    "persona_name": "배당주 투자자 영수",
+    "google_id": "test07",
+    "email": "test07@test.com",
+    "nickname": "배당주 투자자 영수",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDciLCJleHAiOjE3NzU5ODM3MDF9.WocmwAoG-Ao8liUCd6oU9uvS_nlLhL5qZrcrgGuFVM0"
+  },
+  {
+    "persona_id": "9007",
+    "persona_name": "글로벌 경제 관심 지민",
+    "google_id": "test08",
+    "email": "test08@test.com",
+    "nickname": "글로벌 경제 관심 지민",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDgiLCJleHAiOjE3NzU5ODM3MDF9.BB7w3CIju_PT6DaGRkPWw-N9LqxwTfYe5yRQyJ6vUkE"
+  },
+  {
+    "persona_id": "9008",
+    "persona_name": "플랫폼 산업 분석가 지은",
+    "google_id": "test09",
+    "email": "test09@test.com",
+    "nickname": "플랫폼 산업 분석가 지은",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDkiLCJleHAiOjE3NzU5ODM3MDF9.A0GSyCXoDKo6Hd_Cr5-BgD7Le9sOIIyEERg7KBD2O0o"
+  },
+  {
+    "persona_id": "9009",
+    "persona_name": "AI 스타트업 덕후 서연",
+    "google_id": "test10",
+    "email": "test10@test.com",
+    "nickname": "AI 스타트업 덕후 서연",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTAiLCJleHAiOjE3NzU5ODM3MDF9.LGEm7_p2s2QFG2UnAUkFd21CTvaf3EGgIGMLOa1T1So"
+  },
+  {
+    "persona_id": "9010",
+    "persona_name": "게임 산업 매니아 도윤",
+    "google_id": "test11",
+    "email": "test11@test.com",
+    "nickname": "게임 산업 매니아 도윤",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTEiLCJleHAiOjE3NzU5ODM3MDF9.uhiZEoUFAUxu31ra1ewXU0jb51zJGv1yUFRgp0e7oyY"
+  },
+  {
+    "persona_id": "9011",
+    "persona_name": "K-팝 산업 관심 신유진",
+    "google_id": "test12",
+    "email": "test12@test.com",
+    "nickname": "K-팝 산업 관심 신유진",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTIiLCJleHAiOjE3NzU5ODM3MDF9.cudRst43AenPBUmk4IV5JOgC_Ds6eFXVMyFpNkL2IYk"
+  },
+  {
+    "persona_id": "9012",
+    "persona_name": "바이오 투자자 세진",
+    "google_id": "test13",
+    "email": "test13@test.com",
+    "nickname": "바이오 투자자 세진",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTMiLCJleHAiOjE3NzU5ODM3MDF9.0EH1XlyzYT5um4moPZH2Oy9boBy6u37qZ8IeyAviklg"
+  },
+  {
+    "persona_id": "9013",
+    "persona_name": "헬스케어 관심 지수",
+    "google_id": "test14",
+    "email": "test14@test.com",
+    "nickname": "헬스케어 관심 지수",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTQiLCJleHAiOjE3NzU5ODM3MDF9.4yfxoC3T9AHf4c_rCsIL0hjVeGQ94LlFL8YqKydjZyA"
+  },
+  {
+    "persona_id": "9014",
+    "persona_name": "건설 인프라 투자자 동현",
+    "google_id": "test15",
+    "email": "test15@test.com",
+    "nickname": "건설 인프라 투자자 동현",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTUiLCJleHAiOjE3NzU5ODM3MDF9.yBeHstcVx6_oISkows5HN7HqyQbfDgNCxNwj2zM9Hvs"
+  },
+  {
+    "persona_id": "9015",
+    "persona_name": "철강 산업 분석가 성민",
+    "google_id": "test16",
+    "email": "test16@test.com",
+    "nickname": "철강 산업 분석가 성민",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTYiLCJleHAiOjE3NzU5ODM3MDF9.E2RvFhV9qULgV6XfPflbjSp25r3f92oSu0-dhSE2-Nk"
+  },
+  {
+    "persona_id": "9016",
+    "persona_name": "소비 트렌드 관찰자 나연",
+    "google_id": "test17",
+    "email": "test17@test.com",
+    "nickname": "소비 트렌드 관찰자 나연",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTciLCJleHAiOjE3NzU5ODM3MDF9.RzbjzUVR7YWbzB9Kw31aRYfsav14cbeZeSIExra0aUE"
+  },
+  {
+    "persona_id": "9017",
+    "persona_name": "유통 산업 관심 민재",
+    "google_id": "test18",
+    "email": "test18@test.com",
+    "nickname": "유통 산업 관심 민재",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTgiLCJleHAiOjE3NzU5ODM3MDF9.BdyikQviNJWKy7KaxM323yTkIew7EG9sv5mrkoKVJN4"
+  },
+  {
+    "persona_id": "9018",
+    "persona_name": "종합 뉴스 탐색가 승우",
+    "google_id": "test19",
+    "email": "test19@test.com",
+    "nickname": "종합 뉴스 탐색가 승우",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MTkiLCJleHAiOjE3NzU5ODM3MDF9.viw-cgayLUamdG5IgGt03VUGo-yeJRfRdMf1O_Yr79U"
+  },
+  {
+    "persona_id": "9019",
+    "persona_name": "관심사 없는 유저 소영",
+    "google_id": "test20",
+    "email": "test20@test.com",
+    "nickname": "관심사 없는 유저 소영",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MjAiLCJleHAiOjE3NzU5ODM3MDF9.davrfFQa0_N3PWcBBVrT8UwqWAY7jX37_dpVkm88tcg"
+  }
+]

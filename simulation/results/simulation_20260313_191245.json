@@ -1,0 +1,285 @@
+{
+  "simulation_id": "20260313_191245",
+  "run_at": "2026-03-13T19:12:45.701586",
+  "elapsed_sec": 90.93,
+  "total_personas": 1,
+  "success_count": 1,
+  "summary": {
+    "total_served": 120,
+    "total_clicks": 2,
+    "ctr": 0.0167,
+    "avg_satisfaction": 1.0,
+    "avg_freshness": 2.0,
+    "avg_relevance": 1.0,
+    "avg_diversity": 3.0
+  },
+  "results": [
+    {
+      "persona_id": "9001",
+      "persona_name": "반도체 장비 투자자 지훈",
+      "google_id": "test02",
+      "email": "test02@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDIiLCJleHAiOjE3NzU5ODM3MDF9.j7xYj2iP38MgjnOrKl3dyADx7JYu-S_VOZmsEPSWrZI",
+      "context": {
+        "attitude": "소극적",
+        "time_slot": "주말 오전",
+        "time_slot_description": "여유롭게 여러 뉴스를 천천히 탐색.",
+        "condition": "약간 피곤함. 흥미로운 뉴스만 읽을 것 같음.",
+        "fatigue": 0,
+        "random_seed": 4000
+      },
+      "app_session_id": "sim-app-9001-d9cc48a5",
+      "screen_session_id": "sim-screen-9001-49c9cdd1",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9001-ac3c3316",
+          "source": "mock",
+          "news_ids": [
+            233692,
+            233690,
+            233689,
+            233688,
+            233687,
+            233686,
+            233685,
+            233682,
+            233680,
+            233679,
+            233678,
+            233677,
+            233676,
+            233675,
+            233674,
+            233673,
+            233672,
+            233671,
+            233670,
+            233669
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9001-b0618d89",
+          "source": "mock",
+          "news_ids": [
+            233668,
+            233667,
+            233666,
+            233665,
+            233663,
+            233659,
+            233658,
+            233657,
+            233654,
+            233653,
+            233652,
+            233651,
+            233650,
+            233648,
+            233646,
+            233645,
+            233644,
+            233639,
+            233637,
+            233635
+          ]
+        },
+        {
+          "fetch": 3,
+          "request_id": "sim-req-9001-59b71f25",
+          "source": "mock",
+          "news_ids": [
+            233633,
+            233632,
+            233629,
+            233628,
+            233627,
+            233626,
+            233623,
+            233621,
+            233620,
+            233619,
+            233618,
+            233616,
+            233615,
+            233614,
+            233611,
+            233607,
+            233604,
+            233603,
+            233599,
+            233594
+          ]
+        },
+        {
+          "fetch": 4,
+          "request_id": "sim-req-9001-73e00bc8",
+          "source": "mock",
+          "news_ids": [
+            233593,
+            233592,
+            233591,
+            233590,
+            233589,
+            233587,
+            233586,
+            233585,
+            233583,
+            233582,
+            233581,
+            233580,
+            233579,
+            233578,
+            233577,
+            233576,
+            233575,
+            233574,
+            233573,
+            233572
+          ]
+        },
+        {
+          "fetch": 5,
+          "request_id": "sim-req-9001-daccad01",
+          "source": "mock",
+          "news_ids": [
+            233567,
+            233566,
+            233565,
+            233562,
+            233561,
+            233559,
+            233558,
+            233557,
+            233556,
+            233555,
+            233553,
+            233552,
+            233550,
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542
+          ]
+        },
+        {
+          "fetch": 6,
+          "request_id": "sim-req-9001-02f8466d",
+          "source": "mock",
+          "news_ids": [
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522,
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233645,
+          "title": "“월급 안 받는 시장 나온다고?”~이호균, 1000억 펀드·5성급 호텔 약속에 목포 민심 ‘들썩’",
+          "url": "https://www.wikitree.co.kr/articles/1124781",
+          "dwell_time_sec": 11.31,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "반도체 투자와 관련 없는 정치 뉴스라서 흥미가 떨어진다."
+        },
+        {
+          "news_id": 233577,
+          "title": "권동희 전무, 쏠리드 주식 1200주 매도",
+          "url": "https://www.digitaltoday.co.kr/news/articleView.html?idxno=640959",
+          "dwell_time_sec": 11.34,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "쏠리드는 반도체 장비 관련 기업이 아니고, 개인의 주식 매도 소식은 투자 판단에 큰 영향을 주지 않으므로 바로 종료합니다."
+        }
+      ],
+      "actions": [
+        {
+          "type": "next",
+          "reason": "오늘은 특별히 확 땡기는 뉴스는 없지만, 그래도 다음 페이지에 혹시나 반도체 관련 소식이 있을까 싶어 더 보겠습니다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "한화가 호주에 방산 생산기지를 세운다는 내용이 흥미롭다. 장비쪽은 아니지만, 한화에어로스페이스도 관심있게 보고 있어서 클릭.",
+          "fetch": 2
+        },
+        {
+          "type": "bounce",
+          "news_id": 233645,
+          "reason": "반도체 투자와 관련 없는 정치 뉴스라서 흥미가 떨어진다.",
+          "fetch": 2
+        },
+        {
+          "type": "next",
+          "reason": "유효하지 않은 news_id 반환 (id=233616)",
+          "fetch": 2
+        },
+        {
+          "type": "next",
+          "reason": "관심있는 뉴스는 없지만, 혹시나 다음 페이지에 더 있을까 싶어 더 탐색해본다.",
+          "fetch": 3
+        },
+        {
+          "type": "select",
+          "reason": "개미 순매수 TOP 5, 어떤 종목을 샀는지 궁금하네요. 투자 동향 파악에 참고할 수 있을 것 같아요.",
+          "fetch": 4
+        },
+        {
+          "type": "bounce",
+          "news_id": 233577,
+          "reason": "쏠리드는 반도체 장비 관련 기업이 아니고, 개인의 주식 매도 소식은 투자 판단에 큰 영향을 주지 않으므로 바로 종료합니다.",
+          "fetch": 4
+        },
+        {
+          "type": "next",
+          "reason": "반도체 관련 뉴스가 없는 것 같아 다음 페이지를 확인해보고 싶다.",
+          "fetch": 4
+        },
+        {
+          "type": "next",
+          "reason": "오늘은 특별히 눈에 띄는 뉴스가 없네요. 다음 페이지를 보겠습니다.",
+          "fetch": 5
+        },
+        {
+          "type": "exit",
+          "reason": "피곤해서 더 이상 뉴스를 보고 싶지 않다.",
+          "fetch": 6
+        }
+      ],
+      "next_count": 5,
+      "total_served": 120,
+      "exit_reason": "피곤해서 더 이상 뉴스를 보고 싶지 않다.",
+      "evaluation": {
+        "satisfaction": 1,
+        "freshness": 2,
+        "relevance": 1,
+        "diversity": 3,
+        "comment": "반도체 장비 투자자인 저에게 이호균 펀드나 쏠리드 주식 매도 뉴스는 전혀 관련 없고 흥미도 없어서 매우 실망스러운 세션이었습니다."
+      },
+      "total_session_time_sec": 90.92
+    }
+  ]
+}

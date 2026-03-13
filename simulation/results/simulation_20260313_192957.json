@@ -1,0 +1,189 @@
+{
+  "simulation_id": "20260313_192957",
+  "run_at": "2026-03-13T19:29:57.836628",
+  "elapsed_sec": 47.57,
+  "total_personas": 1,
+  "success_count": 1,
+  "summary": {
+    "total_served": 60,
+    "total_clicks": 2,
+    "ctr": 0.0333,
+    "avg_satisfaction": 1.0,
+    "avg_freshness": 2.0,
+    "avg_relevance": 1.0,
+    "avg_diversity": 3.0
+  },
+  "results": [
+    {
+      "persona_id": "9001",
+      "persona_name": "반도체 장비 투자자 지훈",
+      "google_id": "test02",
+      "email": "test02@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDIiLCJleHAiOjE3NzU5ODM3MDF9.j7xYj2iP38MgjnOrKl3dyADx7JYu-S_VOZmsEPSWrZI",
+      "context": {
+        "attitude": "무관심",
+        "time_slot": "출근 전 아침",
+        "time_slot_description": "시간이 없어 빠르게 훑어봄. 핵심만 확인.",
+        "condition": "컨디션 좋음. 집중력 높음.",
+        "fatigue": 0,
+        "random_seed": 5636
+      },
+      "app_session_id": "sim-app-9001-c5dbf563",
+      "screen_session_id": "sim-screen-9001-19b41a9d",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9001-b4627b8c",
+          "source": "mock",
+          "news_ids": [
+            233692,
+            233690,
+            233689,
+            233688,
+            233687,
+            233686,
+            233685,
+            233682,
+            233680,
+            233679,
+            233678,
+            233677,
+            233676,
+            233675,
+            233674,
+            233673,
+            233672,
+            233671,
+            233670,
+            233669
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9001-e87c671d",
+          "source": "mock",
+          "news_ids": [
+            233668,
+            233667,
+            233666,
+            233665,
+            233663,
+            233659,
+            233658,
+            233657,
+            233654,
+            233653,
+            233652,
+            233651,
+            233650,
+            233648,
+            233646,
+            233645,
+            233644,
+            233639,
+            233637,
+            233635
+          ]
+        },
+        {
+          "fetch": 3,
+          "request_id": "sim-req-9001-93f841b6",
+          "source": "mock",
+          "news_ids": [
+            233633,
+            233632,
+            233629,
+            233628,
+            233627,
+            233626,
+            233623,
+            233621,
+            233620,
+            233619,
+            233618,
+            233616,
+            233615,
+            233614,
+            233611,
+            233607,
+            233604,
+            233603,
+            233599,
+            233594
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233645,
+          "title": "“월급 안 받는 시장 나온다고?”~이호균, 1000억 펀드·5성급 호텔 약속에 목포 민심 ‘들썩’",
+          "url": "https://www.wikitree.co.kr/articles/1124781",
+          "dwell_time_sec": 8.76,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "반도체 투자와 관련 없는 정치/지역 뉴스이므로 관심 없음."
+        },
+        {
+          "news_id": 233646,
+          "title": "무기만 수출하던 시대 끝났다···호주에 '방산 생산기지' 세우는 한화",
+          "url": "https://www.smartbizn.com/news/articleView.html?idxno=139000",
+          "dwell_time_sec": 10.78,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "반도체 장비 투자자로서 방산 관련 뉴스는 투자 판단에 직접적인 연관이 없다고 판단됨."
+        }
+      ],
+      "actions": [
+        {
+          "type": "next",
+          "reason": "반도체 관련 뉴스는 보이지 않음. 다음 페이지 확인.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "한화에어로스페이스가 호주에 방산 생산기지를 세운다는 소식은 긍정적이라고 판단되어 클릭.",
+          "fetch": 2
+        },
+        {
+          "type": "bounce",
+          "news_id": 233645,
+          "reason": "반도체 투자와 관련 없는 정치/지역 뉴스이므로 관심 없음.",
+          "fetch": 2
+        },
+        {
+          "type": "select",
+          "reason": "무기만 수출하던 시대 끝났다는 제목에서 한화에어로스페이스의 방산 생산기지 관련 내용이 흥미롭다.",
+          "fetch": 2
+        },
+        {
+          "type": "bounce",
+          "news_id": 233646,
+          "reason": "반도체 장비 투자자로서 방산 관련 뉴스는 투자 판단에 직접적인 연관이 없다고 판단됨.",
+          "fetch": 2
+        },
+        {
+          "type": "next",
+          "reason": "아직 관심가는 뉴스가 없습니다.",
+          "fetch": 2
+        },
+        {
+          "type": "exit",
+          "reason": "반도체 관련 뉴스가 없고, 다른 뉴스도 흥미롭지 않음. 출근 준비해야 함.",
+          "fetch": 3
+        }
+      ],
+      "next_count": 2,
+      "total_served": 60,
+      "exit_reason": "반도체 관련 뉴스가 없고, 다른 뉴스도 흥미롭지 않음. 출근 준비해야 함.",
+      "evaluation": {
+        "satisfaction": 1,
+        "freshness": 2,
+        "relevance": 1,
+        "diversity": 3,
+        "comment": "반도체 투자자에게 관련 뉴스 부족, 출근 전 시간 없어 종료."
+      },
+      "total_session_time_sec": 47.57
+    }
+  ]
+}

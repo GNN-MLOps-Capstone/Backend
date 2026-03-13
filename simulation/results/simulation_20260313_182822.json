@@ -1,0 +1,485 @@
+{
+  "simulation_id": "20260313_182822",
+  "run_at": "2026-03-13T18:28:22.503043",
+  "elapsed_sec": 209.37,
+  "total_personas": 1,
+  "success_count": 1,
+  "summary": {
+    "total_served": 120,
+    "total_clicks": 12,
+    "ctr": 0.1,
+    "avg_satisfaction": 2.0,
+    "avg_freshness": 2.0,
+    "avg_relevance": 1.0,
+    "avg_diversity": 4.0
+  },
+  "results": [
+    {
+      "persona_id": "9001",
+      "persona_name": "반도체 장비 투자자 지훈",
+      "google_id": "test02",
+      "email": "test02@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDIiLCJleHAiOjE3NzU5ODM3MDF9.j7xYj2iP38MgjnOrKl3dyADx7JYu-S_VOZmsEPSWrZI",
+      "context": {
+        "attitude": "소극적",
+        "time_slot": "퇴근 후 저녁",
+        "time_slot_description": "피곤하지만 관심 있는 뉴스는 끝까지 읽음.",
+        "condition": "컨디션 좋음. 집중력 높음.",
+        "fatigue": 0,
+        "random_seed": 4943
+      },
+      "app_session_id": "sim-app-9001-c1a6ea86",
+      "screen_session_id": "sim-screen-9001-e0a394a8",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9001-0a3d713f",
+          "source": "mock",
+          "news_ids": [
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542,
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9001-1a661d80",
+          "source": "mock",
+          "news_ids": [
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510,
+            233509,
+            233508,
+            233507,
+            233506,
+            233505,
+            233503,
+            233501,
+            233500,
+            233499,
+            233498,
+            233497,
+            233496,
+            233494
+          ]
+        },
+        {
+          "fetch": 3,
+          "request_id": "sim-req-9001-addf2bb4",
+          "source": "mock",
+          "news_ids": [
+            233493,
+            233492,
+            233490,
+            233488,
+            233487,
+            233486,
+            233481,
+            233480,
+            233478,
+            233477,
+            233475,
+            233474,
+            233473,
+            233472,
+            233471,
+            233470,
+            233468,
+            233467,
+            233466,
+            233465
+          ]
+        },
+        {
+          "fetch": 4,
+          "request_id": "sim-req-9001-c880bdaa",
+          "source": "mock",
+          "news_ids": [
+            233464,
+            233463,
+            233462,
+            233461,
+            233459,
+            233458,
+            233455,
+            233454,
+            233453,
+            233451,
+            233450,
+            233449,
+            233447,
+            233446,
+            233445,
+            233444,
+            233443,
+            233441,
+            233440,
+            233439
+          ]
+        },
+        {
+          "fetch": 5,
+          "request_id": "sim-req-9001-42d49faa",
+          "source": "mock",
+          "news_ids": [
+            233438,
+            233437,
+            233436,
+            233435,
+            233434,
+            233433,
+            233430,
+            233429,
+            233427,
+            233426,
+            233425,
+            233421,
+            233420,
+            233419,
+            233417,
+            233416,
+            233415,
+            233412,
+            233409,
+            233408
+          ]
+        },
+        {
+          "fetch": 6,
+          "request_id": "sim-req-9001-8e20faed",
+          "source": "mock",
+          "news_ids": [
+            233407,
+            233406,
+            233405,
+            233404,
+            233403,
+            233402,
+            233401,
+            233399,
+            233394,
+            233393,
+            233392,
+            233391,
+            233390,
+            233387,
+            233386,
+            233384,
+            233383,
+            233382,
+            233381,
+            233376
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233542,
+          "title": "[Y인사이트] 배터리 열폭주 위험 줄여주는 '폭연 방산구'의 위력",
+          "url": "https://www.thelec.kr/news/articleView.html?idxno=53475",
+          "dwell_time_sec": 8.92,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "배터리 관련 뉴스로, 반도체 장비 투자자인 내 관심사와 거리가 멀다."
+        },
+        {
+          "news_id": 233532,
+          "title": "주요주주 국민연금공단, 한화비전 주식 10.01% 보유 신규 보고",
+          "url": "https://www.digitaltoday.co.kr/news/articleView.html?idxno=640885",
+          "dwell_time_sec": 11.99,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "한화비전은 반도체 장비 관련 기업이 아니므로 관심도가 낮습니다."
+        },
+        {
+          "news_id": 233526,
+          "title": "RFHIC 주주 모건스탠리 앤 씨오 인터내셔널 피엘씨, RFHIC 보유 보고…총 지분율 3.97%",
+          "url": "https://www.digitaltoday.co.kr/news/articleView.html?idxno=640887",
+          "dwell_time_sec": 10.62,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "RFHIC는 반도체 장비 기업이 아니므로 관심도가 낮습니다."
+        },
+        {
+          "news_id": 233533,
+          "title": "이재명 대통령 “2차 공공기관 이전, 흩뿌리듯 안 된다…집중 필요”",
+          "url": "http://www.segyebiz.com/newsView/20260313512363?OutUrl=naver",
+          "dwell_time_sec": 9.89,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "반도체 투자와 직접적인 관련이 없어 보입니다."
+        },
+        {
+          "news_id": 233513,
+          "title": "유가 충격에 코스피 1.7% 내려…‘삼전닉스’ 동반 2% 하락",
+          "url": "https://n.news.naver.com/mnews/article/032/0003433161?sid=101",
+          "dwell_time_sec": 14.11,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "유가, 환율 관련 거시경제 뉴스는 지금 투자 판단에 직접적인 도움이 되지 않는다고 판단됨."
+        },
+        {
+          "news_id": 233506,
+          "title": "코스피, 유가 충격에 1.7% 하락… 5480선 후퇴",
+          "url": "https://it.chosun.com/news/articleView.html?idxno=2023092158600",
+          "dwell_time_sec": 12.42,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "반도체 장비 투자와 직접적인 관련이 없는 거시경제 뉴스이므로 관심도가 낮음."
+        },
+        {
+          "news_id": 233421,
+          "title": "[브리프] KB금융 BNK금융 KB국민은행 하나은행 우리은행 농협은행 外",
+          "url": "http://www.biztribune.co.kr/news/articleView.html?idxno=350446",
+          "dwell_time_sec": 7.25,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "반도체 장비 투자와 관련 없는 금융 정보 뉴스"
+        },
+        {
+          "news_id": 233406,
+          "title": "삼성, '지구를 위한 갤럭시' 비전 제시...\"쓴 물의 110% 돌려준다\"",
+          "url": "https://www.insightkorea.co.kr/news/articleView.html?idxno=242714",
+          "dwell_time_sec": 14.86,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "반도체 장비 투자와 직접적인 관련이 없는 환경 관련 뉴스"
+        },
+        {
+          "news_id": 233393,
+          "title": "“한국판 안두릴 만들겠다”…크래프톤, 한화에어로와 ‘피지컬 AI’ 동맹",
+          "url": "https://n.news.naver.com/mnews/article/025/0003508918?sid=105",
+          "dwell_time_sec": 5.91,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "반도체 장비 투자와 관련 없는 내용이므로 바로 나갑니다."
+        },
+        {
+          "news_id": 233384,
+          "title": "김주현 경영부문 부문장, RFHIC 주식 9500주 매도",
+          "url": "https://www.digitaltoday.co.kr/news/articleView.html?idxno=640835",
+          "dwell_time_sec": 8.69,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "RFHIC는 관심 종목이 아니고, 경영진 주식 매도는 투자 판단에 직접적인 영향을 주지 않는다고 판단됨."
+        },
+        {
+          "news_id": 233403,
+          "title": "커지는 미 사모대출 뇌관…'거품 붕괴' 막는 조건은 [미다스의 손]",
+          "url": "https://n.news.naver.com/mnews/article/215/0001245087?sid=101",
+          "dwell_time_sec": 13.26,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "미국 사모대출 시장 관련 뉴스는 반도체 투자와 직접적인 관련성이 낮다고 판단되어 넘어갑니다."
+        },
+        {
+          "news_id": 233401,
+          "title": "보급과 고급 사이 노리는 외산폰…갤S26 가격 인상에 애플·낫싱 틈새 진격",
+          "url": "https://n.news.naver.com/mnews/article/138/0002220512?sid=105",
+          "dwell_time_sec": 7.77,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "반도체 장비 투자자로서 스마트폰 시장 경쟁 관련 뉴스는 투자 결정에 직접적인 영향을 주지 않아 관심도가 낮음."
+        }
+      ],
+      "actions": [
+        {
+          "type": "select",
+          "reason": "배터리 열폭주 관련 기술 뉴스는 반도체 장비 투자 관점에서 안전 관련 기술 동향을 파악하는데 도움이 될 수 있다.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233542,
+          "reason": "배터리 관련 뉴스로, 반도체 장비 투자자인 내 관심사와 거리가 멀다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "국민연금공단의 한화비전 주식 보유 보고는 투자 판단에 참고할 만한 정보라고 생각된다.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233532,
+          "reason": "한화비전은 반도체 장비 관련 기업이 아니므로 관심도가 낮습니다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "RFHIC 주주 변동 공시는 투자 판단에 참고할 만한 정보이므로 확인해봐야겠다.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233526,
+          "reason": "RFHIC는 반도체 장비 기업이 아니므로 관심도가 낮습니다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "이재명 대통령의 공공기관 이전 관련 발언에서 정책적 결과 우선시 언급이 있어, 반도체 관련 기관 이전 가능성을 간접적으로나마 파악할 수 있을 것 같아서.",
+          "fetch": 1
+        },
+        {
+          "type": "bounce",
+          "news_id": 233533,
+          "reason": "반도체 투자와 직접적인 관련이 없어 보입니다.",
+          "fetch": 1
+        },
+        {
+          "type": "next",
+          "reason": "반도체 관련 뉴스가 없어서 다음 뉴스를 보고 싶습니다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "유가 충격에 코스피 하락, 삼성전자와 SK하이닉스 동반 하락은 반도체 장비 투자자로서 간과할 수 없는 정보입니다.",
+          "fetch": 2
+        },
+        {
+          "type": "bounce",
+          "news_id": 233513,
+          "reason": "유가, 환율 관련 거시경제 뉴스는 지금 투자 판단에 직접적인 도움이 되지 않는다고 판단됨.",
+          "fetch": 2
+        },
+        {
+          "type": "select",
+          "reason": "코스피 하락에 삼성전자, SK하이닉스 등 대형주 약세 기사라 반도체 투자에 영향이 있을지 확인하고 싶다.",
+          "fetch": 2
+        },
+        {
+          "type": "bounce",
+          "news_id": 233506,
+          "reason": "반도체 장비 투자와 직접적인 관련이 없는 거시경제 뉴스이므로 관심도가 낮음.",
+          "fetch": 2
+        },
+        {
+          "type": "next",
+          "reason": "관심있는 반도체 관련 뉴스가 아직 안보임.",
+          "fetch": 2
+        },
+        {
+          "type": "next",
+          "reason": "반도체 관련 뉴스가 없어서 다음 목록을 확인하고 싶습니다.",
+          "fetch": 3
+        },
+        {
+          "type": "next",
+          "reason": "반도체 관련 뉴스가 보이지 않아 다음 목록을 확인하고 싶습니다.",
+          "fetch": 4
+        },
+        {
+          "type": "select",
+          "reason": "KB금융의 AI 관련 보안 가이드라인 마련 계획은 반도체 산업의 보안과도 연관될 수 있다고 판단되어 관심이 갑니다.",
+          "fetch": 5
+        },
+        {
+          "type": "bounce",
+          "news_id": 233421,
+          "reason": "반도체 장비 투자와 관련 없는 금융 정보 뉴스",
+          "fetch": 5
+        },
+        {
+          "type": "next",
+          "reason": "반도체 관련 뉴스가 아직 안 보이는 것 같다.",
+          "fetch": 5
+        },
+        {
+          "type": "select",
+          "reason": "삼성의 지속가능성 노력에 대한 내용은 반도체 산업의 트렌드를 파악하는데 도움이 될 수 있다고 생각한다.",
+          "fetch": 6
+        },
+        {
+          "type": "bounce",
+          "news_id": 233406,
+          "reason": "반도체 장비 투자와 직접적인 관련이 없는 환경 관련 뉴스",
+          "fetch": 6
+        },
+        {
+          "type": "select",
+          "reason": "크래프톤이 한화에어로와 AI 기술 동맹을 맺었다는 소식은 기술 발전 방향과 투자 가능성을 엿볼 수 있게 한다.",
+          "fetch": 6
+        },
+        {
+          "type": "bounce",
+          "news_id": 233393,
+          "reason": "반도체 장비 투자와 관련 없는 내용이므로 바로 나갑니다.",
+          "fetch": 6
+        },
+        {
+          "type": "select",
+          "reason": "RFHIC 주식 매도 관련 뉴스이고, 관심 종목과 연관되어 있어 확인해보고 싶다.",
+          "fetch": 6
+        },
+        {
+          "type": "bounce",
+          "news_id": 233384,
+          "reason": "RFHIC는 관심 종목이 아니고, 경영진 주식 매도는 투자 판단에 직접적인 영향을 주지 않는다고 판단됨.",
+          "fetch": 6
+        },
+        {
+          "type": "select",
+          "reason": "미국 사모대출 시장의 거품 붕괴 가능성이 반도체 장비 투자 환경에 영향을 줄 수 있는지 확인하고 싶다.",
+          "fetch": 6
+        },
+        {
+          "type": "bounce",
+          "news_id": 233403,
+          "reason": "미국 사모대출 시장 관련 뉴스는 반도체 투자와 직접적인 관련성이 낮다고 판단되어 넘어갑니다.",
+          "fetch": 6
+        },
+        {
+          "type": "select",
+          "reason": "메모리 가격 상승이 스마트폰 시장에 미치는 영향과, 갤S26 가격 인상에 따른 외산폰의 틈새 시장 공략에 대한 내용이 반도체 시장 투자에 참고가 될 수 있을 것 같아서.",
+          "fetch": 6
+        },
+        {
+          "type": "bounce",
+          "news_id": 233401,
+          "reason": "반도체 장비 투자자로서 스마트폰 시장 경쟁 관련 뉴스는 투자 결정에 직접적인 영향을 주지 않아 관심도가 낮음.",
+          "fetch": 6
+        },
+        {
+          "type": "next",
+          "reason": "반도체 관련 뉴스가 보이지 않음.",
+          "fetch": 6
+        }
+      ],
+      "next_count": 6,
+      "total_served": 120,
+      "exit_reason": "",
+      "evaluation": {
+        "satisfaction": 2,
+        "freshness": 2,
+        "relevance": 1,
+        "diversity": 4,
+        "comment": "반도체 장비 투자자로서 관심있는 뉴스가 거의 없어 아쉬움. 그나마 RFHIC 관련 뉴스가 있었지만, 직접적인 투자 관심 종목 뉴스는 없었음."
+      },
+      "total_session_time_sec": 209.37
+    }
+  ]
+}

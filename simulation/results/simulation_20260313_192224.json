@@ -1,0 +1,337 @@
+{
+  "simulation_id": "20260313_192224",
+  "run_at": "2026-03-13T19:22:24.709551",
+  "elapsed_sec": 73.99,
+  "total_personas": 1,
+  "success_count": 1,
+  "summary": {
+    "total_served": 140,
+    "total_clicks": 3,
+    "ctr": 0.0214,
+    "avg_satisfaction": 1.0,
+    "avg_freshness": 2.0,
+    "avg_relevance": 1.0,
+    "avg_diversity": 3.0
+  },
+  "results": [
+    {
+      "persona_id": "9001",
+      "persona_name": "반도체 장비 투자자 지훈",
+      "google_id": "test02",
+      "email": "test02@test.com",
+      "user_id": null,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0MDIiLCJleHAiOjE3NzU5ODM3MDF9.j7xYj2iP38MgjnOrKl3dyADx7JYu-S_VOZmsEPSWrZI",
+      "context": {
+        "attitude": "무관심",
+        "time_slot": "출근 전 아침",
+        "time_slot_description": "시간이 없어 빠르게 훑어봄. 핵심만 확인.",
+        "condition": "약간 피곤함. 흥미로운 뉴스만 읽을 것 같음.",
+        "fatigue": 0,
+        "random_seed": 4925
+      },
+      "app_session_id": "sim-app-9001-7efab93d",
+      "screen_session_id": "sim-screen-9001-bd7e8aa8",
+      "served_news": [
+        {
+          "fetch": 1,
+          "request_id": "sim-req-9001-264a4c86",
+          "source": "mock",
+          "news_ids": [
+            233692,
+            233690,
+            233689,
+            233688,
+            233687,
+            233686,
+            233685,
+            233682,
+            233680,
+            233679,
+            233678,
+            233677,
+            233676,
+            233675,
+            233674,
+            233673,
+            233672,
+            233671,
+            233670,
+            233669
+          ]
+        },
+        {
+          "fetch": 2,
+          "request_id": "sim-req-9001-98d451eb",
+          "source": "mock",
+          "news_ids": [
+            233668,
+            233667,
+            233666,
+            233665,
+            233663,
+            233659,
+            233658,
+            233657,
+            233654,
+            233653,
+            233652,
+            233651,
+            233650,
+            233648,
+            233646,
+            233645,
+            233644,
+            233639,
+            233637,
+            233635
+          ]
+        },
+        {
+          "fetch": 3,
+          "request_id": "sim-req-9001-beb2c661",
+          "source": "mock",
+          "news_ids": [
+            233633,
+            233632,
+            233629,
+            233628,
+            233627,
+            233626,
+            233623,
+            233621,
+            233620,
+            233619,
+            233618,
+            233616,
+            233615,
+            233614,
+            233611,
+            233607,
+            233604,
+            233603,
+            233599,
+            233594
+          ]
+        },
+        {
+          "fetch": 4,
+          "request_id": "sim-req-9001-e661058d",
+          "source": "mock",
+          "news_ids": [
+            233593,
+            233592,
+            233591,
+            233590,
+            233589,
+            233587,
+            233586,
+            233585,
+            233583,
+            233582,
+            233581,
+            233580,
+            233579,
+            233578,
+            233577,
+            233576,
+            233575,
+            233574,
+            233573,
+            233572
+          ]
+        },
+        {
+          "fetch": 5,
+          "request_id": "sim-req-9001-7f9bdbe3",
+          "source": "mock",
+          "news_ids": [
+            233567,
+            233566,
+            233565,
+            233562,
+            233561,
+            233559,
+            233558,
+            233557,
+            233556,
+            233555,
+            233553,
+            233552,
+            233550,
+            233549,
+            233548,
+            233546,
+            233545,
+            233544,
+            233543,
+            233542
+          ]
+        },
+        {
+          "fetch": 6,
+          "request_id": "sim-req-9001-5b266d0f",
+          "source": "mock",
+          "news_ids": [
+            233541,
+            233539,
+            233538,
+            233537,
+            233536,
+            233533,
+            233532,
+            233531,
+            233530,
+            233528,
+            233526,
+            233524,
+            233522,
+            233521,
+            233517,
+            233514,
+            233513,
+            233512,
+            233511,
+            233510
+          ]
+        },
+        {
+          "fetch": 7,
+          "request_id": "sim-req-9001-153ef385",
+          "source": "mock",
+          "news_ids": [
+            233509,
+            233508,
+            233507,
+            233506,
+            233505,
+            233503,
+            233501,
+            233500,
+            233499,
+            233498,
+            233497,
+            233496,
+            233494,
+            233493,
+            233492,
+            233490,
+            233488,
+            233487,
+            233486,
+            233481
+          ]
+        }
+      ],
+      "read_articles": [
+        {
+          "news_id": 233645,
+          "title": "“월급 안 받는 시장 나온다고?”~이호균, 1000억 펀드·5성급 호텔 약속에 목포 민심 ‘들썩’",
+          "url": "https://www.wikitree.co.kr/articles/1124781",
+          "dwell_time_sec": 7.79,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "반도체 투자와 관련 없는 정치 뉴스라서 흥미가 없음."
+        },
+        {
+          "news_id": 233544,
+          "title": "그룹아이비, 공급망 공격 위협 고도화…\"사이버범죄, 암묵적 규칙도 깨...",
+          "url": "https://www.epnc.co.kr/news/articleView.html?idxno=329830",
+          "dwell_time_sec": 7.66,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "반도체 장비 투자와 직접적인 관련이 없어 보임."
+        },
+        {
+          "news_id": 233506,
+          "title": "코스피, 유가 충격에 1.7% 하락… 5480선 후퇴",
+          "url": "https://it.chosun.com/news/articleView.html?idxno=2023092158600",
+          "dwell_time_sec": 7.75,
+          "read_type": "bounce",
+          "after_action": "back",
+          "after_reason": "유가 관련 뉴스는 반도체 장비 투자와 직접적인 관련이 없다고 판단되어 흥미가 떨어짐."
+        }
+      ],
+      "actions": [
+        {
+          "type": "next",
+          "reason": "오늘은 특별히 눈에 띄는 뉴스가 없네요. 다음 페이지를 보겠습니다.",
+          "fetch": 1
+        },
+        {
+          "type": "select",
+          "reason": "한화에어로스페이스 호주 방산 생산기지 설립. 장비 섹터에 긍정적 영향 기대",
+          "fetch": 2
+        },
+        {
+          "type": "bounce",
+          "news_id": 233645,
+          "reason": "반도체 투자와 관련 없는 정치 뉴스라서 흥미가 없음.",
+          "fetch": 2
+        },
+        {
+          "type": "next",
+          "reason": "유효하지 않은 news_id 반환 (id=233615)",
+          "fetch": 2
+        },
+        {
+          "type": "next",
+          "reason": "관심있는 뉴스는 없지만, 혹시나 다음 페이지에 반도체 관련 뉴스가 있을까 싶어 더 봅니다.",
+          "fetch": 3
+        },
+        {
+          "type": "next",
+          "reason": "관심가는 뉴스가 없습니다.",
+          "fetch": 4
+        },
+        {
+          "type": "select",
+          "reason": "공급망 공격 위협 고도화. 반도체 장비도 공급망에 속하므로 관련 리스크 확인 필요.",
+          "fetch": 5
+        },
+        {
+          "type": "bounce",
+          "news_id": 233544,
+          "reason": "반도체 장비 투자와 직접적인 관련이 없어 보임.",
+          "fetch": 5
+        },
+        {
+          "type": "next",
+          "reason": "반도체 관련 뉴스는 없지만, 흥미로운 기사가 있을 수도 있으니 다음 페이지를 확인해본다.",
+          "fetch": 5
+        },
+        {
+          "type": "next",
+          "reason": "아직 흥미로운 뉴스가 없다.",
+          "fetch": 6
+        },
+        {
+          "type": "select",
+          "reason": "코스피 하락에 삼성전자, SK하이닉스 약세. 반도체 투자자로서 확인해야 할 내용.",
+          "fetch": 7
+        },
+        {
+          "type": "bounce",
+          "news_id": 233506,
+          "reason": "유가 관련 뉴스는 반도체 장비 투자와 직접적인 관련이 없다고 판단되어 흥미가 떨어짐.",
+          "fetch": 7
+        },
+        {
+          "type": "exit",
+          "reason": "아침에 시간이 없고, 흥미로운 뉴스가 없다.",
+          "fetch": 7
+        }
+      ],
+      "next_count": 6,
+      "total_served": 140,
+      "exit_reason": "아침에 시간이 없고, 흥미로운 뉴스가 없다.",
+      "evaluation": {
+        "satisfaction": 1,
+        "freshness": 2,
+        "relevance": 1,
+        "diversity": 3,
+        "comment": "반도체 투자자인 제게 전혀 관련 없는 뉴스만 추천해서 시간 낭비였습니다."
+      },
+      "total_session_time_sec": 73.99
+    }
+  ]
+}
