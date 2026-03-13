@@ -18,10 +18,15 @@ API 엔드포인트:
 """
 
 import html
+import json
+import base64
+import binascii
+from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import IntegrityError
 from typing import Optional
 from datetime import datetime, timezone
 from google import genai
@@ -29,9 +34,28 @@ from google.genai import types
 import logging
 
 from app.database import get_db
-from app.models import NaverNews, CrawledNews, ProcessStatus, StockSummaryCache, NewsStockMapping, FilteredNews
-from app.schemas import NewsSimpleResponse, NewsListResponse, NewsDetailResponse, StockSummaryResponse
+from app.models import (
+    NaverNews,
+    CrawledNews,
+    ProcessStatus,
+    StockSummaryCache,
+    NewsStockMapping,
+    FilteredNews,
+    RecommendationServe,
+    User,
+)
+from app.schemas import (
+    NewsSimpleResponse,
+    NewsListResponse,
+    NewsDetailResponse,
+    StockSummaryResponse,
+    NewsRecommendationItem,
+    NewsRecommendationResponse,
+)
 from app.config import get_settings
+from app.kis.errors import KISError
+from app.recommender.client import RecommendationClient, RecommendationCandidate, RecommendationResult
+from app.routers.users import get_current_user
 
 
 router = APIRouter(
@@ -42,6 +66,9 @@ router = APIRouter(
 settings = get_settings()
 logger = logging.getLogger(__name__)
 gemini_client = genai.Client(api_key=settings.gemini_api)
+recommendation_client = RecommendationClient(settings)
+_CURSOR_VERSION = 1
+_RECOMMENDATION_PAGE_SIZE = 20
 
 # =============================================================================
 # 헬퍼 함수
@@ -67,6 +94,70 @@ def decode_html_entities(text: Optional[str]) -> Optional[str]:
     if text is None:
         return None
     return html.unescape(text)
+
+
+def _encode_recommendation_cursor(*, page: int, offset: int, limit: int) -> str:
+    payload = {
+        "v": _CURSOR_VERSION,
+        "page": page,
+        "offset": offset,
+        "limit": limit,
+    }
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii")
+
+
+def _decode_recommendation_cursor(cursor: str) -> tuple[int, int, int | None]:
+    try:
+        raw = base64.urlsafe_b64decode(cursor.encode("ascii"))
+        payload = json.loads(raw.decode("utf-8"))
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="Invalid cursor format")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Invalid cursor payload")
+
+    if payload.get("v") != _CURSOR_VERSION:
+        raise HTTPException(status_code=400, detail="Unsupported cursor version")
+
+    try:
+        page = int(payload.get("page"))
+        offset = int(payload.get("offset"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid cursor values")
+
+    if page < 1 or offset < 0:
+        raise HTTPException(status_code=400, detail="Invalid cursor values")
+
+    raw_limit = payload.get("limit")
+    cursor_limit: int | None = None
+    if raw_limit is not None:
+        try:
+            cursor_limit = int(raw_limit)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Invalid cursor values")
+        if cursor_limit < 1:
+            raise HTTPException(status_code=400, detail="Invalid cursor values")
+
+    return page, offset, cursor_limit
+
+
+def _try_decode_recommendation_cursor(cursor: str | None) -> tuple[int, int, int | None] | None:
+    if not cursor:
+        return None
+    try:
+        return _decode_recommendation_cursor(cursor)
+    except HTTPException:
+        return None
+
+
+def _default_recommendation_path(source: str) -> str:
+    path_map = {
+        "recommender": "A1",
+        "mock": "M1",
+        "mock_fallback": "M2",
+    }
+    return path_map.get(source, "UNK")
 
 # 새로운 요약문을 생성하는 함수
 async def call_gemini_summary(stock_name, num_article, text_combined):
@@ -181,6 +272,333 @@ async def get_news_simple_list(
         )
     
     return response_list
+
+
+async def _load_news_by_ids(
+    db: AsyncSession,
+    candidates: list[RecommendationCandidate],
+    source: str,
+) -> list[NewsRecommendationItem]:
+    """
+    추천 서버가 반환한 news_id 목록을 DB에서 조회해 프론트 응답 형태로 변환합니다.
+    """
+    if not candidates:
+        return []
+
+    candidate_map = {candidate.news_id: candidate for candidate in candidates}
+    news_ids = list(candidate_map.keys())
+
+    query = (
+        select(NaverNews)
+        .where(NaverNews.news_id.in_(news_ids))
+    )
+    result = await db.execute(query)
+    rows = result.scalars().unique().all()
+    row_map = {row.news_id: row for row in rows}
+
+    summary_result = await db.execute(
+        select(FilteredNews.news_id, FilteredNews.summary).where(FilteredNews.news_id.in_(news_ids))
+    )
+    summary_map = {news_id: summary for news_id, summary in summary_result.all()}
+
+    response_items: list[NewsRecommendationItem] = []
+    for news_id in news_ids:
+        news = row_map.get(news_id)
+        if not news:
+            continue
+
+        summary = decode_html_entities(summary_map.get(news_id))
+        candidate = candidate_map[news_id]
+        response_items.append(
+            NewsRecommendationItem(
+                news_id=news.news_id,
+                title=decode_html_entities(news.title),
+                summary=summary,
+                pub_date=news.pub_date,
+                path=candidate.path or _default_recommendation_path(source),
+            )
+        )
+
+    return response_items
+
+
+async def _mock_candidates_from_db(db: AsyncSession, limit: int) -> list[RecommendationCandidate]:
+    """
+    추천 서버가 준비되지 않은 동안 사용할 DB 기반 목업 추천 결과입니다.
+    """
+    return await _mock_candidates_from_db_with_offset(db=db, limit=limit, offset=0)
+
+
+async def _mock_candidates_from_db_with_offset(
+    db: AsyncSession,
+    limit: int,
+    offset: int,
+) -> list[RecommendationCandidate]:
+    """
+    무한 스크롤 구현을 위해 offset 기반 목업 추천 결과를 반환합니다.
+    """
+    query = (
+        select(FilteredNews.news_id)
+        .where(
+            FilteredNews.summary.is_not(None),
+            FilteredNews.summary != "",
+        )
+        .order_by(desc(FilteredNews.created_at), desc(FilteredNews.news_id))
+        .offset(offset)
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    rows = result.scalars().all()
+    return [RecommendationCandidate(news_id=int(news_id)) for news_id in rows]
+
+
+async def _log_recommendation_serve(
+    db: AsyncSession,
+    user_id: int,
+    request_id: str,
+    page: int,
+    limit: int,
+    screen_session_id: str | None,
+    app_session_id: str | None,
+    source: str,
+    candidates: list[RecommendationCandidate],
+) -> bool:
+    """
+    추천 목록 응답(요청 단위 + 아이템 목록)을 저장합니다.
+    같은 request_id/page 조합은 중복 저장하지 않습니다.
+    """
+    base_position = (page - 1) * limit
+    served_items = []
+    for idx, candidate in enumerate(candidates, start=1):
+        served_items.append(
+            {
+                "news_id": candidate.news_id,
+                "position": base_position + idx,
+                "path": candidate.path or _default_recommendation_path(source),
+            }
+        )
+
+    serve = RecommendationServe(
+        request_id=request_id,
+        user_id=user_id,
+        screen_session_id=screen_session_id,
+        app_session_id=app_session_id,
+        source=source,
+        page=page,
+        limit=limit,
+        served_count=len(candidates),
+        is_mock=source.startswith("mock"),
+        served_items=served_items,
+    )
+    db.add(serve)
+    try:
+        await db.commit()
+        return True
+    except IntegrityError as exc:
+        await db.rollback()
+        error_text = str(getattr(exc, "orig", exc)).lower()
+        is_request_page_duplicate = (
+            ("unique" in error_text or "duplicate" in error_text)
+            and (
+                "uq_recommendation_serves_request_page" in error_text
+                or (
+                    "recommendation_serves" in error_text
+                    and "request_id" in error_text
+                    and "page" in error_text
+                )
+            )
+        )
+        if is_request_page_duplicate:
+            logger.info(
+                "recommendation serve duplicate skipped: request_id=%s page=%s err=%s",
+                request_id,
+                page,
+                exc,
+            )
+            return False
+        raise
+
+
+async def _load_recommendation_items_with_topup(
+    db: AsyncSession,
+    candidates: list[RecommendationCandidate],
+    source: str,
+    limit: int,
+) -> tuple[list[NewsRecommendationItem], list[RecommendationCandidate]]:
+    """누락된 뉴스 행이 있을 때 다음 후보로 응답 개수를 보충한다."""
+    if not candidates or limit <= 0:
+        return [], []
+
+    loaded_items: list[NewsRecommendationItem] = []
+    loaded_candidates: list[RecommendationCandidate] = []
+    loaded_ids: set[int] = set()
+    start = 0
+
+    while start < len(candidates) and len(loaded_items) < limit:
+        batch = candidates[start : start + limit]
+        start += len(batch)
+        batch_items = await _load_news_by_ids(db, batch, source=source)
+        if not batch_items:
+            continue
+
+        candidate_by_id = {candidate.news_id: candidate for candidate in batch}
+        for item in batch_items:
+            if item.news_id in loaded_ids:
+                continue
+            candidate = candidate_by_id.get(item.news_id)
+            if candidate is None:
+                continue
+            loaded_ids.add(item.news_id)
+            loaded_items.append(item)
+            loaded_candidates.append(candidate)
+            if len(loaded_items) >= limit:
+                break
+
+    return loaded_items, loaded_candidates
+
+
+@router.get("/recommendations", response_model=NewsRecommendationResponse)
+async def get_news_recommendations(
+    user_id: Optional[int] = Query(None, ge=1, description="호환용 사용자 ID(토큰 사용자와 같아야 함)"),
+    limit: int = Query(20, ge=1, le=100, description="호환용 파라미터(서버는 항상 20개 고정 반환)"),
+    page: int = Query(1, ge=1, le=1000, description="무한 스크롤 페이지 (1부터 시작)"),
+    cursor: Optional[str] = Query(None, max_length=512, description="다음 페이지 커서 (전달 시 page보다 우선)"),
+    request_id: Optional[str] = Query(None, max_length=128, description="추천 요청 추적 ID (미전달 시 서버 생성)"),
+    screen_session_id: Optional[str] = Query(None, max_length=64, description="추천 화면 세션 ID"),
+    app_session_id: Optional[str] = Query(None, max_length=255, description="앱 세션 ID"),
+    log_served: bool = Query(True, description="추천 응답을 DB 로깅할지 여부"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    추천 시스템 서버와 연동해 사용자 맞춤 뉴스 추천 목록을 반환합니다.
+
+    - RECOMMENDER_MOCK_MODE=true: 외부 서버 대신 DB 기반 mock 추천 사용
+    - RECOMMENDER_MOCK_MODE=false: 외부 추천 서버 호출
+    - cursor 전달 시 page 대신 cursor 기반으로 다음 구간 조회
+    - cursor 전달 시 추천 서버가 지원하는 next_cursor 연동을 그대로 사용
+    - 반환 개수는 클라이언트 limit과 무관하게 항상 20개로 고정
+    """
+    if user_id is not None and user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="user_id does not match authenticated user")
+
+    resolved_user_id = current_user.id
+    effective_limit = _RECOMMENDATION_PAGE_SIZE
+    resolved_request_id = request_id
+    resolved_page = page
+    offset = (resolved_page - 1) * effective_limit
+    decoded_cursor = _try_decode_recommendation_cursor(cursor)
+    if settings.recommender_mock_mode and cursor and decoded_cursor is None:
+        raise HTTPException(status_code=400, detail="Invalid cursor format")
+    if decoded_cursor is not None:
+        resolved_page, offset, cursor_limit = decoded_cursor
+        if cursor_limit is not None and cursor_limit != effective_limit:
+            raise HTTPException(status_code=400, detail="Unsupported cursor limit")
+
+    source = "recommender"
+    candidates: list[RecommendationCandidate] = []
+    recommender_next_cursor: str | None = None
+
+    # source 값은 추천 결과의 출처를 분석/디버깅할 때 그대로 사용됩니다.
+    # - mock: 강제 목업 모드
+    # - mock_fallback: 외부 추천 실패/빈 결과 시 자동 대체
+    # - recommender: 외부 추천 서버 정상 결과
+    if settings.recommender_mock_mode:
+        source = "mock"
+        candidates = await _mock_candidates_from_db_with_offset(
+            db=db,
+            limit=effective_limit,
+            offset=offset,
+        )
+    else:
+        if cursor is None and page > 1:
+            raise HTTPException(
+                status_code=400,
+                detail="page>1 requires cursor when recommender_mock_mode is false",
+            )
+        try:
+            result: RecommendationResult = await recommendation_client.get_news_candidates(
+                user_id=resolved_user_id,
+                limit=effective_limit,
+                cursor=cursor,
+            )
+            candidates = result.items
+            recommender_next_cursor = result.next_cursor
+            if not resolved_request_id and result.request_id:
+                resolved_request_id = result.request_id
+        except KISError as exc:
+            logger.warning("추천 서버 호출 실패: %s", exc)
+            candidates = []
+            recommender_next_cursor = None
+        except Exception:
+            logger.exception("추천 서버 응답 정규화 실패")
+            candidates = []
+            recommender_next_cursor = None
+
+        if not candidates:
+            source = "mock_fallback"
+            candidates = await _mock_candidates_from_db_with_offset(
+                db=db,
+                limit=effective_limit,
+                offset=offset,
+            )
+
+    if not resolved_request_id:
+        resolved_request_id = f"req-{uuid4().hex}"
+
+    items, served_candidates = await _load_recommendation_items_with_topup(
+        db=db,
+        candidates=candidates,
+        source=source,
+        limit=effective_limit,
+    )
+    logged = False
+    if log_served:
+        try:
+            logged = await _log_recommendation_serve(
+                db=db,
+                user_id=resolved_user_id,
+                request_id=resolved_request_id,
+                page=resolved_page,
+                limit=effective_limit,
+                screen_session_id=screen_session_id,
+                app_session_id=app_session_id,
+                source=source,
+                candidates=served_candidates,
+            )
+        except Exception as exc:
+            await db.rollback()
+            logger.warning(
+                "recommendation serve logging failed: user_id=%s request_id=%s page=%s limit=%s source=%s err=%s",
+                resolved_user_id,
+                resolved_request_id,
+                resolved_page,
+                effective_limit,
+                source,
+                exc,
+            )
+            logged = False
+
+    next_cursor: Optional[str] = None
+    if source == "recommender":
+        next_cursor = recommender_next_cursor
+    elif len(items) == effective_limit:
+        next_cursor = _encode_recommendation_cursor(
+            page=resolved_page + 1,
+            offset=offset + len(items),
+            limit=effective_limit,
+        )
+
+    return NewsRecommendationResponse(
+        user_id=resolved_user_id,
+        request_id=resolved_request_id,
+        source=source,
+        page=resolved_page,
+        next_cursor=next_cursor,
+        served_count=len(items),
+        logged=logged,
+        items=items,
+    )
 
 
 # =============================================================================

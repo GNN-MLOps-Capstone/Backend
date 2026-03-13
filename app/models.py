@@ -16,7 +16,20 @@
 """
 
 import enum
-from sqlalchemy import Column, BigInteger, String, Text, DateTime, Integer, ForeignKey, Float, Boolean, Time, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    BigInteger,
+    String,
+    Text,
+    DateTime,
+    Integer,
+    ForeignKey,
+    Float,
+    Boolean,
+    Time,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -44,11 +57,31 @@ class ProcessStatus(enum.Enum):
     crawl_skipped = "crawl_skipped"
 
 
+class InteractionEventType(str, enum.Enum):
+    """상호작용 이벤트 타입"""
+    screen_view = "screen_view"
+    screen_heartbeat = "screen_heartbeat"
+    screen_leave = "screen_leave"
+    content_open = "content_open"
+    content_heartbeat = "content_heartbeat"
+    content_leave = "content_leave"
+    recommendation_request = "recommendation_request"
+    recommendation_response = "recommendation_response"
+    recommendation_impression = "recommendation_impression"
+    scroll_depth = "scroll_depth"
+
+
 # PostgreSQL에 이미 존재하는 enum 타입과 연결 (create_type=False)
 ProcessStatusEnum = PG_ENUM(
     ProcessStatus,
     name='process_status_enum',
     create_type=False,  # DB에 이미 존재하므로 생성하지 않음
+)
+
+InteractionEventTypeEnum = PG_ENUM(
+    InteractionEventType,
+    name="interaction_event_type_enum",
+    create_type=False,
 )
 
 
@@ -154,6 +187,7 @@ class User(Base):
 
     settings = relationship("UserSettings",back_populates="user",uselist=False,cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    watchlist_items = relationship("Watchlist", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, name={self.nickname})>"
@@ -281,7 +315,55 @@ class Watchlist(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     stock = relationship("Stock", back_populates="watchlist_items")
-    user = relationship("User")
+    user = relationship("User", back_populates="watchlist_items")
 
     def __repr__(self):
         return f"<Watchlist(id={self.id}, user_id={self.user_id}, stock_id={self.stock_id})>"
+
+
+class InteractionEvent(Base):
+    """
+    추천/콘텐츠 상호작용 원본 이벤트 로그 (append-only)
+    """
+
+    __tablename__ = "interaction_events"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    event_id = Column(String(64), unique=True, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    device_id = Column(String(255), nullable=True)
+    app_session_id = Column(String(255), nullable=True, index=True)
+    event_type = Column(InteractionEventTypeEnum, nullable=False, index=True)
+    screen_session_id = Column(String(64), nullable=True, index=True)
+    content_session_id = Column(String(64), nullable=True, index=True)
+    news_id = Column(BigInteger, nullable=True, index=True)
+    request_id = Column(String(128), nullable=True, index=True)
+    position = Column(Integer, nullable=True)
+    page = Column(Integer, nullable=True)
+    scroll_depth = Column(Float, nullable=True)
+    event_ts_client = Column(DateTime(timezone=True), nullable=True)
+    event_ts_server = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class RecommendationServe(Base):
+    """
+    추천 목록 응답 단위 로그
+    """
+
+    __tablename__ = "recommendation_serves"
+    __table_args__ = (
+        UniqueConstraint("request_id", "page", name="uq_recommendation_serves_request_page"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(String(128), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    screen_session_id = Column(String(64), nullable=True, index=True)
+    app_session_id = Column(String(255), nullable=True, index=True)
+    source = Column(String(50), nullable=False)
+    page = Column(Integer, nullable=False, default=1)
+    limit = Column(Integer, nullable=False)
+    served_count = Column(Integer, nullable=False, default=0)
+    is_mock = Column(Boolean, nullable=False, default=False)
+    served_items = Column(JSONB, nullable=False, default=list)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
