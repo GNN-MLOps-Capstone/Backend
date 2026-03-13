@@ -86,7 +86,8 @@ async def get_watchlist(
     ai_tasks_payload = []
     for item in watchlist_items:
         s_id = item.stock_id
-        s_name = stock_map[s_id].stock_name if s_id in stock_map else s_id
+        stock_row = stock_map.get(s_id)
+        s_name = (stock_row.stock_name if stock_row else None) or s_id
         
         # 캐시 및 최신 뉴스 ID 확인
         cache_stmt = select(StockSummaryCache).where(StockSummaryCache.stock_id == s_id)
@@ -141,11 +142,16 @@ async def get_watchlist(
         gemini_results = await asyncio.gather(*[
             call_gemini_summary(p["stock_name"], p["news_count"], p["combined_text"])
             for p in ai_tasks_payload
-        ])
+        ], return_exceptions=True)
 
         # ai 결과를 db에 저장
         for payload, new_summary in zip(ai_tasks_payload, gemini_results, strict=False):
             s_id = payload["stock_id"]
+
+            if isinstance(new_summary, Exception):
+                logger.warning("요약 생성 실패(stock_id=%s): %s", s_id, new_summary)
+                summary_map[s_id] = payload["cached_summary"] or "요약 생성에 실패했습니다."
+                continue
             
             if new_summary:
                 summary_map[s_id] = new_summary
@@ -416,9 +422,9 @@ async def get_watchlist_briefing(
         stock_name = issue.stock_name
         try:
             stock_id_result = await db.execute(
-                select(Stock.stock_id).where(Stock.stock_name == stock_name)
+                select(Stock.stock_id).where(Stock.stock_name == stock_name).limit(1)
             )
-            stock_id = stock_id_result.scalar_one_or_none()
+            stock_id = stock_id_result.scalar()
             if not stock_id:
                 logger.warning("종목 ID 조회 실패, 건너뜀: %s", stock_name)
                 continue

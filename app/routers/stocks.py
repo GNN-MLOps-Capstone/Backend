@@ -1195,6 +1195,8 @@ async def read_ai_trends(
         async def _fetch_overview_safe(code: str) -> dict | None:
             try:
                 return await get_stock_overview(code)
+            except (HTTPException, KISError):
+                raise
             except Exception as e:
                 logger.warning("overview fetch failed for %s: %s", code, e)
                 return None
@@ -1227,8 +1229,13 @@ async def read_ai_trends(
  
         return results
  
+    except HTTPException:
+        raise
+    except KISError as e:
+        _raise_kis_http_error(e)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        logger.exception("read_ai_trends 실패")
+        raise HTTPException(status_code=500, detail="Internal Server Error") from e
 
 async def get_stock_weather(
     db: AsyncSession,
@@ -1308,8 +1315,8 @@ async def get_stock_weather(
             overview = transform_overview(data, stock_id)
             await cache.set(f"overview:{stock_id}", overview, ttl_seconds=3)
         change_rate = overview.get("change_rate")
-    except Exception as e:
-        logger.warning("get_stock_weather: overview fetch failed for %s: %s", stock_id, e)
+    except KISError as e:
+        _raise_kis_http_error(e)
  
     return get_weather(change_rate, avg_sentiment)
  
