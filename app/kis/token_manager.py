@@ -53,9 +53,9 @@ class TokenManager:
             cls._expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
             return token
 
-    _RETRYABLE_TOKEN_STATUS = frozenset({403, 429, 500, 502, 503})
-    _TOKEN_MAX_RETRIES = 3
-    _TOKEN_BACKOFF_SECONDS = 0.5
+    _RETRYABLE_TOKEN_STATUS: frozenset[int] = frozenset({403, 429, 500, 502, 503})
+    _TOKEN_MAX_RETRIES: int = 3
+    _TOKEN_BACKOFF_SECONDS: float = 0.5
 
     @classmethod
     async def _issue_token(cls, settings: Settings) -> Tuple[str, int]:
