@@ -122,6 +122,8 @@ class Settings(BaseSettings):
     secret_key: str = Field(..., env="SECRET_KEY")
     algorithm: str = Field(..., env="ALGORITHM")
     access_token_expire_minutes: int = 43200
+    google_client_id: str = Field(..., env="GOOGLE_CLIENT_ID")
+    dev_bypass_login: bool = False
 
     @model_validator(mode="after")
     def _validate_kis_fields(self) -> "Settings":

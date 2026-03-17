@@ -217,6 +217,7 @@ async def call_gemini_summary(stock_name, num_article, text_combined):
 async def get_news_simple_list(
     limit: int = Query(20, ge=1, le=100, description="가져올 뉴스 개수 (기본 20개)"),
     search: Optional[str] = Query(None, description="검색어 (제목에서 검색)"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -610,6 +611,7 @@ async def get_news_recommendations(
 @router.get("/{news_id}", response_model=NewsDetailResponse)
 async def get_news_detail(
     news_id: int,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -656,6 +658,7 @@ async def get_news_detail(
 #
 @router.get("/stats/summary")
 async def get_news_stats(
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -687,6 +690,7 @@ async def get_news_stats(
 @router.get("/summary/{stock_name}", response_model=StockSummaryResponse)
 async def get_stock_summary(
     stock_name: str,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """

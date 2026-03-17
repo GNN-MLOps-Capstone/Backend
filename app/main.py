@@ -34,6 +34,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, status  # 웹 프레임워크
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어
+from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings  # 설정 가져오기
 from app.database import ensure_interaction_tables, init_db  # DB 초기화 함수
@@ -184,6 +185,10 @@ app.add_middleware(
     #
     allow_headers=["*"],
 )
+
+docs_dir = Path(__file__).resolve().parent.parent / "docs"
+if docs_dir.exists():
+    app.mount("/static", StaticFiles(directory=docs_dir), name="static")
 
 
 # =============================================================================
