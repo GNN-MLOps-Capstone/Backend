@@ -320,6 +320,7 @@ POST /api/interactions/events
 - 추천 스크롤: `scroll_depth`
 
 현재 운영 가이드 기준으로는 추천 목록 노출은 `recommendation_serves`로 판단하므로 `recommendation_impression`은 기본적으로 사용하지 않습니다.
+또한 추천 화면 진입 이벤트인 `screen_view`에는 `request_id`를 반드시 포함해야 합니다.
 
 예시:
 
@@ -377,9 +378,10 @@ curl -X POST "http://localhost:8000/api/interactions/events" \
 - `recommendation_serves`: 요청 단위(요청 ID, 페이지, source, served_count, `served_items`)
 - `interaction_events`: 추천 요청/응답/스크롤/콘텐츠 이벤트 원본 로그
 
-현재 운영 권장안:
+현재 운영 규칙:
+- `screen_view`에는 `request_id`를 반드시 포함
 - `content_open`에는 `request_id`와 `news_id`를 반드시 포함
-- `content_leave`에도 같은 `news_id`를 함께 포함
+- `content_heartbeat`, `content_leave`에도 같은 `news_id`를 반드시 포함
 
 `POST /api/interactions/events` 응답 필드:
 - `accepted`: 저장된 이벤트 수

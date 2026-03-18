@@ -85,6 +85,9 @@ async def ingest_interaction_events(
         if item.event_type in _SCREEN_START | _SCREEN_HEARTBEAT | _SCREEN_END:
             if not item.screen_session_id:
                 raise HTTPException(status_code=400, detail=f"{item.event_type} requires screen_session_id")
+        if item.event_type in _SCREEN_START:
+            if not item.request_id:
+                raise HTTPException(status_code=400, detail="screen_view requires request_id")
         if item.event_type in _RECOMMEND_IMPRESSION:
             if not item.request_id:
                 raise HTTPException(status_code=400, detail=f"{item.event_type} requires request_id")
@@ -104,6 +107,8 @@ async def ingest_interaction_events(
         if item.event_type in _CONTENT_HEARTBEAT | _CONTENT_END:
             if not item.content_session_id:
                 raise HTTPException(status_code=400, detail=f"{item.event_type} requires content_session_id")
+            if item.news_id is None:
+                raise HTTPException(status_code=400, detail=f"{item.event_type} requires news_id")
         if item.event_type in _SCROLL:
             if not item.screen_session_id:
                 raise HTTPException(status_code=400, detail=f"{item.event_type} requires screen_session_id")
