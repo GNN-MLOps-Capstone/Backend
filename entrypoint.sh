@@ -15,6 +15,12 @@ echo "Starting News API..."
 MASKED_URL=$(echo "$DATABASE_URL" | sed 's|://[^:]*:[^@]*@|://****:****@|')
 echo "Database: $MASKED_URL"
 
+# 명시적으로 요청된 경우에만 마이그레이션 실행
+if [ "${MIGRATE_ON_STARTUP:-false}" = "true" ]; then
+  echo "Running Alembic migrations..."
+  alembic -c alembic.ini upgrade head
+fi
+
 # -----------------------------------------------------------------------------
 # 서버 시작
 # -----------------------------------------------------------------------------

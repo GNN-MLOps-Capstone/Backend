@@ -13,10 +13,13 @@ API 스키마 정의 (schemas.py)
 ==============================================================================
 """
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime,time
 import re
+from enum import Enum
+
+from app.models import InteractionEventType
 
 class NewsSimpleResponse(BaseModel):
     """
@@ -76,6 +79,25 @@ class NewsDetailResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class NewsRecommendationItem(BaseModel):
+    news_id: int
+    title: str
+    summary: Optional[str] = None
+    pub_date: Optional[datetime] = None
+    path: Optional[str] = None
+
+
+class NewsRecommendationResponse(BaseModel):
+    user_id: int
+    request_id: str
+    source: str
+    page: int
+    next_cursor: Optional[str] = None
+    served_count: int
+    logged: bool
+    items: List[NewsRecommendationItem]
+
+
 class StockSummaryResponse(BaseModel):
     """
     요약 정보 스키마
@@ -91,11 +113,22 @@ class StockSummaryResponse(BaseModel):
         from_attributes = True
 
 class UserLoginRequest(BaseModel):
-    google_id: str
-    email: str     
-    nickname: str 
+    id_token: str
+    nickname: Optional[str] = None
     img_url: Optional[str] = None
-    onesignal_id: Optional[str] = None
+    onesignal_id: Optional[str] = Field(None, max_length=255)
+
+
+class DevLoginRequest(BaseModel):
+    google_id: str = Field(..., min_length=1, max_length=255)
+    email: str = Field(..., min_length=3, max_length=255)
+    nickname: Optional[str] = Field(None, max_length=255)
+    img_url: Optional[str] = None
+    onesignal_id: Optional[str] = Field(None, max_length=255)
+
+
+class GoogleLoginConfigResponse(BaseModel):
+    client_id: str
 
 class UserUpdateRequest(BaseModel):
     """
@@ -151,9 +184,8 @@ class NotificationCreateRequest(BaseModel):
     """
     N-0: 알림 저장 요청 스키마 (앱 -> 서버)
     
-    앱이 OneSignal 발송 성공 후 서버에 저장을 요청할 때 사용합니다.
+    로그인한 사용자가 자신의 알림 이력을 서버에 저장할 때 사용합니다.
     """
-    onesignal_id: str
     type: str
     title: str
     body: Optional[str] = None
@@ -198,6 +230,31 @@ class NotificationCountResponse(BaseModel):
     처리가 끝난 후 남은 '안 읽은 알림 개수'를 반환합니다.
     """
     unread_count: int
+
+
+class InteractionEventIn(BaseModel):
+    event_id: str = Field(..., min_length=1, max_length=64)
+    user_id: int = Field(..., ge=1)
+    event_type: InteractionEventType
+    device_id: Optional[str] = Field(None, max_length=255)
+    app_session_id: Optional[str] = Field(None, max_length=255)
+    screen_session_id: Optional[str] = Field(None, max_length=64)
+    content_session_id: Optional[str] = Field(None, max_length=64)
+    news_id: Optional[int] = None
+    request_id: Optional[str] = Field(None, max_length=128)
+    position: Optional[int] = None
+    page: Optional[int] = None
+    scroll_depth: Optional[float] = None
+    event_ts_client: Optional[datetime] = None
+
+
+class InteractionEventBatchRequest(BaseModel):
+    events: List[InteractionEventIn]
+
+
+class InteractionIngestResponse(BaseModel):
+    accepted: int
+    duplicated: int
 
 # =============================================================================
 # 주식 API 스키마
@@ -304,3 +361,24 @@ class IssueStock(BaseModel):
 class IssueRankingResponse(BaseModel):
     text: str
     top_issues: List[IssueStock]
+
+class WeatherType(str, Enum):
+    THUNDERSTORM = "THUNDERSTORM"
+    RAINY = "RAINY"
+    CLOUDY = "CLOUDY"
+    PARTLY_CLOUDY = "PARTLY_CLOUDY"
+    SUNNY = "SUNNY"
+
+class AITrendResponse(BaseModel):
+    rank: int
+    code: str
+    name: str
+    weather: WeatherType
+    score: int
+    last_price: int | None = None
+    change_rate: float | None = None
+    news_count: int
+    avg_sentiment: float | None
+
+class StockWeatherResponse(BaseModel):
+    weather: WeatherType

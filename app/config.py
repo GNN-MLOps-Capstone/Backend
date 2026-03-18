@@ -101,6 +101,15 @@ class Settings(BaseSettings):
     #   - 모의: ws://ops.koreainvestment.com:31000
     kis_ws_base_url: str = "ws://ops.koreainvestment.com:21000"
     kis_ws_path: str = "/tryitout"
+
+    # =========================================================================
+    # Recommendation API 설정
+    # =========================================================================
+    recommender_base_url: str = ""
+    recommender_news_path: str = "/recommend/news"
+    recommender_timeout: float = 5.0
+    recommender_api_key: str = ""
+    recommender_mock_mode: bool = True
     
     #=========================================================================
     # 제미나이 api키 설정
@@ -113,6 +122,8 @@ class Settings(BaseSettings):
     secret_key: str = Field(..., env="SECRET_KEY")
     algorithm: str = Field(..., env="ALGORITHM")
     access_token_expire_minutes: int = 43200
+    google_client_id: str = Field(..., env="GOOGLE_CLIENT_ID")
+    dev_bypass_login: bool = False
 
     @model_validator(mode="after")
     def _validate_kis_fields(self) -> "Settings":
@@ -127,6 +138,14 @@ class Settings(BaseSettings):
         for field_name, value in _non_negative.items():
             if value < 0:
                 raise ValueError(f"{field_name} must be non-negative, got {value}")
+        if self.recommender_timeout <= 0:
+            raise ValueError(
+                f"recommender_timeout must be greater than 0, got {self.recommender_timeout}"
+            )
+        if not self.recommender_mock_mode and not self.recommender_base_url.strip():
+            raise ValueError(
+                "recommender_base_url is required when recommender_mock_mode is false"
+            )
         return self
 
     class Config:
