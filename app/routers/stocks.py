@@ -66,8 +66,13 @@ async def _require_stock_ws_user(websocket: WebSocket) -> User | None:
 
 
 def _raise_kis_http_error(exc: KISError) -> None:
+    try:
+        code = int(exc.status_code)
+        http_status = code if 400 <= code <= 599 else 502
+    except (TypeError, ValueError):
+        http_status = 502
     raise HTTPException(
-        status_code=502,
+        status_code=http_status,
         detail={
             "status_code": exc.status_code,
             "code": exc.code,
@@ -880,8 +885,49 @@ async def get_stock_overview(
     """
     종목 상단 카드용 현재가 요약 정보.
     """
+    cache_key = f"overview:{code}"
+    cached = await cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    # 총 재시도 예산 캡: 토큰 재발급·KIS 재시도 중첩으로 지연이 과도해지지 않도록 제한
+    _OVERVIEW_TOTAL_TIMEOUT = 8.0
     try:
-        return await _fetch_stock_overview(code)
+        try:
+            data = await asyncio.wait_for(
+                client.request(
+                    "GET",
+                    "/uapi/domestic-stock/v1/quotations/inquire-price",
+                    tr_id="FHKST01010100",  # KIS: 주식현재가 시세
+                    params={
+                        "FID_COND_MRKT_DIV_CODE": "J",
+                        "FID_INPUT_ISCD": code,
+                    },
+                    retries=3,
+                ),
+                timeout=_OVERVIEW_TOTAL_TIMEOUT,
+            )
+        except asyncio.TimeoutError as exc:
+            raise KISError(
+                f"overview request timed out after {_OVERVIEW_TOTAL_TIMEOUT}s",
+                status_code=504,
+            ) from exc
+        _ensure_kis_ok(data)
+        overview = transform_overview(data, code)
+        if (overview.get("last_price") or 0) <= 0:
+            # 일부 종목(우선주/비유동 종목)에서 현재가가 0으로 내려올 때 최근 유효 일봉으로 보정
+            try:
+                latest = await _fetch_latest_daily_point(code)
+            except KISError:
+                latest = None
+            if latest is not None:
+                overview["last_price"] = int(latest.get("c") or 0)
+                overview["open"] = int(latest.get("o") or 0)
+                overview["high"] = int(latest.get("h") or 0)
+                overview["low"] = int(latest.get("l") or 0)
+                overview["volume"] = int(latest.get("v") or 0)
+        await cache.set(cache_key, overview, ttl_seconds=3)
+        return overview
     except KISError as exc:
         _raise_kis_http_error(exc)
 
@@ -1048,10 +1094,9 @@ async def get_stock_series(
                                     "v": int(latest.get("v") or 0),
                                 }
                             ]
+            await cache.set(cache_key, series, ttl_seconds=120)
             if bypass_cache:
                 await _record_series_bypass_cooldown(request, code, range_label)
-            else:
-                await cache.set(cache_key, series, ttl_seconds=15)
             return series
         except KISError as exc:
             _raise_kis_http_error(exc)
@@ -1101,10 +1146,9 @@ async def get_stock_series(
             )
             _ensure_kis_ok(data)
             series = transform_series_daily(data, code, range_label)
+            await cache.set(cache_key, series, ttl_seconds=120)
             if bypass_cache:
                 await _record_series_bypass_cooldown(request, code, range_label)
-            else:
-                await cache.set(cache_key, series, ttl_seconds=120)
             return series
         except KISError as exc:
             _raise_kis_http_error(exc)
