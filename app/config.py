@@ -143,6 +143,10 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"recommender_timeout must be greater than 0, got {self.recommender_timeout}"
             )
+        if self.gemini_max_concurrency <= 0:
+            raise ValueError(
+                f"gemini_max_concurrency must be greater than 0, got {self.gemini_max_concurrency}"
+            )
         if not self.recommender_mock_mode and not self.recommender_base_url.strip():
             raise ValueError(
                 "recommender_base_url is required when recommender_mock_mode is false"
