@@ -73,8 +73,14 @@ class NewsDetailResponse(BaseModel):
     news_id: int
     title: str
     summary: Optional[str] = None
+    body: Optional[str] = None
     pub_date: Optional[datetime] = None
     url: Optional[str] = None
+    sentiment: Optional[str] = None
+    keywords: List[str] = Field(default_factory=list)
+    stock_name: Optional[str] = None
+    stock_change: Optional[str] = None
+    stock_up: Optional[bool] = None
     
     class Config:
         from_attributes = True
@@ -85,6 +91,9 @@ class NewsRecommendationItem(BaseModel):
     summary: Optional[str] = None
     pub_date: Optional[datetime] = None
     path: Optional[str] = None
+    stock_name: Optional[str] = None
+    stock_change: Optional[str] = None
+    stock_up: Optional[bool] = None
 
 
 class NewsRecommendationResponse(BaseModel):

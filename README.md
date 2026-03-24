@@ -158,6 +158,9 @@ DEV_BYPASS_LOGIN=true
 GOOGLE_CLIENT_ID=dummy-client-id-for-local-dev
 ```
 
+- `DEV_BYPASS_LOGIN=true`는 주석 처리(`#`)가 아니라 실제로 활성화되어 있어야 합니다.
+- 서버는 `.env` 변경 후 재시작해야 반영됩니다.
+
 개발 우회 엔드포인트:
 
 ```bash
