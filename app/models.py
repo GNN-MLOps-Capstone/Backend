@@ -279,9 +279,12 @@ class Notification(Base):
     앱에서 보낸 알림 이력과 읽음 상태를 저장합니다.
     """
     __tablename__ = "notifications"
+    __table_args__ = (
+        UniqueConstraint("onesignal_notification_id", "user_id", name="uq_notification_onesignal_user"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    onesignal_notification_id = Column(String, unique=True, index=True)
+    onesignal_notification_id = Column(String, index=True)
     user_id = Column(String, ForeignKey("users.google_id", ondelete="CASCADE"), nullable=False, index=True)
     
     type = Column(String(50), nullable=False)
