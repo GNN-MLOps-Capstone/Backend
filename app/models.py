@@ -284,7 +284,7 @@ class Notification(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    onesignal_notification_id = Column(String, index=True)
+    onesignal_notification_id = Column(String(255), nullable=False, index=True)
     user_id = Column(String, ForeignKey("users.google_id", ondelete="CASCADE"), nullable=False, index=True)
     
     type = Column(String(50), nullable=False)
