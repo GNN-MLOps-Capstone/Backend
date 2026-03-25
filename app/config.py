@@ -126,6 +126,13 @@ class Settings(BaseSettings):
     google_client_id: str = Field(..., env="GOOGLE_CLIENT_ID")
     dev_bypass_login: bool = False
 
+    # =============================================================================
+    #  onesignal 설정
+    # =============================================================================
+    onesignal_app_id: str = ""
+    onesignal_rest_api_key: str = ""
+    
+
     @model_validator(mode="after")
     def _validate_kis_fields(self) -> "Settings":
         _non_negative = {
