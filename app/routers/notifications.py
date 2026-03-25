@@ -215,8 +215,20 @@ async def create_notification(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    existing = await db.execute(
+        select(Notification).where(
+            Notification.onesignal_notification_id == req.notification_id,
+            Notification.user_id == current_user.google_id  # 👈 이 조건 추가!
+        )
+    )
+
+    if existing.scalar_one_or_none():
+        # 이미 있다면 저장하지 않고 성공(200) 반환
+        return {"success": True, "message": "Already exists for this use"}
+    
     new_noti = Notification(
         user_id=current_user.google_id,
+        onesignal_notification_id=req.notification_id,
         type=req.type,
         title=req.title,
         stock_name=req.stock_name,

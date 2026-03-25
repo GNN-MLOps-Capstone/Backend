@@ -281,6 +281,7 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, index=True)
+    onesignal_notification_id = Column(String, unique=True, index=True)
     user_id = Column(String, ForeignKey("users.google_id", ondelete="CASCADE"), nullable=False, index=True)
     
     type = Column(String(50), nullable=False)
