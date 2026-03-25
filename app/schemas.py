@@ -382,3 +382,27 @@ class AITrendResponse(BaseModel):
 
 class StockWeatherResponse(BaseModel):
     weather: WeatherType
+
+
+class RelatedStockItem(BaseModel):
+    stock_code: str
+    stock_name: str
+    logo_url: str
+
+
+class RelatedStocksResponse(BaseModel):
+    related_stocks: List[RelatedStockItem]
+
+
+class ThemeKeywordItem(BaseModel):
+    keyword: str
+    similarity_score: float
+    color_level: str
+
+
+class StockThemeKeywordsResponse(BaseModel):
+    stock_code: str
+    stock_name: str
+    core_message: str
+    core_keyword: str
+    theme_keywords: List[ThemeKeywordItem]

@@ -131,6 +131,7 @@ alembic -c alembic.ini revision --autogenerate -m "describe-change"
 ### 1. Google ID Token으로 실제 로그인 테스트
 
 1. `.env`에 `GOOGLE_CLIENT_ID`를 설정합니다.
+   모바일 앱 로그인까지 함께 검증하려면 `GOOGLE_ANDROID_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`도 추가합니다.
 2. 서버 실행 후 `http://localhost:8000/static/google-login-test.html`을 브라우저로 엽니다.
 3. Google 로그인 버튼을 눌러 `id_token`과 `/api/users/login` 응답을 확인합니다.
 4. 필요하면 Swagger의 `POST /api/users/login`에 아래 형태로 직접 요청합니다.
@@ -156,6 +157,8 @@ Google 토큰 없이 백엔드만 빠르게 테스트하려면 개발 우회를 
 DEBUG=true
 DEV_BYPASS_LOGIN=true
 GOOGLE_CLIENT_ID=dummy-client-id-for-local-dev
+GOOGLE_ANDROID_CLIENT_ID=
+GOOGLE_IOS_CLIENT_ID=
 ```
 
 개발 우회 엔드포인트:
@@ -442,6 +445,71 @@ curl "http://localhost:8000/api/stocks/005930/series?range=1m" \
   -H "Authorization: Bearer <access_token>"
 ```
 
+### 유사 종목 조회
+
+```
+GET /api/stocks/{code}/related?limit=10
+```
+
+- `test_service_embeddings` 테이블의 `entity_type='stock'` 임베딩에 대해 코사인 유사도 검색을 수행합니다.
+- 응답의 `logo_url`은 바로 렌더링 가능한 SVG `data:` URL입니다.
+
+예시:
+
+```bash
+curl "http://localhost:8000/api/stocks/005930/related?limit=5" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+응답 예시:
+
+```json
+{
+  "related_stocks": [
+    {
+      "stock_code": "000660",
+      "stock_name": "SK하이닉스",
+      "logo_url": "data:image/svg+xml;utf8,%3Csvg..."
+    }
+  ]
+}
+```
+
+### 관련 키워드 조회
+
+```
+GET /api/stocks/{code}/theme-keywords?limit=5
+```
+
+- `test_service_embeddings` 테이블에서 `stock` 임베딩과 `keyword` 임베딩 사이 코사인 유사도를 조회합니다.
+- `similarity_score`는 0~1 범위의 코사인 유사도 값입니다.
+- `color_level`은 해당 종목에서 가장 높은 키워드 대비 상대 강도로 계산합니다.
+
+예시:
+
+```bash
+curl "http://localhost:8000/api/stocks/005930/theme-keywords?limit=5" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+응답 예시:
+
+```json
+{
+  "stock_code": "005930",
+  "stock_name": "삼성전자",
+  "core_message": "삼성전자는 반도체 키워드와 관련이 깊어요",
+  "core_keyword": "반도체",
+  "theme_keywords": [
+    {
+      "keyword": "반도체",
+      "similarity_score": 0.56,
+      "color_level": "HIGH"
+    }
+  ]
+}
+```
+
 ### 실시간 현재가 (WebSocket)
 
 ```
@@ -485,6 +553,8 @@ DEBUG=True
 SECRET_KEY=change-me
 ALGORITHM=HS256
 GOOGLE_CLIENT_ID=실제_구글_OAuth_Web_Client_ID
+GOOGLE_ANDROID_CLIENT_ID=실제_구글_OAuth_Android_Client_ID
+GOOGLE_IOS_CLIENT_ID=실제_구글_OAuth_iOS_Client_ID
 DEV_BYPASS_LOGIN=false
 
 # CORS 허용 출처 (쉼표로 구분)
@@ -499,7 +569,8 @@ KIS_WS_PATH=/tryitout
 ```
 
 > KIS APP_KEY/APP_SECRET은 반드시 backend/.env에서만 관리하세요. (클라이언트 노출 금지)
-> `GOOGLE_CLIENT_ID`는 Google 로그인 검증에 사용하는 OAuth Client ID입니다.
+> `GOOGLE_CLIENT_ID`는 웹/테스트 페이지에서 사용하는 Google OAuth Client ID입니다.
+> `GOOGLE_ANDROID_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`를 추가하면 모바일 앱에서 발급된 Google ID 토큰도 함께 검증할 수 있습니다.
 > `DEV_BYPASS_LOGIN=true`는 개발용 우회 로그인 테스트에서만 사용하세요.
 
 ### 데이터베이스 연결
