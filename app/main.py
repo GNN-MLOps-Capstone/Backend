@@ -120,7 +120,7 @@ async def lifespan(app: FastAPI):
     # =========================================================================
     # 서버 종료 시 실행
     # =========================================================================
-    scheduler.shutdown()
+    scheduler.shutdown(wait=True)
     print("Scheduler shut down.")
     await stocks.shutdown_stocks_resources()
     print("Shutting down...")

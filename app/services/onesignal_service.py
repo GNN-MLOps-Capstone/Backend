@@ -40,10 +40,17 @@ async def send_volatility_push_and_save(db: AsyncSession, user_ids: list, stock_
         "data": {"type": alert_type, "stock_name": stock_name}
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         try:
             response = await client.post(url, json=payload, headers=headers)
-            os_id = response.json().get("id") if response.status_code == 200 else None
+            if response.status_code != 200:
+                print(f"❌ OneSignal API 에러: {response.status_code} - {response.text}")
+                return None
+            
+            os_id = response.json().get("id")
+            if not os_id:
+                print(f"❌ OneSignal 응답에 ID가 없습니다")
+                return None
             
             # 2. 비동기 방식의 DB 대량 저장 (add_all 사용)
             new_notifications = []
@@ -66,7 +73,19 @@ async def send_volatility_push_and_save(db: AsyncSession, user_ids: list, stock_
             print(f"✅ [{alert_type}] {stock_name} 처리 완료 (푸시ID: {os_id})")
             return os_id
                 
+        except httpx.RequestError as e:
+            # 네트워크 연결이나 타임아웃 관련 에러만 따로 처리
+            print(f"OneSignal API 연결 실패: {e}")
+            return None
+
+        except IntegrityError as e:
+            # DB 제약 조건 위반 (예: 필수값 누락 등)
+            await db.rollback()
+            print(f"DB 데이터 무결성 에러: {e}")
+            return None
+
         except Exception as e:
-            print(f"❌ 알림 서비스 에러: {e}")
-            await db.rollback() # ✅ 비동기 롤백
+            # 그 외 우리가 예상치 못한 진짜 "치명적인" 에러
+            await db.rollback()
+            print(f"예상치 못한 시스템 에러: {e}")
             return None

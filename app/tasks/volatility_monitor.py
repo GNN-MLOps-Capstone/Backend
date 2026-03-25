@@ -18,10 +18,11 @@ async def run_volatility_check():
 
     async with AsyncSessionLocal() as db:
         try:
+            today_kst = now.date()
             # 오늘 이미 알림을 보낸 종목명 리스트 가져오기 (중복 방지)
             sent_today_stmt = select(Notification.stock_name).where(
                 Notification.type.in_(["risk", "high_risk"]),
-                func.date(Notification.created_at) == date.today()
+                func.date(Notification.created_at) == today_kst
             ).distinct()
             sent_result = await db.execute(sent_today_stmt)
             sent_stock_names = set(sent_result.scalars().all())
@@ -54,7 +55,8 @@ async def run_volatility_check():
 
                 try:
                     overview = await _fetch_stock_overview(stock_code)
-                    if not overview: continue
+                    if not overview:
+                        continue
                     
                     rate = float(overview.get("change_rate") or 0.0)
 
