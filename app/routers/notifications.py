@@ -22,6 +22,8 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, update, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
+from fastapi.responses import JSONResponse
 
 from app.database import get_db
 from app.models import Notification,User
@@ -224,7 +226,10 @@ async def create_notification(
 
     if existing.scalar_one_or_none():
         # 이미 있다면 저장하지 않고 성공(200) 반환
-        return {"success": True, "message": "Already exists for this use"}
+        return JSONResponse(
+            status_code=200,
+            content={"success": True, "message": "Already exists for this user"}
+        )
     
     new_noti = Notification(
         user_id=current_user.google_id,
@@ -242,6 +247,13 @@ async def create_notification(
         await db.commit()
         await db.refresh(new_noti)
         return {"success": True, "id": new_noti.id}
+    except IntegrityError:
+        await db.rollback()
+        # 중복 키 - 이미 다른 요청에서 저장됨 (경쟁 조건)
+        return JSONResponse(
+            status_code=200,
+            content={"success": True, "message": "Already exists for this user"}
+        )
     except Exception as e:
         await db.rollback()
         logger.exception("알림 저장 실패: user_id=%s", current_user.id)
