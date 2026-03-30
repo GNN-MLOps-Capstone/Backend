@@ -53,6 +53,20 @@ router = APIRouter(
 settings = get_settings()
 security = HTTPBearer()
 
+
+def get_allowed_google_client_ids() -> tuple[str, ...]:
+    client_ids: list[str] = []
+    for client_id in (
+        settings.google_client_id,
+        settings.google_android_client_id,
+        settings.google_ios_client_id,
+    ):
+        normalized = client_id.strip()
+        if normalized and normalized not in client_ids:
+            client_ids.append(normalized)
+    return tuple(client_ids)
+
+
 def create_access_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
@@ -81,12 +95,13 @@ def decode_access_token(token: str) -> str:
 
 
 async def verify_google_login_token(login_token: str) -> dict:
+    allowed_client_ids = get_allowed_google_client_ids()
     try:
         token_info = await asyncio.to_thread(
             id_token.verify_oauth2_token,
             login_token,
             requests.Request(),
-            settings.google_client_id,
+            None,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -104,6 +119,12 @@ async def verify_google_login_token(login_token: str) -> dict:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="신뢰할 수 없는 Google 토큰 발급자입니다.",
+        )
+    audience = token_info.get("aud")
+    if audience not in allowed_client_ids:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="허용되지 않은 Google OAuth 클라이언트입니다.",
         )
     if not token_info.get("sub"):
         raise HTTPException(
@@ -245,7 +266,7 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
     }
 
 
-@router.post("/dev-login", response_model=AuthResponse, include_in_schema=False)
+@router.post("/dev-login", response_model=AuthResponse)
 async def dev_login(req: DevLoginRequest, db: AsyncSession = Depends(get_db)):
     if not settings.debug or not settings.dev_bypass_login:
         raise HTTPException(status_code=404, detail="Not found")

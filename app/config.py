@@ -123,6 +123,8 @@ class Settings(BaseSettings):
     algorithm: str = Field(..., env="ALGORITHM")
     access_token_expire_minutes: int = 43200
     google_client_id: str = Field(..., env="GOOGLE_CLIENT_ID")
+    google_android_client_id: str = Field("", env="GOOGLE_ANDROID_CLIENT_ID")
+    google_ios_client_id: str = Field("", env="GOOGLE_IOS_CLIENT_ID")
     dev_bypass_login: bool = False
 
     @model_validator(mode="after")
