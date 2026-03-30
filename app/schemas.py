@@ -98,6 +98,14 @@ class NewsRecommendationResponse(BaseModel):
     items: List[NewsRecommendationItem]
 
 
+class TopDwellStockResponse(BaseModel):
+    stock_id: str
+    stock_name: Optional[str] = None
+    total_dwell_event_count: int
+    news_count: int
+    latest_bucket_end: Optional[datetime] = None
+
+
 class StockSummaryResponse(BaseModel):
     """
     요약 정보 스키마

@@ -28,7 +28,7 @@ from sqlalchemy import select, func, desc
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from google import genai
 from google.genai import types
 import logging
@@ -42,6 +42,7 @@ from app.models import (
     NewsStockMapping,
     FilteredNews,
     RecommendationServe,
+    RecommendationNewsPathMetrics,
     User,
 )
 from app.schemas import (
@@ -51,6 +52,7 @@ from app.schemas import (
     StockSummaryResponse,
     NewsRecommendationItem,
     NewsRecommendationResponse,
+    TopDwellStockResponse,
 )
 from app.config import get_settings
 from app.kis.errors import KISError
@@ -600,6 +602,85 @@ async def get_news_recommendations(
         logged=logged,
         items=items,
     )
+
+
+@router.get("/top-dwell-stocks", response_model=list[TopDwellStockResponse])
+async def get_top_dwell_stocks(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    최근 24시간 동안 뉴스 상세 체류 이벤트 수가 가장 많았던 종목 상위 3개를 반환합니다.
+
+    집계 방식:
+        1. recommendation_news_path_metrics에서 최근 24시간 뉴스 메트릭 조회
+        2. news_stock_mapping으로 뉴스-종목 매핑
+        3. 종목별 dwell_event_count 합산
+        4. 상위 3개 반환
+
+    주의:
+        하나의 뉴스가 여러 종목에 매핑된 경우, 해당 뉴스의 dwell_event_count는
+        각 종목에 그대로 합산합니다.
+        recommendation_news_path_metrics는 경로별 집계 테이블이므로, 종목 전체 집계에는
+        path='TOTAL' 레코드만 사용합니다.
+    """
+    _ = current_user  # 인증된 사용자만 접근 가능
+    # bucket_end는 PostgreSQL timestamp without time zone 이므로
+    # 비교값도 naive datetime(UTC 기준)으로 맞춥니다.
+    window_start = datetime.utcnow() - timedelta(hours=24)
+
+    aggregated_metrics = (
+        select(
+            NewsStockMapping.stock_id.label("stock_id"),
+            func.sum(RecommendationNewsPathMetrics.dwell_event_count).label(
+                "total_dwell_event_count"
+            ),
+            func.count(func.distinct(RecommendationNewsPathMetrics.news_id)).label("news_count"),
+            func.max(RecommendationNewsPathMetrics.bucket_end).label("latest_bucket_end"),
+        )
+        .join(
+            NewsStockMapping,
+            NewsStockMapping.news_id == RecommendationNewsPathMetrics.news_id,
+        )
+        .where(RecommendationNewsPathMetrics.path == "TOTAL")
+        .where(RecommendationNewsPathMetrics.bucket_end >= window_start)
+        .group_by(NewsStockMapping.stock_id)
+        .subquery()
+    )
+
+    query = (
+        select(
+            aggregated_metrics.c.stock_id,
+            StockSummaryCache.stock_name,
+            aggregated_metrics.c.total_dwell_event_count,
+            aggregated_metrics.c.news_count,
+            aggregated_metrics.c.latest_bucket_end,
+        )
+        .outerjoin(
+            StockSummaryCache,
+            StockSummaryCache.stock_id == aggregated_metrics.c.stock_id,
+        )
+        .order_by(
+            desc(aggregated_metrics.c.total_dwell_event_count),
+            desc(aggregated_metrics.c.news_count),
+            desc(aggregated_metrics.c.latest_bucket_end),
+        )
+        .limit(3)
+    )
+
+    result = await db.execute(query)
+    rows = result.mappings().all()
+
+    return [
+        TopDwellStockResponse(
+            stock_id=row["stock_id"],
+            stock_name=decode_html_entities(row["stock_name"]),
+            total_dwell_event_count=int(row["total_dwell_event_count"] or 0),
+            news_count=int(row["news_count"] or 0),
+            latest_bucket_end=row["latest_bucket_end"],
+        )
+        for row in rows
+    ]
 
 
 # =============================================================================
