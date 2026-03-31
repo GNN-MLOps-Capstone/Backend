@@ -247,11 +247,21 @@ class NewsStockMapping(Base):
 
 class FilteredNews(Base):
     __tablename__ = "filtered_news"
-    news_id = Column(Integer, primary_key=True, index=True)
+    __table_args__ = (UniqueConstraint("news_id", name="uq_filtered_news_news_id"),)
+
+    filtered_news_id = Column(BigInteger, primary_key=True, index=True)
+    news_id = Column(
+        BigInteger,
+        ForeignKey("naver_news.news_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     summary = Column(Text, nullable=True)
     refined_text = Column(Text, nullable=True)
     sentiment = Column(String(20), nullable=True)
+    embedding_model_version = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class Keyword(Base):

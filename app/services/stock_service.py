@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timedelta
 
@@ -14,6 +15,7 @@ settings = get_settings()
 client = KISClient(settings)
 cache = TTLCache()
 logger = logging.getLogger(__name__)
+_KIS_REQUEST_TIMEOUT = 8.0
 
 
 async def shutdown_stock_service_resources() -> None:
@@ -34,19 +36,28 @@ async def fetch_latest_daily_point(code: str, lookback_days: int = 20) -> dict |
     now_kst = datetime.now(tz=KST).date()
     from_date = (now_kst - timedelta(days=lookback_days)).strftime("%Y%m%d")
     to_date = now_kst.strftime("%Y%m%d")
-    data = await client.request(
-        "GET",
-        "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
-        tr_id="FHKST03010100",
-        params={
-            "FID_COND_MRKT_DIV_CODE": "J",
-            "FID_INPUT_ISCD": code,
-            "FID_INPUT_DATE_1": from_date,
-            "FID_INPUT_DATE_2": to_date,
-            "FID_PERIOD_DIV_CODE": "D",
-            "FID_ORG_ADJ_PRC": "0",
-        },
-    )
+    try:
+        data = await asyncio.wait_for(
+            client.request(
+                "GET",
+                "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
+                tr_id="FHKST03010100",
+                params={
+                    "FID_COND_MRKT_DIV_CODE": "J",
+                    "FID_INPUT_ISCD": code,
+                    "FID_INPUT_DATE_1": from_date,
+                    "FID_INPUT_DATE_2": to_date,
+                    "FID_PERIOD_DIV_CODE": "D",
+                    "FID_ORG_ADJ_PRC": "0",
+                },
+            ),
+            timeout=_KIS_REQUEST_TIMEOUT,
+        )
+    except asyncio.TimeoutError as exc:
+        raise KISError(
+            f"daily point request timed out after {_KIS_REQUEST_TIMEOUT}s",
+            status_code=504,
+        ) from exc
     ensure_kis_ok(data)
     daily = transform_series_daily(data, code, "1d-fallback")
     points = daily.get("points") or []
@@ -65,15 +76,24 @@ async def fetch_stock_overview(code: str) -> dict:
     if cached is not None:
         return cached
 
-    data = await client.request(
-        "GET",
-        "/uapi/domestic-stock/v1/quotations/inquire-price",
-        tr_id="FHKST01010100",
-        params={
-            "FID_COND_MRKT_DIV_CODE": "J",
-            "FID_INPUT_ISCD": code,
-        },
-    )
+    try:
+        data = await asyncio.wait_for(
+            client.request(
+                "GET",
+                "/uapi/domestic-stock/v1/quotations/inquire-price",
+                tr_id="FHKST01010100",
+                params={
+                    "FID_COND_MRKT_DIV_CODE": "J",
+                    "FID_INPUT_ISCD": code,
+                },
+            ),
+            timeout=_KIS_REQUEST_TIMEOUT,
+        )
+    except asyncio.TimeoutError as exc:
+        raise KISError(
+            f"overview request timed out after {_KIS_REQUEST_TIMEOUT}s",
+            status_code=504,
+        ) from exc
     ensure_kis_ok(data)
     overview = transform_overview(data, code)
     if (overview.get("last_price") or 0) <= 0:
@@ -90,4 +110,3 @@ async def fetch_stock_overview(code: str) -> dict:
             overview["volume"] = int(latest.get("v") or 0)
     await cache.set(cache_key, overview, ttl_seconds=3)
     return overview
-

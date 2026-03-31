@@ -42,6 +42,32 @@ def upgrade() -> None:
 
     op.execute(
         """
+        DO $$
+        DECLARE
+            conflicting_aliases TEXT;
+        BEGIN
+            SELECT string_agg(alias_name, ', ' ORDER BY alias_name)
+            INTO conflicting_aliases
+            FROM (
+                SELECT alias_name
+                FROM aliases
+                WHERE alias_name IS NOT NULL
+                GROUP BY alias_name
+                HAVING COUNT(DISTINCT stock_id) > 1
+            ) AS conflicts;
+
+            IF conflicting_aliases IS NOT NULL THEN
+                RAISE EXCEPTION
+                    'Cannot enforce uq_aliases_alias_name: alias_name values mapped to multiple stock_id values: %',
+                    conflicting_aliases;
+            END IF;
+        END
+        $$;
+        """
+    )
+
+    op.execute(
+        """
         DELETE FROM aliases AS target
         USING (
             SELECT alias_id
@@ -49,7 +75,7 @@ def upgrade() -> None:
                 SELECT
                     alias_id,
                     ROW_NUMBER() OVER (
-                        PARTITION BY alias_name
+                        PARTITION BY alias_name, stock_id
                         ORDER BY alias_id
                     ) AS row_num
                 FROM aliases

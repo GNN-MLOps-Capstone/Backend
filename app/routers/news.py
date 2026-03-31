@@ -235,14 +235,16 @@ async def _select_top_stock_rows(
         select(
             NewsStockMapping.news_id,
             NewsStockMapping.stock_id,
-            StockSummaryCache.stock_name,
+            func.coalesce(StockSummaryCache.stock_name, Stock.stock_name).label("stock_name"),
             NewsStockMapping.created_at,
             NewsStockMapping.mapping_id,
         )
-        .join(StockSummaryCache, NewsStockMapping.stock_id == StockSummaryCache.stock_id)
+        .join(Stock, NewsStockMapping.stock_id == Stock.stock_id)
+        .outerjoin(StockSummaryCache, NewsStockMapping.stock_id == StockSummaryCache.stock_id)
         .where(NewsStockMapping.news_id.in_(news_ids))
         .order_by(
             NewsStockMapping.news_id,
+            desc(func.coalesce(NewsStockMapping.weight, 1.0)),
             desc(NewsStockMapping.created_at),
             desc(NewsStockMapping.mapping_id),
         )
@@ -651,8 +653,18 @@ async def get_stock_summary(
             message="기존 요약문을 가져왔습니다.",
         )
 
-    content_stmt = select(FilteredNews.summary).where(FilteredNews.news_id.in_(target_news_ids))
-    news_summaries = [row[0] for row in (await db.execute(content_stmt)).fetchall() if row[0]]
+    content_stmt = (
+        select(FilteredNews.summary, FilteredNews.refined_text, CrawledNews.text)
+        .select_from(NaverNews)
+        .outerjoin(FilteredNews, FilteredNews.news_id == NaverNews.news_id)
+        .outerjoin(CrawledNews, CrawledNews.news_id == NaverNews.news_id)
+        .where(NaverNews.news_id.in_(target_news_ids))
+    )
+    news_summaries = [
+        content
+        for row in (await db.execute(content_stmt)).fetchall()
+        if (content := _first_non_empty_text(row[0], row[1], row[2]))
+    ]
     combined_text = "\n\n".join([f"### [기사 {i + 1}]\n{s}" for i, s in enumerate(news_summaries)])
     new_summary = await generate_stock_summary(stock_name, len(news_summaries), combined_text)
 
