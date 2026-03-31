@@ -192,7 +192,12 @@ async def _fetch_change_rate_safe(stock_id: str) -> float | None:
         logger.warning("stock overview fetch failed for %s: %s", stock_id, exc)
         return None
     except Exception as exc:
-        logger.warning("unexpected stock overview error for %s: %s", stock_id, exc)
+        logger.warning(
+            "unexpected stock overview error for %s: %s",
+            stock_id,
+            exc,
+            exc_info=True,
+        )
         return None
 
     raw_change_rate = overview.get("change_rate")
@@ -571,7 +576,12 @@ async def get_news_recommendations(
             )
         except Exception as exc:
             await db.rollback()
-            logger.warning("recommendation serve logging failed: %s", exc)
+            logger.warning(
+                "recommendation serve logging failed (%s): %s",
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+            )
 
     next_cursor: str | None = None
     if len(items) == effective_limit:
@@ -748,13 +758,7 @@ async def get_news_detail(
 
     stock_id = str(existing_top_stock["stock_id"]) if existing_top_stock and existing_top_stock.get("stock_id") else None
     change_rate = await _fetch_change_rate_safe(stock_id) if stock_id else None
-    body = (
-        _first_non_empty_text(
-            filtered.refined_text if filtered else None,
-            news.crawled_news.text if news.crawled_news else None,
-        )
-        or ""
-    )
+    body = article_text
     analyzed_summary = _first_non_empty_text(analysis.get("summary") if analysis else None)
     analyzed_sentiment = _first_non_empty_text(analysis.get("sentiment") if analysis else None)
     summary = existing_summary or analyzed_summary or _fallback_summary(body)
