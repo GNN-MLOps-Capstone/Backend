@@ -261,7 +261,7 @@ class FilteredNews(Base):
     sentiment = Column(String(20), nullable=True)
     embedding_model_version = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now())
++   updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class Keyword(Base):
