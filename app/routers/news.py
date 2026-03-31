@@ -121,6 +121,14 @@ def _preview_text(text: str | None, limit: int = 180) -> str | None:
     return f"{normalized[:limit].rstrip()}..."
 
 
+def _first_non_empty_text(*values: str | None) -> str | None:
+    for value in values:
+        normalized = _normalize_whitespace(value)
+        if normalized:
+            return normalized
+    return None
+
+
 def _fallback_summary(text: str | None) -> str:
     normalized = _normalize_whitespace(text)
     if not normalized:
@@ -246,7 +254,7 @@ async def _fetch_change_rates_for_stock_ids(stock_ids: list[str]) -> dict[str, f
 async def _select_top_stock_rows(
     db: AsyncSession,
     news_ids: list[int],
-) -> dict[int, dict[str, str | float | datetime | None]]:
+) -> dict[int, dict[str, str | datetime | None]]:
     if not news_ids:
         return {}
 
@@ -254,16 +262,14 @@ async def _select_top_stock_rows(
         select(
             NewsStockMapping.news_id,
             NewsStockMapping.stock_id,
-            Stock.stock_name,
-            NewsStockMapping.weight,
+            StockSummaryCache.stock_name,
             NewsStockMapping.created_at,
             NewsStockMapping.mapping_id,
         )
-        .join(Stock, NewsStockMapping.stock_id == Stock.stock_id)
+        .join(StockSummaryCache, NewsStockMapping.stock_id == StockSummaryCache.stock_id)
         .where(NewsStockMapping.news_id.in_(news_ids))
         .order_by(
             NewsStockMapping.news_id,
-            desc(func.coalesce(NewsStockMapping.weight, 1.0)),
             desc(NewsStockMapping.created_at),
             desc(NewsStockMapping.mapping_id),
         )
@@ -277,7 +283,6 @@ async def _select_top_stock_rows(
         top_rows[int(row.news_id)] = {
             "stock_id": row.stock_id,
             "stock_name": row.stock_name,
-            "weight": row.weight,
             "created_at": row.created_at,
         }
     return top_rows
@@ -328,11 +333,19 @@ async def _resolve_related_stocks(
         for stock_id, stock_name in stock_rows
         if stock_name
     }
-    alias_name_map = {
-        (alias_name or "").strip().lower(): (stock_id, stock_name or stock_id)
-        for alias_name, stock_id, stock_name in alias_rows
-        if alias_name
-    }
+    alias_name_map: dict[str, tuple[str, str]] = {}
+    ambiguous_aliases: set[str] = set()
+    for alias_name, stock_id, stock_name in alias_rows:
+        normalized_alias = (alias_name or "").strip().lower()
+        if not normalized_alias or normalized_alias in ambiguous_aliases:
+            continue
+        match = (stock_id, stock_name or stock_id)
+        existing = alias_name_map.get(normalized_alias)
+        if existing and existing[0] != stock_id:
+            ambiguous_aliases.add(normalized_alias)
+            alias_name_map.pop(normalized_alias, None)
+            continue
+        alias_name_map[normalized_alias] = match
 
     resolved: list[tuple[str, str]] = []
     seen_stock_ids: set[str] = set()
@@ -384,7 +397,10 @@ async def _build_recommendation_items(
         top_stock = top_stock_map.get(candidate.news_id)
         stock_id = str(top_stock.get("stock_id") or "").strip() if top_stock else ""
         change_rate = change_rate_map.get(stock_id) if stock_id else None
-        summary = filtered_map.get(candidate.news_id) or crawled_map.get(candidate.news_id)
+        summary = _first_non_empty_text(
+            filtered_map.get(candidate.news_id),
+            crawled_map.get(candidate.news_id),
+        )
         items.append(
             NewsRecommendationItem(
                 news_id=int(news.news_id),
@@ -512,7 +528,7 @@ async def get_news_simple_list(
         NewsSimpleResponse(
             news_id=int(news.news_id),
             title=decode_html_entities(news.title) or "",
-            summary=_preview_text(filtered_summary or crawled_text),
+            summary=_preview_text(_first_non_empty_text(filtered_summary, crawled_text)),
             pub_date=news.pub_date,
         )
         for news, crawled_text, filtered_summary in news_rows
@@ -705,30 +721,20 @@ async def get_news_detail(
         await db.execute(select(FilteredNews).where(FilteredNews.news_id == news_id))
     ).scalar_one_or_none()
 
-    article_text = _normalize_whitespace(
-        (
-            filtered.refined_text
-            if filtered and filtered.refined_text
-            else news.crawled_news.text
-            if news.crawled_news
-            else None
+    article_text = (
+        _first_non_empty_text(
+            filtered.refined_text if filtered else None,
+            news.crawled_news.text if news.crawled_news else None,
         )
+        or ""
     )
     pipeline_keywords = await _get_keywords_for_news(db, news_id)
     existing_keywords = pipeline_keywords
     existing_top_stock_map = await _select_top_stock_rows(db, [news_id])
     existing_top_stock = existing_top_stock_map.get(news_id)
 
-    existing_summary = (
-        filtered.summary
-        if filtered and (filtered.summary or "").strip()
-        else ""
-    )
-    existing_sentiment = (
-        filtered.sentiment
-        if filtered and (filtered.sentiment or "").strip()
-        else ""
-    )
+    existing_summary = _first_non_empty_text(filtered.summary if filtered else None) or ""
+    existing_sentiment = _first_non_empty_text(filtered.sentiment if filtered else None) or ""
 
     missing_summary = not existing_summary
     missing_sentiment = not existing_sentiment
@@ -750,29 +756,17 @@ async def get_news_detail(
 
     stock_id = str(existing_top_stock["stock_id"]) if existing_top_stock and existing_top_stock.get("stock_id") else None
     change_rate = await _fetch_change_rate_safe(stock_id) if stock_id else None
-    body = _normalize_whitespace(
-        (
-            filtered.refined_text
-            if filtered and filtered.refined_text
-            else news.crawled_news.text
-            if news.crawled_news
-            else None
+    body = (
+        _first_non_empty_text(
+            filtered.refined_text if filtered else None,
+            news.crawled_news.text if news.crawled_news else None,
         )
+        or ""
     )
-    summary = (
-        decode_html_entities(filtered.summary)
-        if filtered and filtered.summary
-        else decode_html_entities(analysis.get("summary"))
-        if analysis and analysis.get("summary")
-        else _fallback_summary(body)
-    )
-    sentiment = (
-        decode_html_entities(filtered.sentiment)
-        if filtered and filtered.sentiment
-        else decode_html_entities(analysis.get("sentiment"))
-        if analysis and analysis.get("sentiment")
-        else None
-    )
+    analyzed_summary = _first_non_empty_text(analysis.get("summary") if analysis else None)
+    analyzed_sentiment = _first_non_empty_text(analysis.get("sentiment") if analysis else None)
+    summary = existing_summary or analyzed_summary or _fallback_summary(body)
+    sentiment = existing_sentiment or analyzed_sentiment
     stock_up = _stock_up_from_change_rate(change_rate)
 
     return NewsDetailResponse(

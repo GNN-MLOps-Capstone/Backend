@@ -225,6 +225,11 @@ async def analyze_article(text: str) -> dict:
 
 
 async def generate_stock_summary(stock_name: str, num_article: int, text_combined: str) -> str | None:
+    normalized_text = text_combined.strip()
+    if not normalized_text or not settings.gemini_api.strip():
+        logger.debug("skip stock summary generation for %s: missing input or Gemini API key", stock_name)
+        return None
+
     summary_length = "2줄" if num_article <= 5 else "3줄"
     system_prompt = f"""
     당신은 모바일 증권 앱의 AI 뉴스 요약 봇입니다.
@@ -240,7 +245,7 @@ async def generate_stock_summary(stock_name: str, num_article: int, text_combine
     try:
         response = await gemini_client.aio.models.generate_content(
             model=_GEMINI_MODEL_NAME,
-            contents=text_combined,
+            contents=normalized_text,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 temperature=0.2,
