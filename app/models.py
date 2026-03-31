@@ -232,36 +232,27 @@ class StockSummaryCache(Base):
     summary_text = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    # 관계 설정
+    news_mappings = relationship("NewsStockMapping", back_populates="stock")
+
 class NewsStockMapping(Base):
     __tablename__ = "news_stock_mapping"
 
     mapping_id = Column(Integer, primary_key=True, index=True)
-    stock_id = Column(String(20), ForeignKey("stocks.stock_id", ondelete="CASCADE"), nullable=False)
-    news_id = Column(BigInteger, ForeignKey("naver_news.news_id", ondelete="CASCADE"), nullable=False, index=True)
-    extractor_version = Column(String(50), nullable=True)
-    weight = Column(Float, nullable=True, default=1.0)
+    stock_id = Column(String(20), ForeignKey("stock_summary_cache.stock_id"), nullable=False)
+    news_id = Column(Integer, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
-    stock = relationship("Stock", back_populates="news_mappings")
+    stock = relationship("StockSummaryCache", back_populates="news_mappings")
 
 class FilteredNews(Base):
     __tablename__ = "filtered_news"
-    __table_args__ = (UniqueConstraint("news_id", name="uq_filtered_news_news_id"),)
-
-    filtered_news_id = Column(BigInteger, primary_key=True, index=True)
-    news_id = Column(
-        BigInteger,
-        ForeignKey("naver_news.news_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
+    news_id = Column(Integer, primary_key=True, index=True)
     summary = Column(Text, nullable=True)
     refined_text = Column(Text, nullable=True)
     sentiment = Column(String(20), nullable=True)
-    embedding_model_version = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class Keyword(Base):
@@ -295,7 +286,6 @@ class Stock(Base):
     summary_text = Column(Text, nullable=True)
 
     watchlist_items = relationship("Watchlist", back_populates="stock")
-    news_mappings = relationship("NewsStockMapping", back_populates="stock")
 
     def __repr__(self):
         return f"<Stock(stock_id={self.stock_id}, stock_name={self.stock_name})>"
