@@ -16,14 +16,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import AsyncSessionLocal, get_db
-from app.kis.cache import TTLCache
-from app.kis.client import KISClient
 from app.kis.errors import KISError
 from app.kis.transformers import transform_overview, transform_series_time, transform_series_daily, KST
 from app.kis.ws_client import KISWSClient
 from app.models import User, Stock, StockSummaryCache, FilteredNews, NewsStockMapping
 from app.routers.users import decode_access_token, get_current_user
 from app.schemas import StockOverviewResponse, StockSeriesResponse, StockSeriesQuery, AITrendResponse, StockWeatherResponse
+from app.services.stock_service import (
+    cache,
+    client,
+    ensure_kis_ok as _ensure_kis_ok,
+    fetch_latest_daily_point as _fetch_latest_daily_point,
+    fetch_stock_overview as _fetch_stock_overview,
+    shutdown_stock_service_resources,
+)
 
 
 router = APIRouter(
@@ -32,9 +38,7 @@ router = APIRouter(
 )
 
 settings = get_settings()
-client = KISClient(settings)
 ws_client = KISWSClient(settings)
-cache = TTLCache()
 logger = logging.getLogger(__name__)
 _INTRADAY_PAGE_INTERVAL_SECONDS = float(settings.kis_intraday_page_interval_seconds)
 _INTRADAY_RATE_LIMIT_RETRY_COUNT = int(settings.kis_intraday_rate_limit_retry_count)
@@ -42,7 +46,7 @@ _INTRADAY_RATE_LIMIT_BACKOFF_SECONDS = float(settings.kis_intraday_rate_limit_ba
 
 
 async def shutdown_stocks_resources() -> None:
-    await client.aclose()
+    await shutdown_stock_service_resources()
 
 
 async def _require_stock_ws_user(websocket: WebSocket) -> User | None:
@@ -79,49 +83,6 @@ def _raise_kis_http_error(exc: KISError) -> None:
             "message": exc.message,
         },
     )
-
-
-def _ensure_kis_ok(data: dict) -> None:
-    rt_cd = data.get("rt_cd")
-    if rt_cd is not None and str(rt_cd) != "0":
-        raise KISError(
-            data.get("msg1") or "KIS API error",
-            status_code=200,
-            code=data.get("msg_cd"),
-        )
-
-
-async def _fetch_stock_overview(code: str) -> dict:
-    cache_key = f"overview:{code}"
-    cached = await cache.get(cache_key)
-    if cached is not None:
-        return cached
-
-    data = await client.request(
-        "GET",
-        "/uapi/domestic-stock/v1/quotations/inquire-price",
-        tr_id="FHKST01010100",  # KIS: 주식현재가 시세
-        params={
-            "FID_COND_MRKT_DIV_CODE": "J",
-            "FID_INPUT_ISCD": code,
-        },
-    )
-    _ensure_kis_ok(data)
-    overview = transform_overview(data, code)
-    if (overview.get("last_price") or 0) <= 0:
-        # 일부 종목(우선주/비유동 종목)에서 현재가가 0으로 내려올 때 최근 유효 일봉으로 보정
-        try:
-            latest = await _fetch_latest_daily_point(code)
-        except KISError:
-            latest = None
-        if latest is not None:
-            overview["last_price"] = int(latest.get("c") or 0)
-            overview["open"] = int(latest.get("o") or 0)
-            overview["high"] = int(latest.get("h") or 0)
-            overview["low"] = int(latest.get("l") or 0)
-            overview["volume"] = int(latest.get("v") or 0)
-    await cache.set(cache_key, overview, ttl_seconds=3)
-    return overview
 
 
 def _is_kis_transient_error(exc: KISError) -> bool:
@@ -784,35 +745,6 @@ def _merge_series_rows(regular_rows: list[dict], overtime_rows: list[dict]) -> l
         merged_by_key[key] = merged
 
     return [merged_by_key[key] for key in sorted(merged_by_key.keys())]
-
-
-async def _fetch_latest_daily_point(code: str, lookback_days: int = 20) -> dict | None:
-    now_kst = datetime.now(tz=KST).date()
-    from_date = (now_kst - timedelta(days=lookback_days)).strftime("%Y%m%d")
-    to_date = now_kst.strftime("%Y%m%d")
-    data = await client.request(
-        "GET",
-        "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice",
-        tr_id="FHKST03010100",
-        params={
-            "FID_COND_MRKT_DIV_CODE": "J",
-            "FID_INPUT_ISCD": code,
-            "FID_INPUT_DATE_1": from_date,
-            "FID_INPUT_DATE_2": to_date,
-            "FID_PERIOD_DIV_CODE": "D",
-            "FID_ORG_ADJ_PRC": "0",
-        },
-    )
-    _ensure_kis_ok(data)
-    daily = transform_series_daily(data, code, "1d-fallback")
-    points = daily.get("points") or []
-    if not isinstance(points, list) or not points:
-        return None
-    for p in reversed(points):
-        c = int(p.get("c") or 0)
-        if c > 0:
-            return p
-    return None
 
 
 @router.websocket("/ws/current")

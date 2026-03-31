@@ -31,7 +31,6 @@ from app.database import get_db
 
 from app.models import Watchlist, Stock, StockSummaryCache, User, FilteredNews, NewsStockMapping
 from app.routers.users import get_current_user
-from app.routers.news import call_gemini_summary
 from app.routers.news import get_stock_summary
 from app.schemas import (
     WatchlistAddRequest,
@@ -41,6 +40,7 @@ from app.schemas import (
 )
 from app.config import get_settings
 from app.services.kis_service import kis_service
+from app.services.news_enrichment_service import generate_stock_summary
 
 
 router = APIRouter(
@@ -143,12 +143,12 @@ async def get_watchlist(
 
         async def _call_gemini_bounded(payload: dict) -> str | None:
             async with semaphore:
-                return await call_gemini_summary(
+                return await generate_stock_summary(
                     payload["stock_name"],
                     payload["news_count"],
                     payload["combined_text"],
                 )
-        # call_gemini_summary는 순수 I/O 작업이므로 병렬 처리가 가장 효율적입니다.
+        # generate_stock_summary는 순수 I/O 작업이므로 병렬 처리가 가장 효율적입니다.
         gemini_results = await asyncio.gather(*[
             _call_gemini_bounded(p)
             for p in ai_tasks_payload
@@ -571,7 +571,7 @@ async def get_or_update_summary(stock_id: str, db: AsyncSession, stock_name: str
     combined_text = "\n\n".join([f"### [기사 {i+1}]\n{s}" for i, s in enumerate(news_summaries)])
     
     # Gemini AI 호출 (이름을 전달하여 정확한 요약 유도)
-    new_summary = await call_gemini_summary(stock_name, len(news_summaries), combined_text)
+    new_summary = await generate_stock_summary(stock_name, len(news_summaries), combined_text)
 
     if new_summary:
         cache.latest_news_id = latest_news_id

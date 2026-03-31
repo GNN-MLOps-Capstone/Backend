@@ -241,6 +241,8 @@ class NewsStockMapping(Base):
     mapping_id = Column(Integer, primary_key=True, index=True)
     stock_id = Column(String(20), ForeignKey("stock_summary_cache.stock_id"), nullable=False)
     news_id = Column(Integer, nullable=False)
+    extractor_version = Column(String(50), nullable=True)
+    weight = Column(Float, nullable=True, default=1.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
@@ -252,6 +254,28 @@ class FilteredNews(Base):
     summary = Column(Text, nullable=True)
     refined_text = Column(Text, nullable=True)
     sentiment = Column(String(20), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Keyword(Base):
+    __tablename__ = "keywords"
+
+    keyword_id = Column(Integer, primary_key=True, index=True)
+    word = Column(String(100), nullable=False, unique=True, index=True)
+
+
+class NewsKeywordMapping(Base):
+    __tablename__ = "news_keyword_mapping"
+    __table_args__ = (
+        UniqueConstraint("news_id", "keyword_id", name="uq_news_keyword_mapping_news_keyword"),
+    )
+
+    mapping_id = Column(Integer, primary_key=True, index=True)
+    news_id = Column(BigInteger, ForeignKey("naver_news.news_id", ondelete="CASCADE"), nullable=False, index=True)
+    keyword_id = Column(Integer, ForeignKey("keywords.keyword_id", ondelete="CASCADE"), nullable=False)
+    extractor_version = Column(String(50), nullable=True)
+    weight = Column(Float, nullable=True, default=1.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Stock(Base):
@@ -271,6 +295,15 @@ class Stock(Base):
 
     def __repr__(self):
         return f"<Stock(stock_id={self.stock_id}, stock_name={self.stock_name})>"
+
+
+class Alias(Base):
+    __tablename__ = "aliases"
+    __table_args__ = (UniqueConstraint("alias_name", name="uq_aliases_alias_name"),)
+
+    alias_id = Column(Integer, primary_key=True, index=True)
+    stock_id = Column(String(20), ForeignKey("stocks.stock_id", ondelete="CASCADE"), nullable=False, index=True)
+    alias_name = Column(String(100), nullable=False)
 
 class Notification(Base):
     """
