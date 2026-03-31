@@ -11,19 +11,20 @@
 from __future__ import annotations
 
 import asyncio
-import html
 import json
 import logging
 
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError
 
 from app.config import get_settings
+from app.utils.text import decode_html_entities
 
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-gemini_client = genai.Client(api_key=settings.gemini_api)
+_gemini_client: genai.Client | None = None
 
 _GEMINI_MODEL_NAME = "gemini-2.0-flash-lite"
 _GEMINI_TEMPERATURE = 0.3
@@ -72,16 +73,18 @@ _GEMINI_SYSTEM_PROMPT = """
 """.strip()
 
 
-def _decode_html_entities(text: str | None) -> str | None:
-    if text is None:
-        return None
-    return html.unescape(text)
+def _get_gemini_client() -> genai.Client:
+    global _gemini_client
+    if _gemini_client is None:
+        runtime_settings = get_settings()
+        _gemini_client = genai.Client(api_key=runtime_settings.gemini_api)
+    return _gemini_client
 
 
 def _normalize_whitespace(text: str | None) -> str:
     if not text:
         return ""
-    cleaned = _decode_html_entities(text) or ""
+    cleaned = decode_html_entities(text) or ""
     lines = [" ".join(line.split()) for line in cleaned.replace("\r", "\n").split("\n")]
     filtered = [line for line in lines if line]
     return "\n".join(filtered).strip()
@@ -151,7 +154,7 @@ def _normalize_related_stocks(raw_stocks: object) -> list[str]:
 async def _call_article_gemini(text: str) -> dict | None:
     for attempt in range(_GEMINI_MAX_RETRIES):
         try:
-            response = await gemini_client.aio.models.generate_content(
+            response = await _get_gemini_client().aio.models.generate_content(
                 model=_GEMINI_MODEL_NAME,
                 contents=text,
                 config=types.GenerateContentConfig(
@@ -169,10 +172,10 @@ async def _call_article_gemini(text: str) -> dict | None:
             if isinstance(payload, dict):
                 return payload
             raise ValueError("invalid Gemini response payload")
-        except Exception as exc:
+        except (json.JSONDecodeError, ValueError, APIError) as exc:
             logger.warning("article Gemini call failed (%s/%s): %s", attempt + 1, _GEMINI_MAX_RETRIES, exc)
             if attempt < _GEMINI_MAX_RETRIES - 1:
-                await asyncio.sleep(4**attempt)
+                await asyncio.sleep(min(2**attempt, 8))
     return None
 
 
@@ -243,7 +246,7 @@ async def generate_stock_summary(stock_name: str, num_article: int, text_combine
     5. 제목이나 인사말 없이 결과물만 바로 출력할 것.
     """
     try:
-        response = await gemini_client.aio.models.generate_content(
+        response = await _get_gemini_client().aio.models.generate_content(
             model=_GEMINI_MODEL_NAME,
             contents=normalized_text,
             config=types.GenerateContentConfig(

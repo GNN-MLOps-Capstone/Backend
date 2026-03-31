@@ -23,14 +23,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
-import html
 import json
 import logging
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import desc, func, select
+from sqlalchemy import bindparam, desc, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -58,10 +57,11 @@ from app.schemas import (
     NewsRecommendationResponse,
 )
 from app.kis.errors import KISError
-from app.routers.stocks import _fetch_stock_overview
 from app.recommender.client import RecommendationCandidate
 from app.routers.users import get_current_user
+from app.services.stock_service import fetch_stock_overview
 from app.services.news_enrichment_service import analyze_article, generate_stock_summary
+from app.utils.text import decode_html_entities, escape_sql_like_wildcards
 
 
 router = APIRouter(
@@ -75,33 +75,6 @@ _CURSOR_VERSION = 1
 _RECOMMENDATION_PAGE_SIZE = 20
 _RECENT_RECOMMENDATION_SOURCE = "recent_news"
 _ON_DEMAND_EXTRACTOR_VERSION = "backend_gemini_v1"
-
-# =============================================================================
-# 헬퍼 함수
-# =============================================================================
-
-
-def decode_html_entities(text: str | None) -> str | None:
-    """
-    HTML 엔티티를 실제 문자로 디코딩합니다.
-
-    예시:
-        &quot;  → "
-        &amp;   → &
-        &lt;    → <
-        &gt;    → >
-        &#39;   → '
-
-    Args:
-        text: 디코딩할 텍스트 (None이면 None 반환)
-
-    Returns:
-        디코딩된 텍스트
-    """
-    if text is None:
-        return None
-    return html.unescape(text)
-
 
 def _normalize_whitespace(text: str | None) -> str:
     if not text:
@@ -214,7 +187,7 @@ def _default_recommendation_path(source: str) -> str:
 
 async def _fetch_change_rate_safe(stock_id: str) -> float | None:
     try:
-        overview = await _fetch_stock_overview(stock_id)
+        overview = await fetch_stock_overview(stock_id)
     except KISError as exc:
         logger.warning("stock overview fetch failed for %s: %s", stock_id, exc)
         return None
@@ -247,7 +220,7 @@ async def _fetch_change_rates_for_stock_ids(stock_ids: list[str]) -> dict[str, f
     )
     return {
         stock_id: change_rate
-        for stock_id, change_rate in zip(unique_stock_ids, change_rates)
+        for stock_id, change_rate in zip(unique_stock_ids, change_rates, strict=True)
     }
 
 
@@ -520,7 +493,14 @@ async def get_news_simple_list(
         .limit(limit)
     )
     if search:
-        query = query.where(NaverNews.title.ilike(f"%{search}%"))
+        escaped_search = escape_sql_like_wildcards(search)
+        pattern = f"%{escaped_search}%"
+        query = query.where(
+            NaverNews.title.ilike(
+                bindparam("title_search_pattern", pattern),
+                escape="\\",
+            )
+        )
 
     result = await db.execute(query)
     news_rows = result.all()

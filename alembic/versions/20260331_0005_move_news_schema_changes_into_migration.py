@@ -42,10 +42,14 @@ def _has_column(table_name: str, column_name: str) -> bool:
 
 
 def _get_pk_name(table_name: str) -> str | None:
+    return _get_pk_constraint(table_name).get("name")
+
+
+def _get_pk_constraint(table_name: str) -> dict:
     inspector = _get_inspector()
     if table_name not in inspector.get_table_names():
-        return None
-    return inspector.get_pk_constraint(table_name).get("name")
+        return {}
+    return inspector.get_pk_constraint(table_name)
 
 
 def _has_index(table_name: str, index_name: str) -> bool:
@@ -88,6 +92,27 @@ def _varchar_length(table_name: str, column_name: str) -> int | None:
         return None
     column_type = column["type"]
     return getattr(column_type, "length", None)
+
+
+def _has_sequence(sequence_name: str) -> bool:
+    inspector = _get_inspector()
+    try:
+        return sequence_name in inspector.get_sequence_names()
+    except NotImplementedError:
+        bind = op.get_bind()
+        exists = bind.execute(
+            sa.text(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.sequences
+                    WHERE sequence_name = :sequence_name
+                )
+                """
+            ),
+            {"sequence_name": sequence_name},
+        ).scalar()
+        return bool(exists)
 
 
 def upgrade() -> None:
@@ -196,6 +221,16 @@ def upgrade() -> None:
                 WHERE filtered_news_id IS NULL
                 """
             )
+            op.execute(
+                """
+                SELECT setval(
+                    'filtered_news_filtered_news_id_seq',
+                    COALESCE(MAX(filtered_news_id), 1),
+                    COALESCE(MAX(filtered_news_id), 0) > 0
+                )
+                FROM filtered_news
+                """
+            )
             op.alter_column(
                 "filtered_news",
                 "filtered_news_id",
@@ -203,13 +238,18 @@ def upgrade() -> None:
                 nullable=False,
             )
 
-        current_pk = _get_pk_name("filtered_news")
-        if current_pk and current_pk != "filtered_news_pkey":
-            op.drop_constraint(current_pk, "filtered_news", type_="primary")
-            current_pk = None
-        if current_pk == "filtered_news_pkey":
-            op.drop_constraint("filtered_news_pkey", "filtered_news", type_="primary")
-        op.create_primary_key("filtered_news_pkey", "filtered_news", ["filtered_news_id"])
+        pk_constraint = _get_pk_constraint("filtered_news")
+        current_pk = pk_constraint.get("name")
+        current_pk_columns = list(pk_constraint.get("constrained_columns") or [])
+        if not (
+            current_pk == "filtered_news_pkey"
+            and current_pk_columns == ["filtered_news_id"]
+        ):
+            # Legacy databases may still use the canonical PK name while pointing at news_id,
+            # so check the constrained columns before deciding whether a drop/recreate is needed.
+            if current_pk:
+                op.drop_constraint(current_pk, "filtered_news", type_="primary")
+            op.create_primary_key("filtered_news_pkey", "filtered_news", ["filtered_news_id"])
 
         if not _has_unique_constraint("filtered_news", "uq_filtered_news_news_id"):
             op.create_unique_constraint(
@@ -264,6 +304,8 @@ def downgrade() -> None:
             op.drop_column("filtered_news", "embedding_model_version")
         if _has_column("filtered_news", "filtered_news_id"):
             op.drop_column("filtered_news", "filtered_news_id")
+        if _has_sequence("filtered_news_filtered_news_id_seq"):
+            op.execute("DROP SEQUENCE IF EXISTS filtered_news_filtered_news_id_seq")
         if _has_column("filtered_news", "news_id"):
             op.alter_column(
                 "filtered_news",
@@ -272,6 +314,7 @@ def downgrade() -> None:
                 type_=sa.Integer(),
                 existing_nullable=False,
             )
+
 
     if _has_table("news_stock_mapping"):
         news_fk = _find_foreign_key_name("news_stock_mapping", "news_id", "naver_news")
