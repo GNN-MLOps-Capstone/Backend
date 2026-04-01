@@ -7,23 +7,20 @@ from app.config import get_settings
 from app.models import Notification
 from app.database import AsyncSessionLocal
 import logging
-from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
-@dataclass(frozen=True)
-class SendVolatilityResult:
-    push_sent: bool
-    db_saved: bool
+def classify_volatility_type(rate: float) -> str:
+    return "high_risk" if abs(rate) >= 10.0 else "risk"
 
 async def send_volatility_push_and_save(
     user_ids: list[str],
     stock_name: str,
     rate: float,
     date_kst: date,
-) -> SendVolatilityResult:
+) -> tuple[bool, bool]:
     """
     위험도(10% 기준)에 따라 메시지를 차별화하여 발송하고 DB에 기록합니다.
     """
@@ -34,8 +31,8 @@ async def send_volatility_push_and_save(
         return False, False
 
     # 1. 위험도 및 메시지 분기
-    is_high_risk = abs(rate) >= 10.0
-    alert_type = "high_risk" if is_high_risk else "risk"
+    alert_type = classify_volatility_type(rate)
+    is_high_risk = alert_type == "high_risk"
     
     direction = "🚀 급등" if rate > 0 else "📉 급락"
     prefix = "⚠️ [초고변동 경고]" if is_high_risk else "🔔 [변동 알림]"
