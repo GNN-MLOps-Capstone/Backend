@@ -749,18 +749,17 @@ async def get_news_detail(
 
     if missing_stocks:
         analysis = await analyze_article(article_text)
-        if missing_stocks:
-            related_stocks = await _resolve_related_stocks(db, analysis.get("related_stocks") or [])
-            if related_stocks:
-                existing_stock_rows = [
-                    {
-                        "stock_id": stock_id,
-                        "stock_name": stock_name,
-                        "created_at": None,
-                    }
-                    for stock_id, stock_name in related_stocks
-                ]
-                existing_top_stock = existing_stock_rows[0]
+        related_stocks = await _resolve_related_stocks(db, analysis.get("related_stocks") or [])
+        if related_stocks:
+            existing_stock_rows = [
+                {
+                    "stock_id": stock_id,
+                    "stock_name": stock_name,
+                    "created_at": None,
+                }
+                for stock_id, stock_name in related_stocks
+            ]
+            existing_top_stock = existing_stock_rows[0]
 
     related_stock_change_rates = await _fetch_change_rates_for_stock_ids(
         [
