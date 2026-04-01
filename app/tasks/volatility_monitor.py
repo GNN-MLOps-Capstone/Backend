@@ -84,6 +84,7 @@ async def run_volatility_check():
                         Watchlist.stock_id == stock_code,
                         User.id < 9000
                     )
+                    
                     user_ids = (await db.execute(user_stmt)).scalars().all()
                     unique_user_ids = list(set(user_ids))
                 
