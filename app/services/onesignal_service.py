@@ -59,6 +59,7 @@ async def send_volatility_push_and_save(
         except httpx.RequestError as e:
             print(f"OneSignal API 연결 실패: {e}")
             return None
+        
     if not os_id:
         return None
     
@@ -77,24 +78,23 @@ async def send_volatility_push_and_save(
                     onesignal_notification_id=os_id
                 ) for gid in user_ids
             ]
-            
-            try:
-                db.add_all(new_notifications)
-                await db.commit() # 저장 후 즉시 트랜잭션 종료
-            except IntegrityError:
-                # DB 레벨에서 복합 유니크 제약 조건(예: 날짜+유저+종목)에 걸린 경우
-                await db.rollback()
-                print("⚠️ 이미 동일한 알림이 다른 프로세스에서 발송되었습니다. 중복 저장을 방지합니다.")
-                return None
-            
+            db.add_all(new_notifications)
+            await db.commit() # 저장 후 즉시 트랜잭션 종료
             print(f"✅ [{alert_type}] {stock_name} 처리 완료 (푸시ID: {os_id})")
             return os_id
-
         except IntegrityError as e:
             await db.rollback()
-            print(f"DB 데이터 무결성 에러: {e}")
+
+            error_text = str(getattr(e, "orig", e)).lower()
+
+            if "uq_notification_onesignal_user" in error_text:
+                print(f"⚠️ 중복 방지: [{alert_type}] {stock_name} 알림이 이미 다른 프로세스에 의해 처리되었습니다.")
+            else:
+                # 중복이 아닌 다른 무결성 에러 (FK 위반, Not Null 위반 등)
+                print(f"❌ DB 무결성 에러 발생: {e}")
             return None
+            
         except Exception as e:
             await db.rollback()
-            print(f"DB 저장 중 예상치 못한 에러: {e}")
+            print(f"❌ DB 저장 중 예상치 못한 에러: {e}")
             return None
