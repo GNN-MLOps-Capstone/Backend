@@ -788,5 +788,5 @@ async def get_news_detail(
         related_stocks=related_stock_payloads,
         stock_name=str(primary_stock["stock_name"]) if primary_stock else None,
         stock_change=str(primary_stock["stock_change"]) if primary_stock and primary_stock.get("stock_change") else None,
-        stock_up=bool(primary_stock["stock_up"]) if primary_stock and primary_stock.get("stock_up") is not None else None,
+        stock_up=primary_stock["stock_up"] if primary_stock and primary_stock.get("stock_up") is not None else None,
     )
