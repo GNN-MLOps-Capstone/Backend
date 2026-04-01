@@ -245,7 +245,7 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
     }
 
 
-@router.post("/dev-login", response_model=AuthResponse, include_in_schema=False)
+@router.post("/dev-login", response_model=AuthResponse)
 async def dev_login(req: DevLoginRequest, db: AsyncSession = Depends(get_db)):
     if not settings.debug or not settings.dev_bypass_login:
         raise HTTPException(status_code=404, detail="Not found")
