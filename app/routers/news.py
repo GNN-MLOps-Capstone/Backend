@@ -242,13 +242,53 @@ async def _select_stock_rows(
     return stock_rows
 
 
-def _select_top_stock_rows(
-    stock_rows_map: dict[int, list[dict[str, str | datetime | None]]],
+async def _select_top_stock_row_per_news(
+    db: AsyncSession,
+    news_ids: list[int],
 ) -> dict[int, dict[str, str | datetime | None]]:
+    if not news_ids:
+        return {}
+
+    ranked_stock_rows = (
+        select(
+            NewsStockMapping.news_id.label("news_id"),
+            NewsStockMapping.stock_id.label("stock_id"),
+            func.coalesce(StockSummaryCache.stock_name, Stock.stock_name).label("stock_name"),
+            NewsStockMapping.created_at.label("created_at"),
+            func.row_number()
+            .over(
+                partition_by=NewsStockMapping.news_id,
+                order_by=(
+                    desc(func.coalesce(NewsStockMapping.weight, 1.0)),
+                    desc(NewsStockMapping.created_at),
+                    desc(NewsStockMapping.mapping_id),
+                ),
+            )
+            .label("row_num"),
+        )
+        .join(Stock, NewsStockMapping.stock_id == Stock.stock_id)
+        .outerjoin(StockSummaryCache, NewsStockMapping.stock_id == StockSummaryCache.stock_id)
+        .where(NewsStockMapping.news_id.in_(news_ids))
+        .subquery()
+    )
+    stmt = (
+        select(
+            ranked_stock_rows.c.news_id,
+            ranked_stock_rows.c.stock_id,
+            ranked_stock_rows.c.stock_name,
+            ranked_stock_rows.c.created_at,
+        )
+        .where(ranked_stock_rows.c.row_num == 1)
+        .order_by(ranked_stock_rows.c.news_id)
+    )
+    result = await db.execute(stmt)
     return {
-        news_id: rows[0]
-        for news_id, rows in stock_rows_map.items()
-        if rows
+        int(row.news_id): {
+            "stock_id": row.stock_id,
+            "stock_name": row.stock_name,
+            "created_at": row.created_at,
+        }
+        for row in result.all()
     }
 
 
@@ -368,8 +408,7 @@ async def _build_recommendation_items(
     crawled_map = {int(news_id): text for news_id, text in crawled_rows}
     filtered_map = {int(news_id): summary for news_id, summary in filtered_rows}
 
-    stock_rows_map = await _select_stock_rows(db, news_ids)
-    top_stock_map = _select_top_stock_rows(stock_rows_map)
+    top_stock_map = await _select_top_stock_row_per_news(db, news_ids)
     change_rate_map = await _fetch_change_rates_for_stock_ids(
         [
             str(top_stock.get("stock_id") or "").strip()
