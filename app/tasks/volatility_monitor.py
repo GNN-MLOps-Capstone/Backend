@@ -61,7 +61,15 @@ async def run_volatility_check():
             if not overview:
                 continue
                     
-            rate = float(overview.get("change_rate") or 0.0)
+            raw_rate = overview.get("change_rate")
+            if raw_rate is None:
+                print(f"⚠️ [{stock_code}] change_rate가 없어 변동성 계산을 건너뜁니다.")
+                continue
+            try:
+                rate = float(raw_rate)
+            except (TypeError, ValueError):
+                print(f"⚠️ [{stock_code}] change_rate 파싱 실패: {raw_rate!r}")
+                continue
             abs_rate = abs(rate)
 
             # 알림 발송 여부 결정 로직
@@ -84,7 +92,7 @@ async def run_volatility_check():
                         Watchlist.stock_id == stock_code,
                         User.id < 9000
                     )
-                    
+
                     user_ids = (await db.execute(user_stmt)).scalars().all()
                     unique_user_ids = list(set(user_ids))
                 
