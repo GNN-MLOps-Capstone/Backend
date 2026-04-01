@@ -1,6 +1,7 @@
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from datetime import date
 from app.config import get_settings
 from app.models import Notification
 from app.database import AsyncSessionLocal
@@ -65,6 +66,7 @@ async def send_volatility_push_and_save(
     
     async with AsyncSessionLocal() as db:
         try:
+            today = date.today()
             new_notifications = [
                 Notification(
                     user_id=gid,
@@ -75,7 +77,8 @@ async def send_volatility_push_and_save(
                     star=False,
                     stock_name=stock_name,
                     sentiment_score=rate,
-                    onesignal_notification_id=os_id
+                    onesignal_notification_id=os_id,
+                    date_kst=today
                 ) for gid in user_ids
             ]
             db.add_all(new_notifications)
@@ -87,8 +90,8 @@ async def send_volatility_push_and_save(
 
             error_text = str(getattr(e, "orig", e)).lower()
 
-            if "uq_notification_onesignal_user" in error_text:
-                print(f"⚠️ 중복 방지: [{alert_type}] {stock_name} 알림이 이미 다른 프로세스에 의해 처리되었습니다.")
+            if "uq_notification_daily" in error_text:
+                print(f"ℹ️ 일별 중복 방지: {stock_name} 알림이 오늘 이미 발송되었습니다.")
             else:
                 # 중복이 아닌 다른 무결성 에러 (FK 위반, Not Null 위반 등)
                 print(f"❌ DB 무결성 에러 발생: {e}")
