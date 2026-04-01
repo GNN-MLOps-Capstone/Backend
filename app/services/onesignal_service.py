@@ -1,5 +1,6 @@
 import httpx
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import SQLAlchemyError
 from datetime import date
 from app.config import get_settings
 from app.models import Notification
@@ -92,7 +93,7 @@ async def send_volatility_push_and_save(
             print(f"✅ [{alert_type}] {stock_name} 처리 완료 (푸시ID: {os_id})")
             return True, True
             
-        except Exception as e:
+        except SQLAlchemyError as e:
             await db.rollback()
             print(f"❌ DB 저장 중 예상치 못한 에러: {e}")
             return True, False
