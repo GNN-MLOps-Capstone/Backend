@@ -1,7 +1,7 @@
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
-from datetime import date
+from datetime import datetime, timedelta, timezone
 from app.config import get_settings
 from app.models import Notification
 from app.database import AsyncSessionLocal
@@ -12,6 +12,7 @@ async def send_volatility_push_and_save(
     user_ids: list[str],
     stock_name: str,
     rate: float,
+    date_kst: date,
 ) -> str | None:
     """
     위험도(10% 기준)에 따라 메시지를 차별화하여 발송하고 DB에 기록합니다.
@@ -66,7 +67,8 @@ async def send_volatility_push_and_save(
     
     async with AsyncSessionLocal() as db:
         try:
-            today = date.today()
+            kst = timezone(timedelta(hours=9))
+            today = datetime.now(kst).date()
             new_notifications = [
                 Notification(
                     user_id=gid,
