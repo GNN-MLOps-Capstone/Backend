@@ -52,6 +52,10 @@ async def run_volatility_check():
     print(f"감시 시작: {len(all_stocks)}개 종목")
 
     for stock_code, stock_name in all_stocks:
+        now = datetime.now(kst)
+        if now.weekday() >= 5 or not (8 <= now.hour < 20):
+            print("운영 시간 종료, 감시 루프를 중단합니다.")
+            break
         # API 호출 속도 제한 (1.2초 간격)
         await asyncio.sleep(1.2) 
 

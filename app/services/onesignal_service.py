@@ -1,6 +1,5 @@
 import httpx
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from datetime import date, datetime, timedelta, timezone
 from app.config import get_settings
 from app.models import Notification
@@ -67,35 +66,28 @@ async def send_volatility_push_and_save(
     
     async with AsyncSessionLocal() as db:
         try:
-            new_notifications = [
-                Notification(
-                    user_id=gid,
-                    type=alert_type,
-                    title=title,
-                    body=body,
-                    is_read=False,
-                    star=False,
-                    stock_name=stock_name,
-                    sentiment_score=rate,
-                    onesignal_notification_id=os_id,
-                    date_kst=date_kst
-                ) for gid in user_ids
+            rows = [
+                {
+                    "user_id": gid,
+                    "type": alert_type,
+                    "title": title,
+                    "body": body,
+                    "is_read": False,
+                    "star": False,
+                    "stock_name": stock_name,
+                    "sentiment_score": rate,
+                    "onesignal_notification_id": os_id,
+                    "date_kst": date_kst, 
+                }
+                for gid in user_ids
             ]
-            db.add_all(new_notifications)
-            await db.commit() # 저장 후 즉시 트랜잭션 종료
+            stmt = pg_insert(Notification).values(rows).on_conflict_do_nothing(
+                index_elements=["user_id", "stock_name", "type", "date_kst"]
+            )
+            await db.execute(stmt)
+            await db.commit()
             print(f"✅ [{alert_type}] {stock_name} 처리 완료 (푸시ID: {os_id})")
             return os_id
-        except IntegrityError as e:
-            await db.rollback()
-
-            error_text = str(getattr(e, "orig", e)).lower()
-
-            if "uq_notification_daily" in error_text:
-                print(f"ℹ️ 일별 중복 방지: {stock_name} 알림이 오늘 이미 발송되었습니다.")
-            else:
-                # 중복이 아닌 다른 무결성 에러 (FK 위반, Not Null 위반 등)
-                print(f"❌ DB 무결성 에러 발생: {e}")
-            return None
             
         except Exception as e:
             await db.rollback()
