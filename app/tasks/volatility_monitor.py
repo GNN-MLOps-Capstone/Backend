@@ -27,8 +27,7 @@ async def run_volatility_check() -> None:
                 Notification.type
             ).where(
                 Notification.type.in_(["risk", "high_risk"]),
-                Notification.created_at >= day_start_kst.astimezone(pytz.UTC),
-                Notification.created_at < day_end_kst.astimezone(pytz.UTC),
+                Notification.date_kst == now.date(),
             )
             sent_result = await db.execute(sent_today_stmt)
             sent_history: set[tuple[str, str, str]] = set(sent_result.all())
@@ -40,7 +39,7 @@ async def run_volatility_check() -> None:
                 User, Watchlist.user_id == User.id
             ).where(User.id < 9000)
             result = await db.execute(stmt)
-            all_stocks = result.all()
+            all_stocks: list[tuple[str, str]] = result.all()
 
         except asyncio.CancelledError:
             raise
@@ -90,7 +89,7 @@ async def run_volatility_check() -> None:
                     Watchlist.stock_id == stock_code,
                     User.id < 9000
                 )
-                user_rows = [row[0] for row in (await db.execute(user_stmt)).all()]
+                user_rows: list[tuple[str, int]] = (await db.execute(user_stmt)).all()
  
             if not user_rows:
                 continue
