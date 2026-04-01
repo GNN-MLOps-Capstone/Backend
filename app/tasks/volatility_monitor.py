@@ -1,6 +1,6 @@
 import asyncio
 import pytz
-from datetime import datetime, timedelta
+from datetime import datetime
 from sqlalchemy import select, func
 from app.database import AsyncSessionLocal 
 from app.models import Watchlist, User, Stock, Notification
@@ -18,8 +18,6 @@ async def run_volatility_check() -> None:
 
     async with AsyncSessionLocal() as db:
         try:
-            day_start_kst = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            day_end_kst = day_start_kst + timedelta(days=1)
             # 오늘 이미 알림을 보낸 종목명 리스트 가져오기 (중복 방지)
             sent_today_stmt = select(
                 Notification.user_id,
@@ -89,9 +87,10 @@ async def run_volatility_check() -> None:
                     Watchlist.stock_id == stock_code,
                     User.id < 9000
                 )
-                user_rows: list[tuple[str, int]] = (await db.execute(user_stmt)).all()
- 
-            if not user_rows:
+                user_result = await db.execute(user_stmt)
+                user_google_ids: list[str] = [row[0] for row in user_result.all()]
+            
+            if not user_google_ids:
                 continue
             def already_notified(google_id: str, stype: str, stock_name: str = stock_name) -> bool:
                 if stype == "high_risk":
@@ -106,7 +105,7 @@ async def run_volatility_check() -> None:
  
             target_users = [
                 google_id
-                for google_id in user_rows
+                for google_id in user_google_ids
                 if not already_notified(google_id, current_type)
             ]
  
