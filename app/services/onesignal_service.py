@@ -1,3 +1,4 @@
+from uuid import NAMESPACE_URL, uuid5
 import httpx
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
@@ -40,15 +41,22 @@ async def send_volatility_push_and_save(
         f"{stock_name} 종목이 전일 대비 {rate}% {direction} 중입니다."
     )
 
-    url = "https://onesignal.com/api/v1/notifications"
+    url = "https://api.onesignal.com/notifications"
     headers = {
-        "Authorization": f"Basic {settings.onesignal_rest_api_key}",
+        "Authorization": f"Key {settings.onesignal_rest_api_key}",
         "Content-Type": "application/json; charset=utf-8"
     }
 
     payload = {
         "app_id": settings.onesignal_app_id,
-        "include_external_user_ids": user_ids,
+        "include_aliases": {"external_id": user_ids},
+        "idempotency_key": str(
+            uuid5(
+                NAMESPACE_URL,
+                f"{date_kst}:{alert_type}:{stock_name}:{','.join(sorted(user_ids))}",
+            )
+        ),
+        "target_channel": "push",
         "headings": {"en": title,"ko": title},
         "contents": {"en": body,"ko": body},
         "data": {"type": alert_type, "stock_name": stock_name}
