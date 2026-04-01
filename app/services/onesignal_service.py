@@ -1,7 +1,7 @@
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from app.config import get_settings
 from app.models import Notification
 from app.database import AsyncSessionLocal
@@ -67,8 +67,6 @@ async def send_volatility_push_and_save(
     
     async with AsyncSessionLocal() as db:
         try:
-            kst = timezone(timedelta(hours=9))
-            today = datetime.now(kst).date()
             new_notifications = [
                 Notification(
                     user_id=gid,
@@ -80,7 +78,7 @@ async def send_volatility_push_and_save(
                     stock_name=stock_name,
                     sentiment_score=rate,
                     onesignal_notification_id=os_id,
-                    date_kst=today
+                    date_kst=date_kst
                 ) for gid in user_ids
             ]
             db.add_all(new_notifications)
