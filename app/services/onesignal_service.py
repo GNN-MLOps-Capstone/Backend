@@ -7,17 +7,23 @@ from app.config import get_settings
 from app.models import Notification
 from app.database import AsyncSessionLocal
 import logging
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
+
+@dataclass(frozen=True)
+class SendVolatilityResult:
+    push_sent: bool
+    db_saved: bool
 
 async def send_volatility_push_and_save(
     user_ids: list[str],
     stock_name: str,
     rate: float,
     date_kst: date,
-) -> tuple[bool, bool]:
+) -> SendVolatilityResult:
     """
     위험도(10% 기준)에 따라 메시지를 차별화하여 발송하고 DB에 기록합니다.
     """
