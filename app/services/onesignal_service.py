@@ -78,8 +78,14 @@ async def send_volatility_push_and_save(
                 ) for gid in user_ids
             ]
             
-            db.add_all(new_notifications)
-            await db.commit() # 저장 후 즉시 트랜잭션 종료
+            try:
+                db.add_all(new_notifications)
+                await db.commit() # 저장 후 즉시 트랜잭션 종료
+            except IntegrityError:
+                # DB 레벨에서 복합 유니크 제약 조건(예: 날짜+유저+종목)에 걸린 경우
+                await db.rollback()
+                print("⚠️ 이미 동일한 알림이 다른 프로세스에서 발송되었습니다. 중복 저장을 방지합니다.")
+                return None
             
             print(f"✅ [{alert_type}] {stock_name} 처리 완료 (푸시ID: {os_id})")
             return os_id
