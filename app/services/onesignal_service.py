@@ -1,5 +1,6 @@
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from app.config import get_settings
 from app.models import Notification
 
@@ -49,7 +50,7 @@ async def send_volatility_push_and_save(db: AsyncSession, user_ids: list, stock_
             
             os_id = response.json().get("id")
             if not os_id:
-                print(f"❌ OneSignal 응답에 ID가 없습니다")
+                print("❌ OneSignal 응답에 ID가 없습니다")
                 return None
             
             # 2. 비동기 방식의 DB 대량 저장 (add_all 사용)
