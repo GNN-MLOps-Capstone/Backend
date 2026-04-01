@@ -108,7 +108,9 @@ async def lifespan(app: FastAPI):
         'interval', 
         minutes=5,
         id='volatility_monitoring_job',
-        replace_existing=True
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=60
     )
     scheduler.start()
     logger.info("주가 감시 스케줄러 가동 (5분 주기)")
