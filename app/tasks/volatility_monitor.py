@@ -7,7 +7,7 @@ from app.models import Watchlist, User, Stock, Notification
 from app.routers.stocks import _fetch_stock_overview
 from app.services.onesignal_service import send_volatility_push_and_save
 
-async def run_volatility_check():
+async def run_volatility_check() -> None:
     # 한국 시간대 설정
     kst = pytz.timezone('Asia/Seoul')
     now = datetime.now(kst)
@@ -80,7 +80,7 @@ async def run_volatility_check():
 
             current_type = "high_risk" if abs_rate >= 10.0 else "risk"
 
-             # 이 종목의 watcher 전체 조회
+            # 이 종목의 watcher 전체 조회
             async with AsyncSessionLocal() as db:
                 user_stmt = select(User.google_id).distinct().join(
                     Watchlist, User.id == Watchlist.user_id
@@ -92,7 +92,7 @@ async def run_volatility_check():
  
             if not user_rows:
                 continue
-            def already_notified(google_id: str, stype: str) -> bool:
+            def already_notified(google_id: str, stype: str, stock_name: str = stock_name) -> bool:
                 if stype == "high_risk":
                     # high_risk 전송 대상: high_risk를 아직 안 받은 유저
                     return (google_id, stock_name, "high_risk") in sent_history
@@ -120,9 +120,8 @@ async def run_volatility_check():
             )
  
             # ✅ 발송 후 메모리 상의 sent_history 업데이트 (같은 루프 내 중복 방지)
-            for google_id in user_rows:
-                if google_id in target_users:
-                    sent_history.add((google_id, stock_name, current_type))
+            for google_id in target_users:
+                sent_history.add((google_id, stock_name, current_type))
  
         except asyncio.CancelledError:
             raise
