@@ -732,7 +732,7 @@ async def get_news_detail(
         await db.execute(select(FilteredNews).where(FilteredNews.news_id == news_id))
     ).scalar_one_or_none()
 
-    article_text = _first_non_empty_text(
+    article_text = _normalize_whitespace(
         news.crawled_news.text if news.crawled_news else None,
     ) or ""
     pipeline_keywords = await _get_keywords_for_news(db, news_id)
