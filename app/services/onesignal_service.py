@@ -18,6 +18,9 @@ async def send_volatility_push_and_save(
     """
     if not user_ids:
         return False, False
+    if not settings.onesignal_app_id or not settings.onesignal_rest_api_key:
+        print("❌ OneSignal 설정이 누락되어 변동성 알림 발송을 건너뜁니다.")
+        return False, False
 
     # 1. 위험도 및 메시지 분기
     is_high_risk = abs(rate) >= 10.0

@@ -106,7 +106,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         run_volatility_check, 
         'interval', 
-        minutes=3,
+        minutes=5,
         id='volatility_monitoring_job',
         replace_existing=True,
         max_instances=1,
