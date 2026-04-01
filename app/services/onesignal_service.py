@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from app.config import get_settings
 from app.models import Notification
-from app.database import async_session
+from app.database import AsyncSessionLocal
 
 settings = get_settings()
 
@@ -62,7 +62,7 @@ async def send_volatility_push_and_save(
     if not os_id:
         return None
     
-    async with async_session() as db: 
+    async with AsyncSessionLocal() as db:
         try:
             new_notifications = [
                 Notification(
