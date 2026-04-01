@@ -111,18 +111,23 @@ async def run_volatility_check() -> None:
  
             if not target_users:
                 continue
- 
-            result = await send_volatility_push_and_save(
-                target_users,
-                stock_name,
-                rate,
-                now.date(),
+                
+            now = datetime.now(kst)
+            if now.weekday() >= 5 or not (8 <= now.hour < 20):
+                print("운영 시간 종료, 발송을 중단합니다.")
+                break
+            
+            push_sent, db_saved = await send_volatility_push_and_save(
+                target_users, stock_name, rate, now.date()
             )
+
+            if not db_saved:
+                print(f"[{stock_code}] DB 저장 실패 - 푸시 발송 여부: {push_sent}")
  
-            # ✅ 발송 성공 시에만 메모리 상의 sent_history 업데이트 (같은 루프 내 중복 방지)
-            if result:
-                for google_id in target_users:
-                    sent_history.add((google_id, stock_name, current_type))
+            if push_sent:
+                for google_id in user_google_ids:
+                    if google_id in target_users:
+                        sent_history.add((google_id, stock_name, current_type))
  
         except asyncio.CancelledError:
             raise

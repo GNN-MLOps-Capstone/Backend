@@ -1,6 +1,6 @@
 import httpx
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 from app.config import get_settings
 from app.models import Notification
 from app.database import AsyncSessionLocal
@@ -12,12 +12,12 @@ async def send_volatility_push_and_save(
     stock_name: str,
     rate: float,
     date_kst: date,
-) -> str | None:
+) -> tuple[bool, bool]:
     """
     위험도(10% 기준)에 따라 메시지를 차별화하여 발송하고 DB에 기록합니다.
     """
     if not user_ids:
-        return None
+        return False, False
 
     # 1. 위험도 및 메시지 분기
     is_high_risk = abs(rate) >= 10.0
@@ -54,15 +54,15 @@ async def send_volatility_push_and_save(
             response = await client.post(url, json=payload, headers=headers)
             if response.status_code != 200:
                 print(f"❌ OneSignal API 에러: {response.status_code} - {response.text}")
-                return None
+                return False, False
             
             os_id = response.json().get("id")
         except httpx.RequestError as e:
             print(f"OneSignal API 연결 실패: {e}")
-            return None
+            return False, False
         
     if not os_id:
-        return None
+        return False, False
     
     async with AsyncSessionLocal() as db:
         try:
@@ -87,9 +87,9 @@ async def send_volatility_push_and_save(
             await db.execute(stmt)
             await db.commit()
             print(f"✅ [{alert_type}] {stock_name} 처리 완료 (푸시ID: {os_id})")
-            return os_id
+            return True, True
             
         except Exception as e:
             await db.rollback()
             print(f"❌ DB 저장 중 예상치 못한 에러: {e}")
-            return None
+            return True, False
