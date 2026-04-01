@@ -161,6 +161,9 @@ GOOGLE_ANDROID_CLIENT_ID=
 GOOGLE_IOS_CLIENT_ID=
 ```
 
+- `DEV_BYPASS_LOGIN=true`는 주석 처리(`#`)가 아니라 실제로 활성화되어 있어야 합니다.
+- 서버는 `.env` 변경 후 재시작해야 반영됩니다.
+
 개발 우회 엔드포인트:
 
 ```bash
@@ -249,11 +252,45 @@ curl "http://localhost:8000/api/news/simple?limit=20" \
 GET /api/news/{news_id}
 ```
 
+응답 스키마:
+
+| 필드 | 타입 | Nullable | 설명 |
+| ---- | ---- | -------- | ---- |
+| news_id | int | 아니오 | 뉴스 ID |
+| title | string | 아니오 | HTML 엔티티가 디코딩된 제목 |
+| summary | string | 예 | 정제 요약. `filtered_news.summary`가 비어 있으면 Gemini 분석/본문 fallback 사용 |
+| body | string | 예 | 본문 전체 텍스트. `filtered_news.refined_text` 우선, 없으면 크롤링 본문 사용 |
+| pub_date | datetime | 예 | 발행 시각 |
+| url | string | 예 | 원문 URL |
+| sentiment | string | 예 | 감성 결과. 현재 값은 `긍정`, `중립`, `부정` 중 하나 |
+| keywords | string[] | 아니오 | 추출 키워드 배열. 없으면 빈 배열 |
+| stock_name | string | 예 | 대표 연관 종목명 |
+| stock_change | string | 예 | 대표 종목 등락률 문자열 예: `+3.2%` |
+| stock_up | bool | 예 | 대표 종목 상승 여부 |
+
 예시:
 
 ```bash
 curl http://localhost:8000/api/news/1 \
   -H "Authorization: Bearer <access_token>"
+```
+
+응답 예시:
+
+```json
+{
+  "news_id": 1,
+  "title": "삼성전자, 차세대 HBM 양산 준비",
+  "summary": "HBM 공급 확대 기대와 대형 고객사 수요가 부각됐다.",
+  "body": "삼성전자가 차세대 HBM 양산 준비에 속도를 내고 있다...",
+  "pub_date": "2026-02-25T12:34:56",
+  "url": "https://news.example.com/articles/1",
+  "sentiment": "긍정",
+  "keywords": ["HBM", "반도체", "양산", "AI"],
+  "stock_name": "삼성전자",
+  "stock_change": "+3.2%",
+  "stock_up": true
+}
 ```
 
 ---
@@ -284,6 +321,28 @@ curl "http://localhost:8000/api/news/recommendations?page=1&screen_session_id=sc
 
 - 인증 필수 엔드포인트입니다.
 - `RECOMMENDER_MOCK_MODE=false`에서 2페이지 이상 조회할 때는 반드시 직전 응답의 `next_cursor`를 전달해야 합니다.
+- 현재 추천 응답은 `body`, `sentiment`, `keywords`를 포함하지 않습니다. 이 필드들은 상세 조회(`GET /api/news/{news_id}`)에서만 반환됩니다.
+
+응답 스키마:
+
+| 필드 | 타입 | Nullable | 설명 |
+| ---- | ---- | -------- | ---- |
+| user_id | int | 아니오 | 인증 사용자 ID |
+| request_id | string | 아니오 | 추천 요청 추적 ID |
+| source | string | 아니오 | 추천 소스 |
+| page | int | 아니오 | 현재 페이지 |
+| next_cursor | string | 예 | 다음 페이지 커서 |
+| served_count | int | 아니오 | 응답에 포함된 아이템 수 |
+| logged | bool | 아니오 | 추천 응답 로깅 성공 여부 |
+| items | object[] | 아니오 | 추천 뉴스 목록 |
+| items[].news_id | int | 아니오 | 뉴스 ID |
+| items[].title | string | 아니오 | 뉴스 제목 |
+| items[].summary | string | 예 | 비어 있지 않은 요약/본문을 180자 미리보기로 정규화한 값 |
+| items[].pub_date | datetime | 예 | 발행 시각 |
+| items[].path | string | 예 | 추천 경로 코드 |
+| items[].stock_name | string | 예 | 대표 연관 종목명 |
+| items[].stock_change | string | 예 | 대표 종목 등락률 문자열 예: `-1.4%` |
+| items[].stock_up | bool | 예 | 대표 종목 상승 여부 |
 
 응답 예시:
 
@@ -302,7 +361,10 @@ curl "http://localhost:8000/api/news/recommendations?page=1&screen_session_id=sc
       "title": "기사 제목",
       "summary": "기사 요약",
       "pub_date": "2026-02-25T12:34:56",
-      "path": "A1"
+      "path": "A1",
+      "stock_name": "삼성전자",
+      "stock_change": "-1.4%",
+      "stock_up": false
     }
   ]
 }

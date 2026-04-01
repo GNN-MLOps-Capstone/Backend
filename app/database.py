@@ -155,7 +155,7 @@ async def init_db():
 
 async def ensure_interaction_tables():
     """
-    상호작용/추천 로깅 테이블의 마이그레이션 적용 여부를 확인합니다.
+    런타임에 필요한 마이그레이션 관리 테이블의 적용 여부를 확인합니다.
     """
     required_tables = {
         "interaction_events",
