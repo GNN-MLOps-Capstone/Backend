@@ -5,6 +5,9 @@ from datetime import date
 from app.config import get_settings
 from app.models import Notification
 from app.database import AsyncSessionLocal
+import logging
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -20,7 +23,7 @@ async def send_volatility_push_and_save(
     if not user_ids:
         return False, False
     if not settings.onesignal_app_id or not settings.onesignal_rest_api_key:
-        print("❌ OneSignal 설정이 누락되어 변동성 알림 발송을 건너뜁니다.")
+        logger.error("OneSignal 설정이 누락되어 변동성 알림 발송을 건너뜁니다.")
         return False, False
 
     # 1. 위험도 및 메시지 분기
@@ -57,12 +60,18 @@ async def send_volatility_push_and_save(
         try:
             response = await client.post(url, json=payload, headers=headers)
             if response.status_code != 200:
-                print(f"❌ OneSignal API 에러: {response.status_code} - {response.text}")
+                logger.error(f"OneSignal API 에러: {response.status_code} - {response.text}")
                 return False, False
             
-            os_id = response.json().get("id")
+            try:
+                body_json = response.json()
+            except ValueError:
+                logger.exception(f"OneSignal 응답 JSON 파싱 실패: {response.text}")
+                return False, False
+
+            os_id = body_json.get("id")
         except httpx.RequestError as e:
-            print(f"OneSignal API 연결 실패: {e}")
+            logger.exception(f"OneSignal API 연결 실패: {e}")
             return False, False
         
     if not os_id:
@@ -90,10 +99,10 @@ async def send_volatility_push_and_save(
             )
             await db.execute(stmt)
             await db.commit()
-            print(f"✅ [{alert_type}] {stock_name} 처리 완료 (푸시ID: {os_id})")
+            logger.info(f"[{alert_type}] {stock_name} 처리 완료 (푸시ID: {os_id})")
             return True, True
             
         except SQLAlchemyError as e:
             await db.rollback()
-            print(f"❌ DB 저장 중 예상치 못한 에러: {e}")
+            logger.exception(f"DB 저장 중 예상치 못한 에러: {e}")
             return True, False
