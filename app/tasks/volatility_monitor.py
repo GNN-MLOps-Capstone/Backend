@@ -42,6 +42,8 @@ async def run_volatility_check() -> None:
             result = await db.execute(stmt)
             all_stocks = result.all()
 
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             print(f"❌ 초기 데이터 조회 에러: {e}")
             return
@@ -112,16 +114,17 @@ async def run_volatility_check() -> None:
             if not target_users:
                 continue
  
-            await send_volatility_push_and_save(
+            result = await send_volatility_push_and_save(
                 target_users,
                 stock_name,
                 rate,
                 now.date(),
             )
  
-            # ✅ 발송 후 메모리 상의 sent_history 업데이트 (같은 루프 내 중복 방지)
-            for google_id in target_users:
-                sent_history.add((google_id, stock_name, current_type))
+            # ✅ 발송 성공 시에만 메모리 상의 sent_history 업데이트 (같은 루프 내 중복 방지)
+            if result:
+                for google_id in target_users:
+                    sent_history.add((google_id, stock_name, current_type))
  
         except asyncio.CancelledError:
             raise
