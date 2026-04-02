@@ -252,7 +252,7 @@ async def create_notification(
     except IntegrityError as e:
         await db.rollback()
         error_text = str(getattr(e, "orig", e)).lower()
-        if "uq_notification_onesignal_user" in error_text:
+        if "uq_notification_onesignal_user" in error_text or "uq_notification_daily" in error_text:
             return JSONResponse(
                 status_code=200,
                 content={"success": True, "message": "Already exists for this user"},

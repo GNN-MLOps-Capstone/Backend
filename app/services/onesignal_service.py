@@ -83,7 +83,7 @@ async def send_volatility_push_and_save(
 
             os_id = body_json.get("id")
         except httpx.RequestError as e:
-            logger.exception(f"OneSignal API 연결 실패: {e}")
+            logger.exception("OneSignal API 연결 실패: %s", e)
             return False, False
         
     if not os_id:
@@ -114,5 +114,5 @@ async def send_volatility_push_and_save(
             
         except SQLAlchemyError as e:
             await db.rollback()
-            logger.exception(f"DB 저장 중 예상치 못한 에러: {e}")
+            logger.exception("DB 저장 중 예상치 못한 에러: %s", e)
             return True, False
