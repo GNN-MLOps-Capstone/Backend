@@ -5,7 +5,6 @@ from app.kis.transformers import KST
 from app.database import AsyncSessionLocal 
 from app.models import Watchlist, User, Stock, Notification
 from app.routers.stocks import _fetch_stock_overview
-from app.services.onesignal_service import send_volatility_push_and_save
 from app.services.onesignal_service import (
     classify_volatility_type,
     send_volatility_push_and_save,
@@ -128,9 +127,8 @@ async def run_volatility_check() -> None:
                 print(f"[{stock_code}] DB 저장 실패 - 푸시 발송 여부: {push_sent}")
  
             if push_sent:
-                for google_id in user_google_ids:
-                    if google_id in target_users:
-                        sent_history.add((google_id, stock_name, current_type))
+                for google_id in target_users:
+                    sent_history.add((google_id, stock_name, current_type))
  
         except asyncio.CancelledError:
             raise
