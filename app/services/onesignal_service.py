@@ -89,6 +89,19 @@ async def send_volatility_push_and_save(
     if not os_id:
         return False, False
     
+    invalid_ids = set(
+        body_json.get("errors", {})
+        .get("invalid_aliases", {})
+        .get("external_id", [])
+    )
+    valid_user_ids = [uid for uid in normalized_user_ids if uid not in invalid_ids]
+
+    if invalid_ids:
+        logger.warning("OneSignal invalid_aliases 제외: %s", invalid_ids)
+
+    if not valid_user_ids:
+        return False, False
+    
     async with AsyncSessionLocal() as db:
         try:
             rows = [
@@ -104,12 +117,12 @@ async def send_volatility_push_and_save(
                     "onesignal_notification_id": os_id,
                     "date_kst": date_kst, 
                 }
-                for gid in normalized_user_ids
+                for gid in valid_user_ids
             ]
             stmt = pg_insert(Notification).values(rows).on_conflict_do_nothing()
             await db.execute(stmt)
             await db.commit()
-            logger.info(f"[{alert_type}] {stock_name} 처리 완료 (푸시ID: {os_id})")
+            logger.info("[%s] %s 처리 완료 (푸시ID: %s)", alert_type, stock_name, os_id)
             return True, True
             
         except SQLAlchemyError as e:
