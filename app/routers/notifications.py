@@ -249,13 +249,15 @@ async def create_notification(
         await db.commit()
         await db.refresh(new_noti)
         return {"success": True, "id": new_noti.id}
-    except IntegrityError:
+    except IntegrityError as e:
         await db.rollback()
-        # 중복 키 - 이미 다른 요청에서 저장됨 (경쟁 조건)
-        return JSONResponse(
-            status_code=200,
-            content={"success": True, "message": "Already exists for this user"}
-        )
+        error_text = str(getattr(e, "orig", e)).lower()
+        if "uq_notification_onesignal_user" in error_text:
+            return JSONResponse(
+                status_code=200,
+                content={"success": True, "message": "Already exists for this user"},
+            )
+        raise HTTPException(status_code=500, detail="알림 저장 실패") from e
     except Exception as e:
         await db.rollback()
         logger.exception("알림 저장 실패: user_id=%s", current_user.id)
