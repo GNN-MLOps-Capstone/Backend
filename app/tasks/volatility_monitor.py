@@ -6,6 +6,10 @@ from app.database import AsyncSessionLocal
 from app.models import Watchlist, User, Stock, Notification
 from app.routers.stocks import _fetch_stock_overview
 from app.services.onesignal_service import send_volatility_push_and_save
+from app.services.onesignal_service import (
+    classify_volatility_type,
+    send_volatility_push_and_save,
+)
 
 async def run_volatility_check() -> None:
     # 한국 시간대 설정
@@ -76,7 +80,7 @@ async def run_volatility_check() -> None:
             if abs_rate < 5.0:
                 continue
 
-            current_type = "high_risk" if abs_rate >= 10.0 else "risk"
+            current_type = classify_volatility_type(rate)
 
             # 이 종목의 watcher 전체 조회
             async with AsyncSessionLocal() as db:

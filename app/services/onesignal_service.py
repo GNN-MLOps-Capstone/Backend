@@ -99,7 +99,7 @@ async def send_volatility_push_and_save(
     valid_user_ids = [uid for uid in normalized_user_ids if uid not in invalid_ids]
 
     if invalid_ids:
-        logger.warning("OneSignal invalid_aliases 제외: %s", invalid_ids)
+        logger.warning("OneSignal invalid_aliases 제외(count=%d)", len(invalid_ids))
 
     if not valid_user_ids:
         return False, False
