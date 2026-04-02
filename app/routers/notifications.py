@@ -18,6 +18,7 @@ API 엔드포인트:
 
 import logging
 from typing import List
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, update, func, desc
@@ -240,7 +241,8 @@ async def create_notification(
         sentiment_score=req.sentiment_score,
         body=req.body,
         is_read=False,
-        star=False
+        star=False,
+        date_kst=datetime.now(timezone(timedelta(hours=9))).date()
     )
     try:
         db.add(new_noti)

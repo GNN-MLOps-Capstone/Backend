@@ -72,13 +72,13 @@ async def send_volatility_push_and_save(
         try:
             response = await client.post(url, json=payload, headers=headers)
             if response.status_code != 200:
-                logger.error(f"OneSignal API 에러: {response.status_code} - {response.text}")
+                logger.error("OneSignal API 에러(status=%s)", response.status_code)
                 return False, False
             
             try:
                 body_json = response.json()
             except ValueError:
-                logger.exception(f"OneSignal 응답 JSON 파싱 실패: {response.text}")
+                logger.exception("OneSignal 응답 JSON 파싱 실패(status=%s)", response.status_code)
                 return False, False
 
             os_id = body_json.get("id")
