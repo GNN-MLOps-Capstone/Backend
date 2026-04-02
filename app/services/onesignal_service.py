@@ -24,7 +24,8 @@ async def send_volatility_push_and_save(
     """
     위험도(10% 기준)에 따라 메시지를 차별화하여 발송하고 DB에 기록합니다.
     """
-    if not user_ids:
+    normalized_user_ids = sorted(set(user_ids))
+    if not normalized_user_ids:
         return False, False
     if not settings.onesignal_app_id or not settings.onesignal_rest_api_key:
         logger.error("OneSignal 설정이 누락되어 변동성 알림 발송을 건너뜁니다.")
@@ -52,11 +53,11 @@ async def send_volatility_push_and_save(
 
     payload = {
         "app_id": settings.onesignal_app_id,
-        "include_aliases": {"external_id": user_ids},
+        "include_aliases": {"external_id": normalized_user_ids},
         "idempotency_key": str(
             uuid5(
                 NAMESPACE_URL,
-                f"{date_kst}:{alert_type}:{stock_name}:{','.join(sorted(user_ids))}",
+                f"{date_kst}:{alert_type}:{stock_name}:{','.join(normalized_user_ids)}",
             )
         ),
         "target_channel": "push",
@@ -103,7 +104,7 @@ async def send_volatility_push_and_save(
                     "onesignal_notification_id": os_id,
                     "date_kst": date_kst, 
                 }
-                for gid in user_ids
+                for gid in normalized_user_ids
             ]
             stmt = pg_insert(Notification).values(rows).on_conflict_do_nothing()
             await db.execute(stmt)
