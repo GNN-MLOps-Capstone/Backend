@@ -30,7 +30,9 @@ async def run_volatility_check() -> None:
                 Notification.date_kst == now.date(),
             )
             sent_result = await db.execute(sent_today_stmt)
-            sent_history: set[tuple[str, str, str]] = set(sent_result.all())
+            sent_history: set[tuple[str, str, str]] = {
+                (row[0], row[1], row[2]) for row in sent_result.all()
+            }
 
             # 감시할 전체 종목 정보 가져오기
             stmt = select(Watchlist.stock_id, Stock.stock_name).distinct().join(
