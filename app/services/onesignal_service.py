@@ -105,9 +105,7 @@ async def send_volatility_push_and_save(
                 }
                 for gid in user_ids
             ]
-            stmt = pg_insert(Notification).values(rows).on_conflict_do_nothing(
-                index_elements=["user_id", "stock_name", "type", "date_kst"]
-            )
+            stmt = pg_insert(Notification).values(rows).on_conflict_do_nothing()
             await db.execute(stmt)
             await db.commit()
             logger.info(f"[{alert_type}] {stock_name} 처리 완료 (푸시ID: {os_id})")
