@@ -1,7 +1,7 @@
 import asyncio
-import pytz
 from datetime import datetime
 from sqlalchemy import select, func
+from app.kis.transformers import KST
 from app.database import AsyncSessionLocal 
 from app.models import Watchlist, User, Stock, Notification
 from app.routers.stocks import _fetch_stock_overview
@@ -9,8 +9,7 @@ from app.services.onesignal_service import send_volatility_push_and_save
 
 async def run_volatility_check() -> None:
     # 한국 시간대 설정
-    kst = pytz.timezone('Asia/Seoul')
-    now = datetime.now(kst)
+    now = datetime.now(KST)
     
     # 주말이거나 운영 시간이 아니면 종료
     if now.weekday() >= 5 or not (8 <= now.hour < 20):
@@ -51,7 +50,7 @@ async def run_volatility_check() -> None:
     print(f"감시 시작: {len(all_stocks)}개 종목")
 
     for stock_code, stock_name in all_stocks:
-        now = datetime.now(kst)
+        now = datetime.now(KST)
         if now.weekday() >= 5 or not (8 <= now.hour < 20):
             print("운영 시간 종료, 감시 루프를 중단합니다.")
             break
@@ -112,7 +111,7 @@ async def run_volatility_check() -> None:
             if not target_users:
                 continue
                 
-            now = datetime.now(kst)
+            now = datetime.now(KST)
             if now.weekday() >= 5 or not (8 <= now.hour < 20):
                 print("운영 시간 종료, 발송을 중단합니다.")
                 break

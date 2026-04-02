@@ -30,6 +30,7 @@ from app.database import get_db
 from app.models import Notification,User
 from app.schemas import NotificationCreateRequest, NotificationResponse, NotificationReadRequest, NotificationCountResponse
 from app.routers.users import get_current_user
+from app.kis.transformers import KST
 
 router = APIRouter(
     prefix="/api/notifications",
@@ -242,7 +243,7 @@ async def create_notification(
         body=req.body,
         is_read=False,
         star=False,
-        date_kst=datetime.now(timezone(timedelta(hours=9))).date()
+        date_kst=datetime.now(KST).date()
     )
     try:
         db.add(new_noti)

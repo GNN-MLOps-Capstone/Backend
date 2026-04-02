@@ -36,13 +36,14 @@ async def send_volatility_push_and_save(
     is_high_risk = alert_type == "high_risk"
     
     direction = "🚀 급등" if rate > 0 else "📉 급락"
+    direction_text = "상승" if rate > 0 else "하락"
     prefix = "⚠️ [초고변동 경고]" if is_high_risk else "🔔 [변동 알림]"
     
     title = f"{prefix} {stock_name} {direction}"
     body = (
-        f"‼️ 주의: {stock_name} 종목이 {rate}%로 폭주 중입니다!" 
-        if is_high_risk else 
-        f"{stock_name} 종목이 전일 대비 {rate}% {direction} 중입니다."
+        f"오늘 {rate:+.1f}% 급변동 중입니다. 지금 바로 확인하세요."
+        if is_high_risk else
+        f"전일 대비 {rate:+.1f}% {direction_text} 중입니다."
     )
 
     url = "https://api.onesignal.com/notifications"
@@ -67,6 +68,7 @@ async def send_volatility_push_and_save(
     }
 
     os_id = None
+    body_json = {}
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
