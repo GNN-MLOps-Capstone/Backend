@@ -255,12 +255,13 @@ GET /api/news/{news_id}
 | ---- | ---- | -------- | ---- |
 | news_id | int | 아니오 | 뉴스 ID |
 | title | string | 아니오 | HTML 엔티티가 디코딩된 제목 |
-| summary | string | 예 | 정제 요약. `filtered_news.summary`가 비어 있으면 Gemini 분석/본문 fallback 사용 |
-| body | string | 예 | 본문 전체 텍스트. `filtered_news.refined_text` 우선, 없으면 크롤링 본문 사용 |
+| summary | string | 예 | `filtered_news.summary` 값을 그대로 사용 |
+| body | string | 예 | 본문 전체 텍스트. `crawled_news.text`를 그대로 사용 |
 | pub_date | datetime | 예 | 발행 시각 |
 | url | string | 예 | 원문 URL |
-| sentiment | string | 예 | 감성 결과. 현재 값은 `긍정`, `중립`, `부정` 중 하나 |
-| keywords | string[] | 아니오 | 추출 키워드 배열. 없으면 빈 배열 |
+| sentiment | string | 예 | `filtered_news.sentiment` 값을 그대로 사용. 현재 값은 `긍정`, `중립`, `부정` 중 하나 |
+| keywords | string[] | 아니오 | `news_keyword_mapping`과 `keywords.word`를 조인해 조회한 키워드 배열. 없으면 빈 배열 |
+| related_stocks | object[] | 아니오 | 상세에 노출할 연관 종목 배열. `news_stock_mapping` 전체 매핑을 우선 사용하고, 없으면 Gemini `related_stocks`를 `stocks.stock_name`/`aliases.alias_name` 정확 매칭한 결과만 사용 |
 | stock_name | string | 예 | 대표 연관 종목명 |
 | stock_change | string | 예 | 대표 종목 등락률 문자열 예: `+3.2%` |
 | stock_up | bool | 예 | 대표 종목 상승 여부 |
@@ -284,6 +285,10 @@ curl http://localhost:8000/api/news/1 \
   "url": "https://news.example.com/articles/1",
   "sentiment": "긍정",
   "keywords": ["HBM", "반도체", "양산", "AI"],
+  "related_stocks": [
+    {"stock_id": "005930", "stock_name": "삼성전자", "stock_change": "+3.2%", "stock_up": true},
+    {"stock_id": "000660", "stock_name": "SK하이닉스", "stock_change": "+2.1%", "stock_up": true}
+  ],
   "stock_name": "삼성전자",
   "stock_change": "+3.2%",
   "stock_up": true

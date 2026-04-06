@@ -64,6 +64,13 @@ class NewsListResponse(BaseModel):
     items: list[NewsSimpleResponse]
 
 
+class NewsRelatedStockResponse(BaseModel):
+    stock_id: str
+    stock_name: str
+    stock_change: Optional[str] = None
+    stock_up: Optional[bool] = None
+
+
 class NewsDetailResponse(BaseModel):
     """
     뉴스 상세 응답 스키마
@@ -78,6 +85,7 @@ class NewsDetailResponse(BaseModel):
     url: Optional[str] = None
     sentiment: Optional[str] = None
     keywords: List[str] = Field(default_factory=list)
+    related_stocks: List[NewsRelatedStockResponse] = Field(default_factory=list)
     stock_name: Optional[str] = None
     stock_change: Optional[str] = None
     stock_up: Optional[bool] = None

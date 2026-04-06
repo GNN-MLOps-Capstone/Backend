@@ -102,32 +102,6 @@ def _first_non_empty_text(*values: str | None) -> str | None:
     return None
 
 
-def _fallback_summary(text: str | None) -> str:
-    normalized = _normalize_whitespace(text)
-    if not normalized:
-        return "요약 생성 실패"
-    return normalized[:220]
-
-
-def _normalize_keywords(raw_keywords: object) -> list[str]:
-    if not isinstance(raw_keywords, list):
-        return []
-    normalized: list[str] = []
-    seen: set[str] = set()
-    for raw_keyword in raw_keywords:
-        keyword = str(raw_keyword).strip()
-        if not keyword:
-            continue
-        lowered = keyword.lower()
-        if lowered in seen:
-            continue
-        seen.add(lowered)
-        normalized.append(keyword)
-        if len(normalized) >= 6:
-            break
-    return normalized
-
-
 def _format_change_rate(change_rate: float | None) -> str | None:
     if change_rate is None:
         return None
@@ -229,10 +203,10 @@ async def _fetch_change_rates_for_stock_ids(stock_ids: list[str]) -> dict[str, f
     }
 
 
-async def _select_top_stock_rows(
+async def _select_stock_rows(
     db: AsyncSession,
     news_ids: list[int],
-) -> dict[int, dict[str, str | datetime | None]]:
+) -> dict[int, list[dict[str, str | datetime | None]]]:
     if not news_ids:
         return {}
 
@@ -256,16 +230,90 @@ async def _select_top_stock_rows(
     )
     result = await db.execute(stmt)
 
-    top_rows: dict[int, dict[str, str | float | datetime | None]] = {}
+    stock_rows: dict[int, list[dict[str, str | datetime | None]]] = {}
     for row in result.all():
-        if row.news_id in top_rows:
-            continue
-        top_rows[int(row.news_id)] = {
+        stock_rows.setdefault(int(row.news_id), []).append(
+            {
+                "stock_id": row.stock_id,
+                "stock_name": row.stock_name,
+                "created_at": row.created_at,
+            }
+        )
+    return stock_rows
+
+
+async def _select_top_stock_row_per_news(
+    db: AsyncSession,
+    news_ids: list[int],
+) -> dict[int, dict[str, str | datetime | None]]:
+    if not news_ids:
+        return {}
+
+    ranked_stock_rows = (
+        select(
+            NewsStockMapping.news_id.label("news_id"),
+            NewsStockMapping.stock_id.label("stock_id"),
+            func.coalesce(StockSummaryCache.stock_name, Stock.stock_name).label("stock_name"),
+            NewsStockMapping.created_at.label("created_at"),
+            func.row_number()
+            .over(
+                partition_by=NewsStockMapping.news_id,
+                order_by=(
+                    desc(func.coalesce(NewsStockMapping.weight, 1.0)),
+                    desc(NewsStockMapping.created_at),
+                    desc(NewsStockMapping.mapping_id),
+                ),
+            )
+            .label("row_num"),
+        )
+        .join(Stock, NewsStockMapping.stock_id == Stock.stock_id)
+        .outerjoin(StockSummaryCache, NewsStockMapping.stock_id == StockSummaryCache.stock_id)
+        .where(NewsStockMapping.news_id.in_(news_ids))
+        .subquery()
+    )
+    stmt = (
+        select(
+            ranked_stock_rows.c.news_id,
+            ranked_stock_rows.c.stock_id,
+            ranked_stock_rows.c.stock_name,
+            ranked_stock_rows.c.created_at,
+        )
+        .where(ranked_stock_rows.c.row_num == 1)
+        .order_by(ranked_stock_rows.c.news_id)
+    )
+    result = await db.execute(stmt)
+    return {
+        int(row.news_id): {
             "stock_id": row.stock_id,
             "stock_name": row.stock_name,
             "created_at": row.created_at,
         }
-    return top_rows
+        for row in result.all()
+    }
+
+
+def _build_related_stock_payloads(
+    stock_rows: list[dict[str, str | datetime | None]],
+    change_rate_map: dict[str, float | None],
+) -> list[dict[str, str | bool | None]]:
+    payloads: list[dict[str, str | bool | None]] = []
+    seen_stock_ids: set[str] = set()
+    for row in stock_rows:
+        stock_id = str(row.get("stock_id") or "").strip()
+        stock_name = str(row.get("stock_name") or stock_id).strip()
+        if not stock_id or not stock_name or stock_id in seen_stock_ids:
+            continue
+        seen_stock_ids.add(stock_id)
+        change_rate = change_rate_map.get(stock_id)
+        payloads.append(
+            {
+                "stock_id": stock_id,
+                "stock_name": stock_name,
+                "stock_change": _format_change_rate(change_rate),
+                "stock_up": _stock_up_from_change_rate(change_rate),
+            }
+        )
+    return payloads
 
 
 async def _get_keywords_for_news(db: AsyncSession, news_id: int, limit: int = 5) -> list[str]:
@@ -360,7 +408,7 @@ async def _build_recommendation_items(
     crawled_map = {int(news_id): text for news_id, text in crawled_rows}
     filtered_map = {int(news_id): summary for news_id, summary in filtered_rows}
 
-    top_stock_map = await _select_top_stock_rows(db, news_ids)
+    top_stock_map = await _select_top_stock_row_per_news(db, news_ids)
     change_rate_map = await _fetch_change_rates_for_stock_ids(
         [
             str(top_stock.get("stock_id") or "").strip()
@@ -723,47 +771,49 @@ async def get_news_detail(
         await db.execute(select(FilteredNews).where(FilteredNews.news_id == news_id))
     ).scalar_one_or_none()
 
-    article_text = (
-        _first_non_empty_text(
-            filtered.refined_text if filtered else None,
-            news.crawled_news.text if news.crawled_news else None,
-        )
-        or ""
-    )
+    article_text = _normalize_whitespace(
+        news.crawled_news.text if news.crawled_news else None,
+    ) or ""
     pipeline_keywords = await _get_keywords_for_news(db, news_id)
     existing_keywords = pipeline_keywords
-    existing_top_stock_map = await _select_top_stock_rows(db, [news_id])
-    existing_top_stock = existing_top_stock_map.get(news_id)
+    existing_stock_rows_map = await _select_stock_rows(db, [news_id])
+    existing_stock_rows = existing_stock_rows_map.get(news_id, [])
+    existing_top_stock = existing_stock_rows[0] if existing_stock_rows else None
 
     existing_summary = _first_non_empty_text(filtered.summary if filtered else None) or ""
     existing_sentiment = _first_non_empty_text(filtered.sentiment if filtered else None) or ""
 
-    missing_summary = not existing_summary
-    missing_sentiment = not existing_sentiment
-    missing_keywords = len(existing_keywords) == 0
     missing_stocks = existing_top_stock is None
     analysis: dict | None = None
 
-    if missing_summary or missing_sentiment or missing_keywords or missing_stocks:
+    if missing_stocks:
         analysis = await analyze_article(article_text)
-        if missing_keywords:
-            existing_keywords = _normalize_keywords(analysis.get("keywords"))
-        if missing_stocks:
-            related_stocks = await _resolve_related_stocks(db, analysis.get("related_stocks") or [])
-            if related_stocks:
-                existing_top_stock = {
-                    "stock_id": related_stocks[0][0],
-                    "stock_name": related_stocks[0][1],
+        related_stocks = await _resolve_related_stocks(db, analysis.get("related_stocks") or [])
+        if related_stocks:
+            existing_stock_rows = [
+                {
+                    "stock_id": stock_id,
+                    "stock_name": stock_name,
+                    "created_at": None,
                 }
+                for stock_id, stock_name in related_stocks
+            ]
+            existing_top_stock = existing_stock_rows[0]
 
-    stock_id = str(existing_top_stock["stock_id"]) if existing_top_stock and existing_top_stock.get("stock_id") else None
-    change_rate = await _fetch_change_rate_safe(stock_id) if stock_id else None
+    related_stock_change_rates = await _fetch_change_rates_for_stock_ids(
+        [
+            str(stock_row.get("stock_id") or "").strip()
+            for stock_row in existing_stock_rows
+        ]
+    )
+    related_stock_payloads = _build_related_stock_payloads(
+        existing_stock_rows,
+        related_stock_change_rates,
+    )
+    primary_stock = related_stock_payloads[0] if related_stock_payloads else None
     body = article_text
-    analyzed_summary = _first_non_empty_text(analysis.get("summary") if analysis else None)
-    analyzed_sentiment = _first_non_empty_text(analysis.get("sentiment") if analysis else None)
-    summary = existing_summary or analyzed_summary or _fallback_summary(body)
-    sentiment = existing_sentiment or analyzed_sentiment
-    stock_up = _stock_up_from_change_rate(change_rate)
+    summary = existing_summary or None
+    sentiment = existing_sentiment or None
 
     return NewsDetailResponse(
         news_id=int(news.news_id),
@@ -774,7 +824,8 @@ async def get_news_detail(
         url=news.url,
         sentiment=sentiment,
         keywords=existing_keywords,
-        stock_name=str(existing_top_stock["stock_name"]) if existing_top_stock and existing_top_stock.get("stock_name") else None,
-        stock_change=_format_change_rate(change_rate),
-        stock_up=stock_up,
+        related_stocks=related_stock_payloads,
+        stock_name=str(primary_stock["stock_name"]) if primary_stock else None,
+        stock_change=str(primary_stock["stock_change"]) if primary_stock and primary_stock.get("stock_change") else None,
+        stock_up=primary_stock["stock_up"] if primary_stock and primary_stock.get("stock_up") is not None else None,
     )
