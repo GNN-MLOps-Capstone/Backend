@@ -544,13 +544,14 @@ curl "http://localhost:8000/api/stocks/005930/series?range=1m" \
   -H "Authorization: Bearer <access_token>"
 ```
 
-### 유사 종목 조회
+### 연관 종목 조회
 
 ```
 GET /api/stocks/{code}/related?limit=10
 ```
 
-- `test_service_embeddings` 테이블의 `entity_type='stock'` 임베딩에 대해 코사인 유사도 검색을 수행합니다.
+- `news_stock_mapping` 테이블에서 기준 종목과 같은 뉴스에 함께 등장한 다른 종목을 전체 기간 기준으로 집계해 공등장 순위로 반환합니다.
+- 정렬 기준은 공등장 뉴스 수 내림차순, 최근 매핑 시각 내림차순, 종목코드 오름차순입니다.
 - 응답의 `logo_url`은 바로 렌더링 가능한 SVG `data:` URL입니다.
 
 예시:
@@ -580,8 +581,9 @@ curl "http://localhost:8000/api/stocks/005930/related?limit=5" \
 GET /api/stocks/{code}/theme-keywords?limit=5
 ```
 
-- `test_service_embeddings` 테이블에서 `stock` 임베딩과 `keyword` 임베딩 사이 코사인 유사도를 조회합니다.
-- `similarity_score`는 0~1 범위의 코사인 유사도 값입니다.
+- 최근 7일 내 `news_stock_mapping`으로 해당 종목이 등장한 뉴스 집합을 잡고, 최근 7일 내 `news_keyword_mapping` 및 `keywords.word`를 조인해 같은 뉴스에 함께 등장한 키워드를 집계합니다.
+- 종목명과 동일한 키워드는 제외합니다.
+- `similarity_score`는 해당 종목 뉴스 중 해당 키워드가 함께 등장한 비율(0~1)입니다.
 - `color_level`은 해당 종목에서 가장 높은 키워드 대비 상대 강도로 계산합니다.
 
 예시:
@@ -597,7 +599,7 @@ curl "http://localhost:8000/api/stocks/005930/theme-keywords?limit=5" \
 {
   "stock_code": "005930",
   "stock_name": "삼성전자",
-  "core_message": "삼성전자는 반도체 키워드와 관련이 깊어요",
+  "core_message": "삼성전자 뉴스에서 반도체 키워드가 자주 함께 등장해요",
   "core_keyword": "반도체",
   "theme_keywords": [
     {

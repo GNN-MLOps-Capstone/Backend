@@ -1421,12 +1421,12 @@ def _keyword_color_level(score: float, top_score: float) -> str:
 @router.get("/{stock_code}/related", response_model=RelatedStocksResponse)
 async def get_related_stocks(
     stock_code: str = Path(..., pattern=r"^[A-Za-z0-9]{6}$", description="종목코드 (6자리)"),
-    limit: int = Query(10, ge=1, le=20, description="반환할 유사 종목 수"),
+    limit: int = Query(10, ge=1, le=20, description="반환할 공등장 상위 종목 수"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
-    임베딩 코사인 유사도 기반으로 유사 종목 목록을 반환한다.
+    전체 기간 동일 뉴스에 함께 등장한 빈도 기반으로 연관 종목 목록을 반환한다.
     """
     _ = current_user
     exists = await db.execute(select(Stock.stock_id).where(Stock.stock_id == stock_code))
@@ -1436,17 +1436,17 @@ async def get_related_stocks(
     query = text(
         """
         SELECT
-            related.entity_id AS stock_code,
-            COALESCE(s.stock_name, related.display_name, related.entity_id) AS stock_name
-        FROM test_service_embeddings AS source
-        JOIN test_service_embeddings AS related
-          ON related.entity_type = 'stock'
-         AND related.entity_id <> source.entity_id
+            related.stock_id AS stock_code,
+            COALESCE(s.stock_name, related.stock_id) AS stock_name
+        FROM news_stock_mapping AS source
+        JOIN news_stock_mapping AS related
+          ON related.news_id = source.news_id
+         AND related.stock_id <> source.stock_id
         LEFT JOIN stocks AS s
-          ON s.stock_id = related.entity_id
-        WHERE source.entity_type = 'stock'
-          AND source.entity_id = :stock_code
-        ORDER BY source.gnn_embedding <=> related.gnn_embedding
+          ON s.stock_id = related.stock_id
+        WHERE source.stock_id = :stock_code
+        GROUP BY related.stock_id, COALESCE(s.stock_name, related.stock_id)
+        ORDER BY COUNT(DISTINCT related.news_id) DESC, MAX(related.created_at) DESC, related.stock_id ASC
         LIMIT :limit
         """
     )
@@ -1456,7 +1456,7 @@ async def get_related_stocks(
     if not rows:
         raise HTTPException(
             status_code=404,
-            detail="해당 종목의 임베딩 데이터가 없어 유사 종목을 조회할 수 없습니다.",
+            detail="해당 종목과 함께 등장한 다른 종목 데이터가 없어 연관 종목을 조회할 수 없습니다.",
         )
 
     related_stocks = [
@@ -1478,7 +1478,7 @@ async def get_stock_theme_keywords(
     current_user: User = Depends(get_current_user),
 ):
     """
-    종목 임베딩과 키워드 임베딩의 코사인 유사도 기반 테마 키워드를 반환한다.
+    최근 7일 내 동일 뉴스에 함께 등장한 빈도 기반으로 테마 키워드를 반환한다.
     """
     _ = current_user
     stock_row = (
@@ -1490,34 +1490,50 @@ async def get_stock_theme_keywords(
         raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다.")
 
     stock_name = stock_row.stock_name or stock_code
+    cutoff = datetime.utcnow() - timedelta(days=7)
     query = text(
         """
+        WITH source_news AS (
+            SELECT DISTINCT news_id
+            FROM news_stock_mapping
+            WHERE stock_id = :stock_code
+              AND created_at >= :cutoff
+        )
         SELECT
-            related.entity_id AS keyword_id,
-            COALESCE(related.display_name, related.entity_id) AS keyword,
-            source.gnn_embedding <=> related.gnn_embedding AS cosine_distance
-        FROM test_service_embeddings AS source
-        JOIN test_service_embeddings AS related
-          ON related.entity_type = 'keyword'
-        WHERE source.entity_type = 'stock'
-          AND source.entity_id = :stock_code
-        ORDER BY source.gnn_embedding <=> related.gnn_embedding
+            k.word AS keyword,
+            ROUND(
+                COUNT(DISTINCT nkm.news_id)::numeric
+                / NULLIF((SELECT COUNT(*) FROM source_news), 0),
+                2
+            ) AS cooccurrence_score
+        FROM source_news AS sn
+        JOIN news_keyword_mapping AS nkm
+          ON nkm.news_id = sn.news_id
+         AND nkm.created_at >= :cutoff
+        JOIN keywords AS k
+          ON k.keyword_id = nkm.keyword_id
+        WHERE BTRIM(k.word) <> BTRIM(:stock_name)
+        GROUP BY k.keyword_id, k.word
+        ORDER BY COUNT(DISTINCT nkm.news_id) DESC, MAX(nkm.created_at) DESC, k.word ASC
         LIMIT :limit
         """
     )
-    result = await db.execute(query, {"stock_code": stock_code, "limit": limit})
+    result = await db.execute(
+        query,
+        {"stock_code": stock_code, "stock_name": stock_name, "limit": limit, "cutoff": cutoff},
+    )
     rows = result.mappings().all()
 
     if not rows:
         raise HTTPException(
             status_code=404,
-            detail="해당 종목의 임베딩 데이터가 없어 관련 키워드를 조회할 수 없습니다.",
+            detail="해당 종목과 함께 등장한 키워드 데이터가 없어 관련 키워드를 조회할 수 없습니다.",
         )
 
     scored_keywords = [
         {
             "keyword": row["keyword"],
-            "similarity_score": _normalize_similarity_score(row["cosine_distance"]),
+            "similarity_score": float(row["cooccurrence_score"] or 0.0),
         }
         for row in rows
     ]
@@ -1534,7 +1550,7 @@ async def get_stock_theme_keywords(
     return {
         "stock_code": stock_code,
         "stock_name": stock_name,
-        "core_message": f"{stock_name}는 {core_keyword} 키워드와 관련이 깊어요",
+        "core_message": f"{stock_name} 뉴스에서 {core_keyword} 키워드가 자주 함께 등장해요",
         "core_keyword": core_keyword,
         "theme_keywords": theme_keywords,
     }
