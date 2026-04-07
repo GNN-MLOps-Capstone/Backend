@@ -25,7 +25,7 @@ import base64
 import binascii
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -43,6 +43,7 @@ from app.models import (
     NewsStockMapping,
     FilteredNews,
     RecommendationServe,
+    RecommendationNewsPathMetrics,
     User,
     Stock,
     Alias,
@@ -55,6 +56,7 @@ from app.schemas import (
     StockSummaryResponse,
     NewsRecommendationItem,
     NewsRecommendationResponse,
+    TopDwellStockResponse,
 )
 from app.kis.errors import KISError
 from app.recommender.client import RecommendationCandidate
@@ -649,6 +651,71 @@ async def get_news_recommendations(
         logged=logged,
         items=items,
     )
+
+
+@router.get("/top-dwell-stocks", response_model=list[TopDwellStockResponse])
+async def get_top_dwell_stocks(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    최근 24시간 동안 뉴스 상세 체류 이벤트 수가 가장 많았던 종목 상위 3개를 반환합니다.
+    """
+    _ = current_user
+    window_start = datetime.utcnow() - timedelta(hours=24)
+
+    aggregated_metrics = (
+        select(
+            NewsStockMapping.stock_id.label("stock_id"),
+            func.sum(RecommendationNewsPathMetrics.dwell_event_count).label(
+                "total_dwell_event_count"
+            ),
+            func.count(func.distinct(RecommendationNewsPathMetrics.news_id)).label("news_count"),
+            func.max(RecommendationNewsPathMetrics.bucket_end).label("latest_bucket_end"),
+        )
+        .join(
+            NewsStockMapping,
+            NewsStockMapping.news_id == RecommendationNewsPathMetrics.news_id,
+        )
+        .where(RecommendationNewsPathMetrics.path == "TOTAL")
+        .where(RecommendationNewsPathMetrics.bucket_end >= window_start)
+        .group_by(NewsStockMapping.stock_id)
+        .subquery()
+    )
+
+    query = (
+        select(
+            aggregated_metrics.c.stock_id,
+            StockSummaryCache.stock_name,
+            aggregated_metrics.c.total_dwell_event_count,
+            aggregated_metrics.c.news_count,
+            aggregated_metrics.c.latest_bucket_end,
+        )
+        .outerjoin(
+            StockSummaryCache,
+            StockSummaryCache.stock_id == aggregated_metrics.c.stock_id,
+        )
+        .order_by(
+            desc(aggregated_metrics.c.total_dwell_event_count),
+            desc(aggregated_metrics.c.news_count),
+            desc(aggregated_metrics.c.latest_bucket_end),
+        )
+        .limit(3)
+    )
+
+    result = await db.execute(query)
+    rows = result.mappings().all()
+
+    return [
+        TopDwellStockResponse(
+            stock_id=row["stock_id"],
+            stock_name=decode_html_entities(row["stock_name"]),
+            total_dwell_event_count=int(row["total_dwell_event_count"] or 0),
+            news_count=int(row["news_count"] or 0),
+            latest_bucket_end=row["latest_bucket_end"],
+        )
+        for row in rows
+    ]
 
 
 # =============================================================================

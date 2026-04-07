@@ -400,3 +400,18 @@ class RecommendationServe(Base):
     is_mock = Column(Boolean, nullable=False, default=False)
     served_items = Column(JSONB, nullable=False, default=list)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class RecommendationNewsPathMetrics(Base):
+    """
+    추천 경로별 뉴스 체류 메트릭 집계 테이블
+    """
+
+    __tablename__ = "recommendation_news_path_metrics"
+
+    bucket_start = Column(DateTime, primary_key=True, nullable=False, index=True)
+    bucket_end = Column(DateTime, primary_key=True, nullable=False, index=True)
+    news_id = Column(BigInteger, primary_key=True, index=True)
+    path = Column(String(16), primary_key=True, nullable=False)
+    dwell_event_count = Column(BigInteger, nullable=False, default=0)
+    updated_at = Column(DateTime, nullable=False, server_default=func.now())

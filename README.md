@@ -374,6 +374,41 @@ curl "http://localhost:8000/api/news/recommendations?page=1&screen_session_id=sc
 
 ---
 
+### 최근 24시간 체류 상위 종목
+
+```http
+GET /api/news/top-dwell-stocks
+```
+
+- 인증 필수 엔드포인트입니다.
+- 최근 24시간 동안 `recommendation_news_path_metrics`의 `dwell_event_count`를 뉴스별로 확인한 뒤,
+  `news_stock_mapping` 기준으로 종목별 합산하여 상위 3개를 반환합니다.
+- 경로별 중복 합산을 막기 위해 `path='TOTAL'` 버킷만 집계합니다.
+- 하나의 뉴스가 여러 종목에 매핑된 경우 해당 뉴스의 `dwell_event_count`는 각 종목에 그대로 반영됩니다.
+
+예시:
+
+```bash
+curl "http://localhost:8000/api/news/top-dwell-stocks" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+응답 예시:
+
+```json
+[
+  {
+    "stock_id": "005930",
+    "stock_name": "삼성전자",
+    "total_dwell_event_count": 128,
+    "news_count": 7,
+    "latest_bucket_end": "2026-03-31T08:00:00+00:00"
+  }
+]
+```
+
+---
+
 ### 추천 로그 수집 (탭/뉴스 체류시간)
 
 ```http
@@ -507,6 +542,71 @@ curl "http://localhost:8000/api/stocks/005930/series?range=1w" \
 # 최근 1달 일봉
 curl "http://localhost:8000/api/stocks/005930/series?range=1m" \
   -H "Authorization: Bearer <access_token>"
+```
+
+### 유사 종목 조회
+
+```
+GET /api/stocks/{code}/related?limit=10
+```
+
+- `test_service_embeddings` 테이블의 `entity_type='stock'` 임베딩에 대해 코사인 유사도 검색을 수행합니다.
+- 응답의 `logo_url`은 바로 렌더링 가능한 SVG `data:` URL입니다.
+
+예시:
+
+```bash
+curl "http://localhost:8000/api/stocks/005930/related?limit=5" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+응답 예시:
+
+```json
+{
+  "related_stocks": [
+    {
+      "stock_code": "000660",
+      "stock_name": "SK하이닉스",
+      "logo_url": "data:image/svg+xml;utf8,%3Csvg..."
+    }
+  ]
+}
+```
+
+### 관련 키워드 조회
+
+```
+GET /api/stocks/{code}/theme-keywords?limit=5
+```
+
+- `test_service_embeddings` 테이블에서 `stock` 임베딩과 `keyword` 임베딩 사이 코사인 유사도를 조회합니다.
+- `similarity_score`는 0~1 범위의 코사인 유사도 값입니다.
+- `color_level`은 해당 종목에서 가장 높은 키워드 대비 상대 강도로 계산합니다.
+
+예시:
+
+```bash
+curl "http://localhost:8000/api/stocks/005930/theme-keywords?limit=5" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+응답 예시:
+
+```json
+{
+  "stock_code": "005930",
+  "stock_name": "삼성전자",
+  "core_message": "삼성전자는 반도체 키워드와 관련이 깊어요",
+  "core_keyword": "반도체",
+  "theme_keywords": [
+    {
+      "keyword": "반도체",
+      "similarity_score": 0.56,
+      "color_level": "HIGH"
+    }
+  ]
+}
 ```
 
 ### 실시간 현재가 (WebSocket)

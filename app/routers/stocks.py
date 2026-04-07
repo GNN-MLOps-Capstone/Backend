@@ -5,13 +5,14 @@ KIS Open API를 사용하는 주식 라우터
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Path, WebSocket, WebSocketDisconnect, Query, Request
 import re
 import asyncio
 import contextlib
 import logging
-from sqlalchemy import select, func, case
+from sqlalchemy import select, func, case, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -21,7 +22,15 @@ from app.kis.transformers import transform_overview, transform_series_time, tran
 from app.kis.ws_client import KISWSClient
 from app.models import User, Stock, StockSummaryCache, FilteredNews, NewsStockMapping
 from app.routers.users import decode_access_token, get_current_user
-from app.schemas import StockOverviewResponse, StockSeriesResponse, StockSeriesQuery, AITrendResponse, StockWeatherResponse
+from app.schemas import (
+    StockOverviewResponse,
+    StockSeriesResponse,
+    StockSeriesQuery,
+    AITrendResponse,
+    StockWeatherResponse,
+    RelatedStocksResponse,
+    StockThemeKeywordsResponse,
+)
 from app.services.stock_service import (
     cache,
     client,
@@ -1357,6 +1366,178 @@ def get_weather(change_rate: float | None, avg_sentiment: float | None) -> str:
     if total == 1:
         return "PARTLY_CLOUDY"
     return "SUNNY"
+
+
+def _build_stock_logo_url(stock_code: str, stock_name: str) -> str:
+    palette = (
+        ("#0F766E", "#5EEAD4"),
+        ("#1D4ED8", "#93C5FD"),
+        ("#B45309", "#FCD34D"),
+        ("#BE123C", "#FDA4AF"),
+        ("#4338CA", "#C4B5FD"),
+        ("#166534", "#86EFAC"),
+    )
+    base_color, accent_color = palette[sum(ord(ch) for ch in stock_code) % len(palette)]
+    label = (stock_name or stock_code).strip()[:4] or stock_code
+    safe_label = (
+        label.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    svg = f"""
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="{base_color}"/>
+      <stop offset="100%" stop-color="{accent_color}"/>
+    </linearGradient>
+  </defs>
+  <rect width="96" height="96" rx="24" fill="url(#g)"/>
+  <circle cx="72" cy="24" r="10" fill="rgba(255,255,255,0.24)"/>
+  <text x="48" y="54" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#FFFFFF">{safe_label}</text>
+</svg>
+""".strip()
+    return f"data:image/svg+xml;utf8,{quote(svg)}"
+
+
+def _normalize_similarity_score(distance: float | None) -> float:
+    if distance is None:
+        return 0.0
+    return round(max(0.0, min(1.0, 1.0 - float(distance))), 2)
+
+
+def _keyword_color_level(score: float, top_score: float) -> str:
+    if top_score <= 0:
+        return "NONE"
+    if score >= top_score * 0.95:
+        return "HIGH"
+    if score >= top_score * 0.82:
+        return "MEDIUM"
+    if score >= top_score * 0.65:
+        return "LOW"
+    return "NONE"
+
+
+@router.get("/{stock_code}/related", response_model=RelatedStocksResponse)
+async def get_related_stocks(
+    stock_code: str = Path(..., pattern=r"^[A-Za-z0-9]{6}$", description="종목코드 (6자리)"),
+    limit: int = Query(10, ge=1, le=20, description="반환할 유사 종목 수"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    임베딩 코사인 유사도 기반으로 유사 종목 목록을 반환한다.
+    """
+    _ = current_user
+    exists = await db.execute(select(Stock.stock_id).where(Stock.stock_id == stock_code))
+    if exists.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다.")
+
+    query = text(
+        """
+        SELECT
+            related.entity_id AS stock_code,
+            COALESCE(s.stock_name, related.display_name, related.entity_id) AS stock_name
+        FROM test_service_embeddings AS source
+        JOIN test_service_embeddings AS related
+          ON related.entity_type = 'stock'
+         AND related.entity_id <> source.entity_id
+        LEFT JOIN stocks AS s
+          ON s.stock_id = related.entity_id
+        WHERE source.entity_type = 'stock'
+          AND source.entity_id = :stock_code
+        ORDER BY source.gnn_embedding <=> related.gnn_embedding
+        LIMIT :limit
+        """
+    )
+    result = await db.execute(query, {"stock_code": stock_code, "limit": limit})
+    rows = result.mappings().all()
+
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail="해당 종목의 임베딩 데이터가 없어 유사 종목을 조회할 수 없습니다.",
+        )
+
+    related_stocks = [
+        {
+            "stock_code": row["stock_code"],
+            "stock_name": row["stock_name"],
+            "logo_url": _build_stock_logo_url(row["stock_code"], row["stock_name"]),
+        }
+        for row in rows
+    ]
+    return {"related_stocks": related_stocks}
+
+
+@router.get("/{stock_code}/theme-keywords", response_model=StockThemeKeywordsResponse)
+async def get_stock_theme_keywords(
+    stock_code: str = Path(..., pattern=r"^[A-Za-z0-9]{6}$", description="종목코드 (6자리)"),
+    limit: int = Query(5, ge=1, le=20, description="반환할 키워드 수"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    종목 임베딩과 키워드 임베딩의 코사인 유사도 기반 테마 키워드를 반환한다.
+    """
+    _ = current_user
+    stock_row = (
+        await db.execute(
+            select(Stock.stock_id, Stock.stock_name).where(Stock.stock_id == stock_code)
+        )
+    ).first()
+    if stock_row is None:
+        raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다.")
+
+    stock_name = stock_row.stock_name or stock_code
+    query = text(
+        """
+        SELECT
+            related.entity_id AS keyword_id,
+            COALESCE(related.display_name, related.entity_id) AS keyword,
+            source.gnn_embedding <=> related.gnn_embedding AS cosine_distance
+        FROM test_service_embeddings AS source
+        JOIN test_service_embeddings AS related
+          ON related.entity_type = 'keyword'
+        WHERE source.entity_type = 'stock'
+          AND source.entity_id = :stock_code
+        ORDER BY source.gnn_embedding <=> related.gnn_embedding
+        LIMIT :limit
+        """
+    )
+    result = await db.execute(query, {"stock_code": stock_code, "limit": limit})
+    rows = result.mappings().all()
+
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail="해당 종목의 임베딩 데이터가 없어 관련 키워드를 조회할 수 없습니다.",
+        )
+
+    scored_keywords = [
+        {
+            "keyword": row["keyword"],
+            "similarity_score": _normalize_similarity_score(row["cosine_distance"]),
+        }
+        for row in rows
+    ]
+    top_score = scored_keywords[0]["similarity_score"]
+    theme_keywords = [
+        {
+            **item,
+            "color_level": _keyword_color_level(item["similarity_score"], top_score),
+        }
+        for item in scored_keywords
+    ]
+    core_keyword = theme_keywords[0]["keyword"]
+
+    return {
+        "stock_code": stock_code,
+        "stock_name": stock_name,
+        "core_message": f"{stock_name}는 {core_keyword} 키워드와 관련이 깊어요",
+        "core_keyword": core_keyword,
+        "theme_keywords": theme_keywords,
+    }
 
 @router.get("/weather", response_model=StockWeatherResponse)
 async def get_stock_weather_endpoint(
