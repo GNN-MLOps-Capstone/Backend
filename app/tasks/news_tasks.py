@@ -2,6 +2,7 @@ import asyncio
 import logging
 from datetime import datetime
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from app.database import AsyncSessionLocal
 from app.models import Watchlist, User, Stock, Notification, UserSettings
 from app.kis.transformers import KST  # 한국 시간대 (없으면 pytz.timezone('Asia/Seoul') 등 사용)
@@ -20,7 +21,7 @@ async def run_news_keyword_check() -> None:
     # 야간 시간 여부 체크 (23:00 ~ 07:00)
     is_night_time = current_hour >= 23 or current_hour < 7
     
-    print(f"🕒 [{now.strftime('%Y-%m-%d %H:%M')}] 뉴스 키워드 감시 시작 (야간 여부: {is_night_time})")
+    logger.info(f"🕒 [{now.strftime('%Y-%m-%d %H:%M')}] 뉴스 키워드 감시 시작 (야간 여부: {is_night_time})")
 
     async with AsyncSessionLocal() as db:
         try:
@@ -41,9 +42,12 @@ async def run_news_keyword_check() -> None:
             )
             stocks_result = await db.execute(stocks_stmt)
             all_stocks = stocks_result.all()
-        except Exception as e:
-            logger.error(f"❌ 초기 조회 에러: {e}")
+        except SQLAlchemyError as e:
+            logger.error(f"❌ DB 조회 에러 (SQLAlchemy): {e}")
             return
+        except Exception as e:
+            logger.error(f"🚨 시스템 치명적 에러: {e}")
+            raise
 
     for stock_id, stock_name in all_stocks:
         await asyncio.sleep(0.5)
@@ -86,7 +90,7 @@ async def run_news_keyword_check() -> None:
                     if not final_targets:
                         continue
 
-                    push_sent, db_saved = await send_volatility_push_and_save(
+                    push_sent, _db_saved = await send_volatility_push_and_save(
                         user_ids=final_targets,
                         stock_name=stock_name,
                         date_kst=today,
@@ -96,12 +100,12 @@ async def run_news_keyword_check() -> None:
                     )
 
                     if push_sent:
-                        print(f"✅ [{stock_name}] {len(final_targets)}명에게 뉴스 알림 발송")
+                        logger.info(f"✅ [{stock_name}] {len(final_targets)}명에게 뉴스 알림 발송")
                         for gid in final_targets:
                             sent_history.add((gid, stock_name))
 
         except Exception as e:
-            logger.error(f"⚠️ [{stock_name}] 처리 에러: {e}")
+            logger.error(f"⚠️ [{stock_name}] 처리 중 {type(e).__name__} 발생: {e}")
             continue
 
-    print(f"✨ 뉴스 감시 종료")
+    logger.info("✨ 뉴스 감시 종료")
