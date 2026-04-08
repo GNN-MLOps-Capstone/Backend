@@ -60,12 +60,12 @@ async def send_volatility_push_and_save(
     payload = {
         "app_id": settings.onesignal_app_id,
         "include_aliases": {"external_id": normalized_user_ids},
-        # "idempotency_key": str(
-        #     uuid5(
-        #         NAMESPACE_URL,
-        #         f"{date_kst}:{alert_type}:{stock_name}:{','.join(normalized_user_ids)}",
-        #     )
-        # ),
+        "idempotency_key": str(
+            uuid5(
+                NAMESPACE_URL,
+                f"{date_kst}:{alert_type}:{stock_name}:{','.join(normalized_user_ids)}",
+            )
+        ),
         "target_channel": "push",
         "headings": {"en": title,"ko": title},
         "contents": {"en": body,"ko": body},
