@@ -31,7 +31,7 @@ async def run_news_keyword_check() -> None:
             )
             sent_result = await db.execute(sent_stmt)
             sent_history = {
-                (row[0], row[1], "am" if row[2].astimezone(KST).hour < 12 else "pm")
+                (row[0], row[1])
                 for row in sent_result.all()
             }
 
@@ -44,8 +44,6 @@ async def run_news_keyword_check() -> None:
         except Exception as e:
             logger.error(f"❌ 초기 조회 에러: {e}")
             return
-        
-    current_slot = "am" if now.hour < 12 else "pm"
 
     for stock_id, stock_name in all_stocks:
         await asyncio.sleep(0.5)
@@ -57,7 +55,8 @@ async def run_news_keyword_check() -> None:
                 if stats and stats.get("is_spike"):
                     user_stmt = (
                         select(
-                            User.google_id, 
+                            User.google_id,
+                            UserSettings.push,
                             UserSettings.night_push_prohibit, 
                             UserSettings.interest_only
                         )
@@ -70,14 +69,16 @@ async def run_news_keyword_check() -> None:
                     user_configs = u_res.all()
 
                     final_targets = []
-                    for gid, night_prohibit, interest_only in user_configs:
+                    for gid, push_enabled, night_prohibit, interest_only in user_configs:
+                        if not push_enabled:
+                            continue
                         if not interest_only:
                             continue
                         
                         if is_night_time and night_prohibit:
                             continue
                         
-                        if (gid, stock_name, current_slot) in sent_history:
+                        if (gid, stock_name) in sent_history:
                             continue
                         
                         final_targets.append(gid)
@@ -97,7 +98,7 @@ async def run_news_keyword_check() -> None:
                     if push_sent:
                         print(f"✅ [{stock_name}] {len(final_targets)}명에게 뉴스 알림 발송")
                         for gid in final_targets:
-                            sent_history.add((gid, stock_name, current_slot))
+                            sent_history.add((gid, stock_name))
 
         except Exception as e:
             logger.error(f"⚠️ [{stock_name}] 처리 에러: {e}")

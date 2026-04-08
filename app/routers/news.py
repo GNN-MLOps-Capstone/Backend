@@ -907,7 +907,7 @@ async def get_stock_news_stats_from_db(db: AsyncSession, stock_id: str, stock_na
 
     # 2. 해당 종목의 최근 뉴스 ID들 조회
     stmt = (
-        select(NewsStockMapping.news_id)
+        select(NewsStockMapping.news_id).distinct()
         .where(
             NewsStockMapping.stock_id == stock_id,
             NewsStockMapping.created_at >= time_threshold
