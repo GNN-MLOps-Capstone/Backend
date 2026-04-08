@@ -41,6 +41,7 @@ from app.database import ensure_interaction_tables, init_db  # DB 초기화 함�
 from app.routers import interactions, news, notifications, stocks, users, watchlist
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.tasks.volatility_monitor import run_volatility_check
+from app.tasks.news_tasks import run_news_keyword_check
 
 # 설정 객체 가져오기
 settings = get_settings()
@@ -106,14 +107,25 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         run_volatility_check, 
         'interval', 
-        minutes=5,
+        minutes=30,
         id='volatility_monitoring_job',
         replace_existing=True,
         max_instances=1,
         misfire_grace_time=60
     )
+
+    scheduler.add_job(
+        run_news_keyword_check,
+        'interval',
+        minutes=2,
+        id='news_keyword_job',
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=60
+    )   
     scheduler.start()
     logger.info("주가 감시 스케줄러 가동 (5분 주기)")
+    logger.info("뉴스 키워드 감시 스케줄러 가동 (30분 주기)")
     
     # yield: 여기서 서버가 실행되고 요청을 처리함
     yield

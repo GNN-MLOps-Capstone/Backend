@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import select, func
 from app.kis.transformers import KST
 from app.database import AsyncSessionLocal 
-from app.models import Watchlist, User, Stock, Notification
+from app.models import Watchlist, User, Stock, Notification, UserSettings
 from app.routers.stocks import _fetch_stock_overview
 from app.services.onesignal_service import (
     classify_volatility_type,
@@ -85,16 +85,24 @@ async def run_volatility_check() -> None:
 
             # 이 종목의 watcher 전체 조회
             async with AsyncSessionLocal() as db:
-                user_stmt = select(User.google_id).distinct().join(
-                    Watchlist, User.id == Watchlist.user_id
-                ).where(
-                    Watchlist.stock_id == stock_code,
-                    User.id < 9000
+                user_stmt = (
+                    select(
+                        User.google_id, 
+                        UserSettings.positive_only, # 상승 알림 여부
+                        UserSettings.risk_only      # 하락 알림 여부
+                    )
+                    .distinct()
+                    .join(Watchlist, User.id == Watchlist.user_id)
+                    .join(UserSettings, User.id == UserSettings.user_id) # 설정 테이블 조인
+                    .where(
+                        Watchlist.stock_id == stock_code,
+                        User.id < 9000
+                    )
                 )
                 user_result = await db.execute(user_stmt)
-                user_google_ids: list[str] = [row[0] for row in user_result.all()]
+                user_configs = user_result.all()
             
-            if not user_google_ids:
+            if not user_configs:
                 continue
             def already_notified(google_id: str, stype: str, stock_name: str = stock_name) -> bool:
                 if stype == "high_risk":
@@ -106,13 +114,24 @@ async def run_volatility_check() -> None:
                         (google_id, stock_name, "risk") in sent_history
                         or (google_id, stock_name, "high_risk") in sent_history
                     )
- 
-            target_users = [
-                google_id
-                for google_id in user_google_ids
-                if not already_notified(google_id, current_type)
-            ]
- 
+
+            target_users = []
+            for gid, pos_only, risk_only in user_configs:
+                
+                # 1. 상승 중인데 유저가 상승 알림(positive_only)을 꺼두었다면 패스
+                if rate > 0 and not pos_only:
+                    continue
+                
+                # 2. 하락 중인데 유저가 하락 알림(risk_only)을 꺼두었다면 패스
+                if rate < 0 and not risk_only:
+                    continue
+                
+                # 3. 이미 오늘 알림을 받았다면 패스
+                if already_notified(gid, current_type):
+                    continue
+                
+                target_users.append(gid)
+
             if not target_users:
                 continue
                 
@@ -122,7 +141,7 @@ async def run_volatility_check() -> None:
                 break
             
             push_sent, db_saved = await send_volatility_push_and_save(
-                target_users, stock_name, rate, now.date()
+                target_users, stock_name, rate, now.date(), alert_type=current_type
             )
 
             if not db_saved:

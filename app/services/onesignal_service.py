@@ -18,8 +18,11 @@ def classify_volatility_type(rate: float) -> str:
 async def send_volatility_push_and_save(
     user_ids: list[str],
     stock_name: str,
-    rate: float,
-    date_kst: date,
+    rate: float = 0.0,
+    date_kst: date = None,
+    alert_type: str = "risk",
+    news_count: int = 0,
+    keywords: list[str] = None
 ) -> tuple[bool, bool]:
     """
     위험도(10% 기준)에 따라 메시지를 차별화하여 발송하고 DB에 기록합니다.
@@ -27,24 +30,26 @@ async def send_volatility_push_and_save(
     normalized_user_ids = sorted(set(user_ids))
     if not normalized_user_ids:
         return False, False
+    
     if not settings.onesignal_app_id or not settings.onesignal_rest_api_key:
         logger.error("OneSignal 설정이 누락되어 변동성 알림 발송을 건너뜁니다.")
         return False, False
-
-    # 1. 위험도 및 메시지 분기
-    alert_type = classify_volatility_type(rate)
-    is_high_risk = alert_type == "high_risk"
-    
-    direction = "🚀 급등" if rate > 0 else "📉 급락"
-    direction_text = "상승" if rate > 0 else "하락"
-    prefix = "⚠️ [초고변동 경고]" if is_high_risk else "🔔 [변동 알림]"
-    
-    title = f"{prefix} {stock_name} {direction}"
-    body = (
-        f"오늘 {rate:+.1f}% 급변동 중입니다. 지금 바로 확인하세요."
-        if is_high_risk else
-        f"전일 대비 {rate:+.1f}% {direction_text} 중입니다."
-    )
+    if alert_type == "keywords":
+        keyword_str = ", ".join(keywords[:3]) if keywords else "관련 이슈"
+        title = f"📰 [뉴스 폭발] {stock_name} 기사 {news_count}건 발생"
+        body = f"{stock_name} 뉴스에서 '{keyword_str}' 등의 키워드가 급증하고 있습니다."
+    else:
+        # 기존 변동성 알림 로직
+        is_high_risk = alert_type == "high_risk"
+        direction = "🚀 급등" if rate > 0 else "📉 급락"
+        direction_text = "상승" if rate > 0 else "하락"
+        prefix = "⚠️ [초고변동 경고]" if is_high_risk else "🔔 [변동 알림]"
+        title = f"{prefix} {stock_name} {direction}"
+        body = (
+            f"오늘 {rate:+.1f}% 급변동 중입니다. 지금 바로 확인하세요."
+            if is_high_risk else
+            f"전일 대비 {rate:+.1f}% {direction_text} 중입니다."
+        )
 
     url = "https://api.onesignal.com/notifications"
     headers = {
@@ -55,12 +60,12 @@ async def send_volatility_push_and_save(
     payload = {
         "app_id": settings.onesignal_app_id,
         "include_aliases": {"external_id": normalized_user_ids},
-        "idempotency_key": str(
-            uuid5(
-                NAMESPACE_URL,
-                f"{date_kst}:{alert_type}:{stock_name}:{','.join(normalized_user_ids)}",
-            )
-        ),
+        # "idempotency_key": str(
+        #     uuid5(
+        #         NAMESPACE_URL,
+        #         f"{date_kst}:{alert_type}:{stock_name}:{','.join(normalized_user_ids)}",
+        #     )
+        # ),
         "target_channel": "push",
         "headings": {"en": title,"ko": title},
         "contents": {"en": body,"ko": body},
@@ -91,19 +96,6 @@ async def send_volatility_push_and_save(
     if not os_id:
         return False, False
     
-    invalid_ids = set(
-        body_json.get("errors", {})
-        .get("invalid_aliases", {})
-        .get("external_id", [])
-    )
-    valid_user_ids = [uid for uid in normalized_user_ids if uid not in invalid_ids]
-
-    if invalid_ids:
-        logger.warning("OneSignal invalid_aliases 제외(count=%d)", len(invalid_ids))
-
-    if not valid_user_ids:
-        return False, False
-    
     async with AsyncSessionLocal() as db:
         try:
             rows = [
@@ -119,7 +111,7 @@ async def send_volatility_push_and_save(
                     "onesignal_notification_id": os_id,
                     "date_kst": date_kst, 
                 }
-                for gid in valid_user_ids
+                for gid in normalized_user_ids
             ]
             stmt = pg_insert(Notification).values(rows).on_conflict_do_nothing()
             await db.execute(stmt)
