@@ -115,6 +115,7 @@ class Settings(BaseSettings):
     # 제미나이 api키 설정
     # =========================================================================
     gemini_api: str = "" 
+    gemini_max_concurrency: int = 5
 
     # =============================================================================
     # 로그인 access token용
@@ -124,6 +125,13 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 43200
     google_client_id: str = Field(..., env="GOOGLE_CLIENT_ID")
     dev_bypass_login: bool = False
+
+    # =============================================================================
+    #  onesignal 설정
+    # =============================================================================
+    onesignal_app_id: str = ""
+    onesignal_rest_api_key: str = ""
+    
 
     @model_validator(mode="after")
     def _validate_kis_fields(self) -> "Settings":
@@ -141,6 +149,10 @@ class Settings(BaseSettings):
         if self.recommender_timeout <= 0:
             raise ValueError(
                 f"recommender_timeout must be greater than 0, got {self.recommender_timeout}"
+            )
+        if self.gemini_max_concurrency <= 0:
+            raise ValueError(
+                f"gemini_max_concurrency must be greater than 0, got {self.gemini_max_concurrency}"
             )
         if not self.recommender_mock_mode and not self.recommender_base_url.strip():
             raise ValueError(

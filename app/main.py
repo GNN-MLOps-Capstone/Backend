@@ -39,9 +39,12 @@ from fastapi.staticfiles import StaticFiles
 from app.config import get_settings  # 설정 가져오기
 from app.database import ensure_interaction_tables, init_db  # DB 초기화 함수
 from app.routers import interactions, news, notifications, stocks, users, watchlist
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from app.tasks.volatility_monitor import run_volatility_check
 
 # 설정 객체 가져오기
 settings = get_settings()
+scheduler = AsyncIOScheduler()
 
 
 logging.basicConfig(
@@ -99,6 +102,18 @@ async def lifespan(app: FastAPI):
     await init_db()
     await ensure_interaction_tables()
     print("Database initialized")
+
+    scheduler.add_job(
+        run_volatility_check, 
+        'interval', 
+        minutes=5,
+        id='volatility_monitoring_job',
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=60
+    )
+    scheduler.start()
+    logger.info("주가 감시 스케줄러 가동 (5분 주기)")
     
     # yield: 여기서 서버가 실행되고 요청을 처리함
     yield
@@ -106,6 +121,8 @@ async def lifespan(app: FastAPI):
     # =========================================================================
     # 서버 종료 시 실행
     # =========================================================================
+    scheduler.shutdown(wait=True)
+    print("Scheduler shut down.")
     await stocks.shutdown_stocks_resources()
     print("Shutting down...")
 

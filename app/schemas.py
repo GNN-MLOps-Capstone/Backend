@@ -211,6 +211,7 @@ class NotificationCreateRequest(BaseModel):
     
     로그인한 사용자가 자신의 알림 이력을 서버에 저장할 때 사용합니다.
     """
+    notification_id: str = Field(..., min_length=1, max_length=255)
     type: str
     title: str
     body: Optional[str] = None
