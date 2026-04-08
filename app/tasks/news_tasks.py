@@ -109,6 +109,5 @@ async def run_news_keyword_check() -> None:
             logger.error(f"⚠️ [{stock_name}] 처리 중 {type(e).__name__} 발생: {e}")
         except Exception as e:
             logger.exception(f"⚠️ [{stock_name}] 처리 중 예상치 못한 에러 발생: {e}")
-            continue
 
     logger.info("✨ 뉴스 감시 종료")
