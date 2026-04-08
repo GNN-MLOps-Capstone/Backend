@@ -409,6 +409,40 @@ curl "http://localhost:8000/api/news/top-dwell-stocks" \
 
 ---
 
+### 최근 24시간 체류 상위 키워드
+
+```http
+GET /api/news/top-dwell-keywords
+```
+
+- 인증 필수 엔드포인트입니다.
+- 최근 24시간 동안 `recommendation_news_path_metrics`의 `dwell_event_count`를 뉴스별로 확인한 뒤,
+  `news_keyword_mapping`과 `keywords` 기준으로 키워드별 합산하여 상위 3개를 반환합니다.
+- 경로별 중복 합산을 막기 위해 `path='TOTAL'` 버킷만 집계합니다.
+- 하나의 뉴스가 여러 키워드에 매핑된 경우 해당 뉴스의 `dwell_event_count`는 각 키워드에 그대로 반영됩니다.
+
+예시:
+
+```bash
+curl "http://localhost:8000/api/news/top-dwell-keywords" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+응답 예시:
+
+```json
+[
+  {
+    "keyword": "반도체",
+    "total_dwell_event_count": 128,
+    "news_count": 7,
+    "latest_bucket_end": "2026-03-31T08:00:00+00:00"
+  }
+]
+```
+
+---
+
 ### 추천 로그 수집 (탭/뉴스 체류시간)
 
 ```http

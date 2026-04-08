@@ -57,6 +57,7 @@ from app.schemas import (
     NewsRecommendationItem,
     NewsRecommendationResponse,
     TopDwellStockResponse,
+    TopDwellKeywordResponse,
 )
 from app.kis.errors import KISError
 from app.recommender.client import RecommendationCandidate
@@ -710,6 +711,70 @@ async def get_top_dwell_stocks(
         TopDwellStockResponse(
             stock_id=row["stock_id"],
             stock_name=decode_html_entities(row["stock_name"]),
+            total_dwell_event_count=int(row["total_dwell_event_count"] or 0),
+            news_count=int(row["news_count"] or 0),
+            latest_bucket_end=row["latest_bucket_end"],
+        )
+        for row in rows
+    ]
+
+
+@router.get("/top-dwell-keywords", response_model=list[TopDwellKeywordResponse])
+async def get_top_dwell_keywords(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    최근 24시간 동안 뉴스 상세 체류 이벤트 수가 가장 많았던 키워드 상위 3개를 반환합니다.
+    """
+    _ = current_user
+    window_start = datetime.utcnow() - timedelta(hours=24)
+
+    aggregated_metrics = (
+        select(
+            Keyword.word.label("keyword"),
+            func.sum(RecommendationNewsPathMetrics.dwell_event_count).label(
+                "total_dwell_event_count"
+            ),
+            func.count(func.distinct(RecommendationNewsPathMetrics.news_id)).label("news_count"),
+            func.max(RecommendationNewsPathMetrics.bucket_end).label("latest_bucket_end"),
+        )
+        .join(
+            NewsKeywordMapping,
+            NewsKeywordMapping.keyword_id == Keyword.keyword_id,
+        )
+        .join(
+            RecommendationNewsPathMetrics,
+            RecommendationNewsPathMetrics.news_id == NewsKeywordMapping.news_id,
+        )
+        .where(RecommendationNewsPathMetrics.path == "TOTAL")
+        .where(RecommendationNewsPathMetrics.bucket_end >= window_start)
+        .group_by(Keyword.keyword_id, Keyword.word)
+        .subquery()
+    )
+
+    query = (
+        select(
+            aggregated_metrics.c.keyword,
+            aggregated_metrics.c.total_dwell_event_count,
+            aggregated_metrics.c.news_count,
+            aggregated_metrics.c.latest_bucket_end,
+        )
+        .order_by(
+            desc(aggregated_metrics.c.total_dwell_event_count),
+            desc(aggregated_metrics.c.news_count),
+            desc(aggregated_metrics.c.latest_bucket_end),
+            aggregated_metrics.c.keyword,
+        )
+        .limit(3)
+    )
+
+    result = await db.execute(query)
+    rows = result.mappings().all()
+
+    return [
+        TopDwellKeywordResponse(
+            keyword=decode_html_entities(row["keyword"]) or "",
             total_dwell_event_count=int(row["total_dwell_event_count"] or 0),
             news_count=int(row["news_count"] or 0),
             latest_bucket_end=row["latest_bucket_end"],

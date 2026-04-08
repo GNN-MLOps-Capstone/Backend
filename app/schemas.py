@@ -123,6 +123,13 @@ class TopDwellStockResponse(BaseModel):
     latest_bucket_end: Optional[datetime] = None
 
 
+class TopDwellKeywordResponse(BaseModel):
+    keyword: str
+    total_dwell_event_count: int
+    news_count: int
+    latest_bucket_end: Optional[datetime] = None
+
+
 class StockSummaryResponse(BaseModel):
     """
     요약 정보 스키마
