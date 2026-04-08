@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
+import httpx
 from app.database import AsyncSessionLocal
 from app.models import Watchlist, User, Stock, Notification, UserSettings
 from app.kis.transformers import KST  # 한국 시간대 (없으면 pytz.timezone('Asia/Seoul') 등 사용)
@@ -26,7 +27,7 @@ async def run_news_keyword_check() -> None:
     async with AsyncSessionLocal() as db:
         try:
             # 1. 중복 발송 내역 조회 (기존과 동일)
-            sent_stmt = select(Notification.user_id, Notification.stock_name, Notification.created_at).where(
+            sent_stmt = select(Notification.user_id, Notification.stock_name).where(
                 Notification.type == "keywords",
                 Notification.date_kst == today
             )
@@ -104,8 +105,10 @@ async def run_news_keyword_check() -> None:
                         for gid in final_targets:
                             sent_history.add((gid, stock_name))
 
-        except Exception as e:
+        except (SQLAlchemyError, httpx.RequestError) as e:
             logger.error(f"⚠️ [{stock_name}] 처리 중 {type(e).__name__} 발생: {e}")
+        except Exception as e:
+            logger.exception(f"⚠️ [{stock_name}] 처리 중 예상치 못한 에러 발생: {e}")
             continue
 
     logger.info("✨ 뉴스 감시 종료")
