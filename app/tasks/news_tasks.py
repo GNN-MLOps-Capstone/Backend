@@ -18,8 +18,7 @@ async def run_news_keyword_check() -> None:
     current_hour = now.hour
     
     # 야간 시간 여부 체크 (23:00 ~ 07:00)
-    #is_night_time = current_hour >= 23 or current_hour < 7
-    is_night_time = (current_hour == 16)
+    is_night_time = current_hour >= 23 or current_hour < 7
     
     print(f"🕒 [{now.strftime('%Y-%m-%d %H:%M')}] 뉴스 키워드 감시 시작 (야간 여부: {is_night_time})")
 
