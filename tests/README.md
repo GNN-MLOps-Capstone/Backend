@@ -46,15 +46,7 @@ python3 -m pip install --upgrade pip setuptools wheel
 python3 -m pip install -r requirements.txt
 ```
 
-5. 테스트 라이브러리를 별도로 설치합니다.
-
-현재 `requirements.txt`에는 앱 실행용 패키지는 포함되어 있지만, 테스트 실행에 필요한 `pytest`, `pytest-asyncio`, `respx`는 기본 설치 목록에 포함되어 있지 않습니다.
-
-```bash
-python3 -m pip install pytest pytest-asyncio respx
-```
-
-6. 테스트용 환경변수를 준비합니다.
+5. 테스트용 환경변수를 준비합니다.
 
 ```bash
 export DEBUG=false
