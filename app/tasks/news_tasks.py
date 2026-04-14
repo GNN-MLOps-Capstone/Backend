@@ -56,12 +56,13 @@ async def run_news_keyword_check() -> None:
             raise
 
     for stock_id, stock_name in all_stocks:
+
+        await asyncio.sleep(0.5)
+
         current_now = datetime.now(KST)
         current_today = current_now.date()
         current_hour = current_now.hour
         is_night_time = current_hour >= 23 or current_hour < 7
-
-        await asyncio.sleep(0.5)
 
         if current_today != start_today:
             logger.warning(f"날짜가 변경되어({start_today} -> {current_today}) 작업을 중단합니다.")

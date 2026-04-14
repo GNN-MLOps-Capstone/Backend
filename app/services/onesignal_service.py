@@ -22,7 +22,7 @@ async def send_volatility_push_and_save(
     rate: float = 0.0,
     alert_type: str = "risk",
     news_count: int = 0,
-    keywords: list[str] = None
+    keywords: list[str] | None = None
 ) -> tuple[bool, bool]:
     """
     위험도(10% 기준)에 따라 메시지를 차별화하여 발송하고 DB에 기록합니다.

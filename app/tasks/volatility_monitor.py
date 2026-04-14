@@ -145,7 +145,11 @@ async def run_volatility_check() -> None:
                 break
             
             push_sent, db_saved = await send_volatility_push_and_save(
-                target_users, stock_name, rate, now.date(), alert_type=current_type
+                user_ids=target_users,
+                stock_name=stock_name,
+                date_kst=now.date(),
+                rate=rate,
+                alert_type=current_type,
             )
 
             if db_saved:
