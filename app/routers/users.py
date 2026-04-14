@@ -19,7 +19,7 @@ API 엔드포인트:
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -222,7 +222,7 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
     nickname = token_info.get("name") or req.nickname
     img_url = token_info.get("picture") or req.img_url
     onesignal_id = req.onesignal_id
-    last_login=datetime.now()
+    last_login = datetime.now(timezone.utc)
 
     if not email:
         raise HTTPException(

@@ -99,6 +99,7 @@ async def run_volatility_check() -> None:
                     .where(
                         Watchlist.stock_id == stock_code,
                         User.id < 9000,
+                        UserSettings.push.is_(True),
                         User.last_login >= active_threshold
                     )
                 )

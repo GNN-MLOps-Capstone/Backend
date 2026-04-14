@@ -18,8 +18,8 @@ def classify_volatility_type(rate: float) -> str:
 async def send_volatility_push_and_save(
     user_ids: list[str],
     stock_name: str,
+    date_kst: date,
     rate: float = 0.0,
-    date_kst: date = None,
     alert_type: str = "risk",
     news_count: int = 0,
     keywords: list[str] = None

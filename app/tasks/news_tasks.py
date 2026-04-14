@@ -18,6 +18,7 @@ async def run_news_keyword_check() -> None:
     start_now = datetime.now(KST)
     start_today = start_now.date()
     active_threshold = start_now - timedelta(days=7)
+    current_hour = start_now.hour
     
     # 야간 시간 여부 체크 (23:00 ~ 07:00)
     is_night_time = current_hour >= 23 or current_hour < 7
@@ -29,7 +30,7 @@ async def run_news_keyword_check() -> None:
             # 1. 중복 발송 내역 조회 (기존과 동일)
             sent_stmt = select(Notification.user_id, Notification.stock_name).where(
                 Notification.type == "keywords",
-                Notification.date_kst == start_now
+                Notification.date_kst == start_today
             )
             sent_result = await db.execute(sent_stmt)
             sent_history = {
