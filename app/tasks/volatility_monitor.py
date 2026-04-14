@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import select, func
 from app.kis.transformers import KST
 from app.database import AsyncSessionLocal 
@@ -83,6 +83,8 @@ async def run_volatility_check() -> None:
 
             current_type = classify_volatility_type(rate)
 
+            active_threshold = now - timedelta(days=7)
+
             # 이 종목의 watcher 전체 조회
             async with AsyncSessionLocal() as db:
                 user_stmt = (
@@ -96,7 +98,8 @@ async def run_volatility_check() -> None:
                     .join(UserSettings, User.id == UserSettings.user_id) # 설정 테이블 조인
                     .where(
                         Watchlist.stock_id == stock_code,
-                        User.id < 9000
+                        User.id < 9000,
+                        User.last_login >= active_threshold
                     )
                 )
                 user_result = await db.execute(user_stmt)
@@ -144,13 +147,23 @@ async def run_volatility_check() -> None:
                 target_users, stock_name, rate, now.date(), alert_type=current_type
             )
 
-            if not db_saved:
-                print(f"[{stock_code}] DB 저장 실패 - 푸시 발송 여부: {push_sent}")
- 
-            if push_sent:
+            if db_saved:
+                # 1. DB 저장이 성공했다면, 설령 푸시가 실패했더라도 중복 방지 리스트에 추가
                 for google_id in target_users:
                     sent_history.add((google_id, stock_name, current_type))
- 
+                
+                if push_sent:
+                    print(f"✅ [{stock_name}] {len(target_users)}명에게 변동성 알림 발송 완료")
+                else:
+                    # 아이폰 Never Subscribed 등 푸시 호출은 안 됐지만 기록은 남은 경우
+                    print(f"⚠️ [{stock_name}] 푸시는 실패했으나 DB 기록 완료 (앱 내 내역 생성)")
+            else:
+                # 2. DB 저장이 실패했다면 다음 주기에 다시 시도되도록 sent_history에 넣지 않음
+                if push_sent:
+                    print(f"[{stock_name}] 푸시는 이미 갔는데 DB 저장 실패! 다음 루프 중복 발송 위험")
+                else:
+                    print(f"[{stock_name}] 푸시 및 DB 저장 모두 실패")
+
         except asyncio.CancelledError:
             raise
         except Exception as e:

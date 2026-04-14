@@ -71,31 +71,30 @@ async def send_volatility_push_and_save(
         "contents": {"en": body,"ko": body},
         "data": {"type": alert_type, "stock_name": stock_name}
     }
-
+    
+    i_key = payload["idempotency_key"]
     os_id = None
+    push_success = False
     body_json = {}
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
             response = await client.post(url, json=payload, headers=headers)
-            if response.status_code != 200:
+            if response.status_code == 200:
+                try:
+                    body_json = response.json()
+                    os_id = body_json.get("id")
+                    push_success = True if os_id else False
+                except ValueError:
+                    logger.exception("OneSignal 응답 JSON 파싱 실패(status=%s)", response.status_code)
+            else:
                 logger.error("OneSignal API 에러(status=%s)", response.status_code)
-                return False, False
             
-            try:
-                body_json = response.json()
-            except ValueError:
-                logger.exception("OneSignal 응답 JSON 파싱 실패(status=%s)", response.status_code)
-                return False, False
-
-            os_id = body_json.get("id")
         except httpx.RequestError as e:
-            logger.exception("OneSignal API 연결 실패: %s", e)
-            return False, False
-        
-    if not os_id:
-        return False, False
-    
+            logger.exception("OneSignal API 연결 실패(타임아웃 등): %s", e)
+
+    final_notification_id = os_id if os_id else f"FAIL_{i_key}"
+
     async with AsyncSessionLocal() as db:
         try:
             rows = [
@@ -108,7 +107,7 @@ async def send_volatility_push_and_save(
                     "star": False,
                     "stock_name": stock_name,
                     "sentiment_score": rate,
-                    "onesignal_notification_id": os_id,
+                    "onesignal_notification_id": final_notification_id,
                     "date_kst": date_kst, 
                 }
                 for gid in normalized_user_ids
@@ -117,9 +116,9 @@ async def send_volatility_push_and_save(
             await db.execute(stmt)
             await db.commit()
             logger.info("[%s] %s 처리 완료 (푸시ID: %s)", alert_type, stock_name, os_id)
-            return True, True
+            return push_success, True
             
         except SQLAlchemyError as e:
             await db.rollback()
             logger.exception("DB 저장 중 예상치 못한 에러: %s", e)
-            return True, False
+            return push_success, False
