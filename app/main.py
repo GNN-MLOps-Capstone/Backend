@@ -31,6 +31,7 @@ import logging
 from contextlib import asynccontextmanager  # 비동기 컨텍스트 매니저
 from hashlib import sha256
 from pathlib import Path
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI, Header, HTTPException, status  # 웹 프레임워크
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어
@@ -111,7 +112,8 @@ async def lifespan(app: FastAPI):
         id='volatility_monitoring_job',
         replace_existing=True,
         max_instances=1,
-        misfire_grace_time=60
+        misfire_grace_time=60,
+        next_run_time=datetime.now() + timedelta(minutes=5)
     )
 
     scheduler.add_job(
@@ -121,7 +123,8 @@ async def lifespan(app: FastAPI):
         id='news_keyword_job',
         replace_existing=True,
         max_instances=1,
-        misfire_grace_time=60
+        misfire_grace_time=60,
+        next_run_time=datetime.now() + timedelta(minutes=30)
     )   
     scheduler.start()
     logger.info("주가 감시 스케줄러 가동 (5분 주기)")
