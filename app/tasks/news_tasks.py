@@ -94,9 +94,12 @@ async def run_news_keyword_check() -> None:
 
                     final_targets = []
                     for gid, push_enabled, night_prohibit, interest_only in user_configs:
-                        if not push_enabled or not interest_only: continue
-                        if is_night_time and night_prohibit: continue
-                        if (gid, stock_name) in sent_history: continue
+                        if not push_enabled or not interest_only:
+                            continue
+                        if is_night_time and night_prohibit:
+                            continue
+                        if (gid, stock_name) in sent_history:
+                            continue
                         final_targets.append(gid)
 
                     if not final_targets:
