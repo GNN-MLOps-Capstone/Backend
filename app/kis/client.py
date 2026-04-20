@@ -5,14 +5,13 @@ KIS Open API HTTP 클라이언트 래퍼
 from __future__ import annotations
 
 import asyncio
-from collections import deque
-import time
 from typing import Any, Optional
 
 import httpx
 
 from app.config import Settings
 from app.kis.errors import KISError
+from app.kis import rest_rate_limiter
 from app.kis.token_manager import TokenManager
 
 
@@ -21,8 +20,6 @@ class KISClient:
         self._settings = settings
         self._http_client: httpx.AsyncClient | None = None
         self._client_lock = asyncio.Lock()
-        self._rate_limit_lock = asyncio.Lock()
-        self._request_timestamps: deque[float] = deque()
 
     async def _get_http_client(self) -> httpx.AsyncClient:
         if self._http_client is not None:
@@ -75,7 +72,7 @@ class KISClient:
                     "custtype": "P",
                 }
                 client = await self._get_http_client()
-                await self._acquire_rate_limit_slot()
+                await rest_rate_limiter.acquire_kis_rest_rate_limit_slot(self._settings)
                 resp = await client.request(
                     method,
                     url,
@@ -121,28 +118,6 @@ class KISClient:
                     raise
                 raise KISError(f"KIS request failed: {exc}", status_code=502) from exc
         raise KISError("KIS request failed after retries", status_code=502)
-
-    async def _acquire_rate_limit_slot(self) -> None:
-        max_rps = int(self._settings.kis_max_requests_per_second or 0)
-        if max_rps <= 0:
-            return
-
-        window_seconds = 1.0
-        while True:
-            sleep_seconds = 0.0
-            async with self._rate_limit_lock:
-                now = time.monotonic()
-                cutoff = now - window_seconds
-                while self._request_timestamps and self._request_timestamps[0] <= cutoff:
-                    self._request_timestamps.popleft()
-
-                if len(self._request_timestamps) < max_rps:
-                    self._request_timestamps.append(now)
-                    return
-
-                oldest = self._request_timestamps[0]
-                sleep_seconds = max((oldest + window_seconds) - now, 0.001)
-            await asyncio.sleep(sleep_seconds)
 
     @staticmethod
     def _is_retriable_error(exc: Exception) -> bool:

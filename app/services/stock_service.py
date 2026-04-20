@@ -16,6 +16,11 @@ client = KISClient(settings)
 cache = TTLCache()
 logger = logging.getLogger(__name__)
 _KIS_REQUEST_TIMEOUT = 8.0
+_OVERVIEW_CACHE_TTL_SECONDS = 15.0
+_OVERVIEW_MAX_CONCURRENCY = 5
+_overview_semaphore = asyncio.Semaphore(_OVERVIEW_MAX_CONCURRENCY)
+_overview_inflight: dict[str, asyncio.Task[dict]] = {}
+_overview_inflight_lock = asyncio.Lock()
 
 
 async def shutdown_stock_service_resources() -> None:
@@ -76,6 +81,29 @@ async def fetch_stock_overview(code: str) -> dict:
     if cached is not None:
         return cached
 
+    async with _overview_inflight_lock:
+        task = _overview_inflight.get(code)
+        if task is None:
+            task = asyncio.create_task(_request_stock_overview_from_kis(code))
+            task.add_done_callback(
+                lambda done_task, stock_code=code: asyncio.create_task(
+                    _clear_overview_inflight(stock_code, done_task)
+                )
+            )
+            _overview_inflight[code] = task
+
+    return await asyncio.shield(task)
+
+
+async def _request_stock_overview_from_kis(code: str) -> dict:
+    cache_key = f"overview:{code}"
+    async with _overview_semaphore:
+        overview = await _load_stock_overview_from_kis(code)
+        await cache.set(cache_key, overview, ttl_seconds=_OVERVIEW_CACHE_TTL_SECONDS)
+        return overview
+
+
+async def _load_stock_overview_from_kis(code: str) -> dict:
     try:
         data = await asyncio.wait_for(
             client.request(
@@ -86,6 +114,7 @@ async def fetch_stock_overview(code: str) -> dict:
                     "FID_COND_MRKT_DIV_CODE": "J",
                     "FID_INPUT_ISCD": code,
                 },
+                retries=3,
             ),
             timeout=_KIS_REQUEST_TIMEOUT,
         )
@@ -94,6 +123,7 @@ async def fetch_stock_overview(code: str) -> dict:
             f"overview request timed out after {_KIS_REQUEST_TIMEOUT}s",
             status_code=504,
         ) from exc
+
     ensure_kis_ok(data)
     overview = transform_overview(data, code)
     if (overview.get("last_price") or 0) <= 0:
@@ -108,5 +138,10 @@ async def fetch_stock_overview(code: str) -> dict:
             overview["high"] = int(latest.get("h") or 0)
             overview["low"] = int(latest.get("l") or 0)
             overview["volume"] = int(latest.get("v") or 0)
-    await cache.set(cache_key, overview, ttl_seconds=3)
     return overview
+
+
+async def _clear_overview_inflight(code: str, task: asyncio.Task[dict]) -> None:
+    async with _overview_inflight_lock:
+        if _overview_inflight.get(code) is task:
+            _overview_inflight.pop(code, None)

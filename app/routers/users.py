@@ -118,13 +118,16 @@ async def verify_google_login_token(login_token: str) -> dict:
 
     return token_info
 
+async def get_current_subject(
+    token_obj: HTTPAuthorizationCredentials = Depends(security),
+) -> str:
+    return decode_access_token(token_obj.credentials)
+
+
 async def get_current_user(
-    token_obj: HTTPAuthorizationCredentials = Depends(security), 
-    db: AsyncSession = Depends(get_db)
+    google_id: str = Depends(get_current_subject),
+    db: AsyncSession = Depends(get_db),
 ):
-    token = token_obj.credentials
-    google_id = decode_access_token(token)
-    
     # 해독된 google_id를 가진 유저가 진짜 DB에 있는지 확인합니다.
     query = select(User).options(selectinload(User.settings)).where(User.google_id == google_id)
     result = await db.execute(query)

@@ -18,9 +18,25 @@
 ==============================================================================
 """
 
-from pydantic_settings import BaseSettings  # 설정 관리 라이브러리
 from functools import lru_cache  # 캐싱 기능 (설정을 한 번만 읽어옴)
+from urllib.parse import urlparse
+
 from pydantic import Field, model_validator
+from pydantic_settings import BaseSettings  # 설정 관리 라이브러리
+
+
+def infer_kis_rest_max_requests_per_second(kis_base_url: str) -> int:
+    """
+    KIS REST 유량을 base URL 기준으로 추론합니다.
+
+    공식 계좌 타입과 다른 URL이 들어와도 과도한 호출을 막기 위해 보수적으로 2 rps를 기본값으로 둡니다.
+    """
+    hostname = (urlparse(kis_base_url.strip()).hostname or "").lower()
+    if hostname == "openapivts.koreainvestment.com":
+        return 2
+    if hostname == "openapi.koreainvestment.com":
+        return 20
+    return 2
 
 
 class Settings(BaseSettings):
@@ -91,7 +107,7 @@ class Settings(BaseSettings):
     kis_app_key: str = ""
     kis_app_secret: str = ""
     kis_timeout: float = 10.0
-    kis_max_requests_per_second: int = 5
+    kis_max_requests_per_second: int | None = None
     kis_intraday_page_interval_seconds: float = 0.2
     kis_intraday_rate_limit_retry_count: int = 2
     kis_intraday_rate_limit_backoff_seconds: float = 0.8
@@ -131,13 +147,17 @@ class Settings(BaseSettings):
     # =============================================================================
     onesignal_app_id: str = ""
     onesignal_rest_api_key: str = ""
-    
+
+    @property
+    def resolved_kis_rest_max_requests_per_second(self) -> int:
+        if self.kis_max_requests_per_second is not None:
+            return int(self.kis_max_requests_per_second)
+        return infer_kis_rest_max_requests_per_second(self.kis_base_url)
 
     @model_validator(mode="after")
     def _validate_kis_fields(self) -> "Settings":
         _non_negative = {
             "kis_timeout": self.kis_timeout,
-            "kis_max_requests_per_second": self.kis_max_requests_per_second,
             "kis_intraday_page_interval_seconds": self.kis_intraday_page_interval_seconds,
             "kis_intraday_rate_limit_retry_count": self.kis_intraday_rate_limit_retry_count,
             "kis_intraday_rate_limit_backoff_seconds": self.kis_intraday_rate_limit_backoff_seconds,
@@ -146,6 +166,14 @@ class Settings(BaseSettings):
         for field_name, value in _non_negative.items():
             if value < 0:
                 raise ValueError(f"{field_name} must be non-negative, got {value}")
+        if (
+            self.kis_max_requests_per_second is not None
+            and self.kis_max_requests_per_second < 0
+        ):
+            raise ValueError(
+                "kis_max_requests_per_second must be non-negative, "
+                f"got {self.kis_max_requests_per_second}"
+            )
         if self.recommender_timeout <= 0:
             raise ValueError(
                 f"recommender_timeout must be greater than 0, got {self.recommender_timeout}"
