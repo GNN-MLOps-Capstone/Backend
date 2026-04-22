@@ -27,6 +27,7 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
+from collections import Counter
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import bindparam, desc, func, select
@@ -961,3 +962,56 @@ async def get_news_detail(
         stock_change=str(primary_stock["stock_change"]) if primary_stock and primary_stock.get("stock_change") else None,
         stock_up=primary_stock["stock_up"] if primary_stock and primary_stock.get("stock_up") is not None else None,
     )
+
+async def get_stock_news_stats_from_db(db: AsyncSession, stock_id: str, stock_name: str) -> dict | None:
+    """
+    관심 종목의 최근 뉴스 급증을 확인하고, 매핑된 실제 키워드 단어들을 추출합니다.
+    """
+    # 1. 기준 시간 설정 (최근 12시간)
+    time_threshold = datetime.now(timezone.utc) - timedelta(hours=12)
+
+    # 2. 해당 종목의 최근 뉴스 ID들 조회
+    stmt = (
+        select(NewsStockMapping.news_id).distinct()
+        .where(
+            NewsStockMapping.stock_id == stock_id,
+            NewsStockMapping.created_at >= time_threshold
+        )
+    )
+    result = await db.execute(stmt)
+    news_ids = [row[0] for row in result.fetchall()]
+
+    count = len(news_ids)
+
+    # 3. 알림 조건 (12시간 내 뉴스 3건 이상)
+    if count < 3:
+        return None
+
+    # 4. 매핑 테이블과 키워드 테이블 조인하여 실제 단어(word) 가져오기
+    # NewsKeywordsMapping(keyword_id) <-> Keywords(keyword_id) 조인
+    keyword_stmt = (
+        select(Keyword.word)
+        .join(NewsKeywordMapping, Keyword.keyword_id == NewsKeywordMapping.keyword_id)
+        .where(NewsKeywordMapping.news_id.in_(news_ids))
+    )
+    keyword_res = await db.execute(keyword_stmt)
+    
+    # 5. 키워드 빈도 분석
+    # 결과가 ('단어',) 형태의 Row이므로 첫 번째 요소를 추출합니다.
+    all_words = [
+        row[0] for row in keyword_res.fetchall() 
+        if row[0] and row[0] != stock_name # 종목명과 똑같은 단어는 제외
+    ]
+
+    if not all_words:
+        return {"count": count, "keywords": ["이슈 분석 중"], "is_spike": True}
+
+    # 기사들 사이에서 가장 많이 겹치는 핵심 키워드 상위 3개 추출
+    most_common = Counter(all_words).most_common(3)
+    top_keywords = [word for word, freq in most_common]
+
+    return {
+        "count": count,
+        "keywords": top_keywords,
+        "is_spike": True
+    }

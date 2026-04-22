@@ -185,6 +185,8 @@ class User(Base):
     onesignal_id = Column(String(255), nullable=True, default=None)
     # 유저정보 생성시간
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # 마지막 로그인
+    last_login = Column(DateTime(timezone=True), server_default=func.now())
 
     settings = relationship("UserSettings",back_populates="user",uselist=False,cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
