@@ -13,7 +13,7 @@ API 스키마 정의 (schemas.py)
 ==============================================================================
 """
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, List
 from datetime import datetime,time
 import re
@@ -50,8 +50,7 @@ class NewsSimpleResponse(BaseModel):
     # sentiment: Optional[str] = None  # 긍정/부정/중립
     # ---------------------------------------------------------
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NewsListResponse(BaseModel):
@@ -90,8 +89,7 @@ class NewsDetailResponse(BaseModel):
     stock_change: Optional[str] = None
     stock_up: Optional[bool] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class NewsRecommendationItem(BaseModel):
     news_id: int
@@ -141,8 +139,7 @@ class StockSummaryResponse(BaseModel):
     last_updated: datetime
     message: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserLoginRequest(BaseModel):
     id_token: str
@@ -187,8 +184,7 @@ class UserResponse(BaseModel):
     email: str
     nickname: str
     img_url: Optional[str] = None
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AuthResponse(BaseModel):
     access_token: str
@@ -209,8 +205,7 @@ class SettingResponse(BaseModel):
     dnd_start: Optional[time]
     dnd_finish: Optional[time]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class NotificationCreateRequest(BaseModel):
     """
@@ -243,8 +238,7 @@ class NotificationResponse(BaseModel):
     sentiment_score: Optional[float] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NotificationReadRequest(BaseModel):
@@ -316,8 +310,7 @@ class WatchlistStockResponse(BaseModel):
     keyword: str
     aiSummary: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WatchlistBriefingResponse(BaseModel):
@@ -325,8 +318,7 @@ class WatchlistBriefingResponse(BaseModel):
     text: str
     topIssues: list[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class StockOverviewResponse(BaseModel):

@@ -87,10 +87,11 @@ asyncpg==0.30.0
 # aiomysql==0.2.0
 
 # 테스트 도구
-# pytest==8.0.0
-# pytest-asyncio==0.23.0
-
-# httpx==0.27.0  # FastAPI 테스트용 HTTP 클라이언트
+pytest==8.4.2
+pytest-asyncio==1.3.0
+pytest-cov==7.0.0
+respx==0.22.0
+# httpx는 밑에 이미 존재함.
 
 # 제미나이
 google-genai==1.56.0
