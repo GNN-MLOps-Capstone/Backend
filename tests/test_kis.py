@@ -245,12 +245,16 @@ class TestKISClientRequest:
 
         assert exc_info.value.status_code == 502
 
-    async def test_base_url_미설정_KISError(self, settings):
+    async def test_base_url_미설정_KISError(self):
         """kis_base_url이 비어있으면 요청 전에 KISError"""
-        settings_copy = get_settings()
-        object.__setattr__(settings_copy, "kis_base_url", "")
-        client = KISClient(settings_copy)
-
+        from unittest.mock import MagicMock
+        fake_settings = MagicMock()
+        fake_settings.kis_base_url = ""
+        fake_settings.kis_app_key = "k"
+        fake_settings.kis_app_secret = "s"
+        fake_settings.kis_timeout = 1.0
+        fake_settings.kis_max_requests_per_second = 0
+        client = KISClient(fake_settings)
         with pytest.raises(KISError) as exc_info:
             await client.request("GET", "/some/path", tr_id="XXXX")
 

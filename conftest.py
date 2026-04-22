@@ -5,6 +5,11 @@ from sqlalchemy import Text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.dialects.postgresql import JSONB
+import json
+from typing import Any
+from sqlalchemy.types import TypeDecorator
+from collections.abc import AsyncIterator
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, async_sessionmaker, AsyncSession
 
 # =============================================================================
 # SQLite 호환 처리: JSONB → Text 교체
@@ -12,9 +17,21 @@ from sqlalchemy.dialects.postgresql import JSONB
 # SQLite는 PostgreSQL 전용 JSONB를 지원하지 않으므로
 # 테스트용 인메모리 DB에서는 Text로 대체합니다.
 # (실제 프로덕션 PostgreSQL에는 영향 없음)
-class _SQLiteJSONB(Text):
+class _SQLiteJSONB(TypeDecorator):
     """SQLite 테스트용 JSONB 대체 타입"""
-    pass
+
+    impl = Text
+    cache_ok = True
+
+    def process_bind_param(self, value: Any, dialect: Any) -> str | None:
+        if value is None:
+            return None
+        return json.dumps(value, ensure_ascii=False)
+
+    def process_result_value(self, value: str | None, dialect: Any) -> Any:
+        if value is None:
+            return None
+        return json.loads(value)
 
 # JSONB 클래스를 패치하여 SQLite에서도 동작하게 함
 import sqlalchemy.dialects.postgresql as pg_dialect
@@ -29,7 +46,7 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
 @pytest_asyncio.fixture(scope="session")
-def engine():
+def engine() -> AsyncEngine:
     """테스트 세션 동안 재사용하는 SQLite 인메모리 엔진"""
     return create_async_engine(
         TEST_DATABASE_URL,
@@ -39,7 +56,7 @@ def engine():
 
 
 @pytest_asyncio.fixture(scope="session")
-async def create_tables(engine):
+async def create_tables(engine: AsyncEngine) -> AsyncIterator[None]:
     """세션 시작 시 테이블 생성, 종료 시 삭제"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -49,7 +66,10 @@ async def create_tables(engine):
 
 
 @pytest_asyncio.fixture
-async def db_session(engine, create_tables) -> AsyncSession:
+async def db_session(
+    engine: AsyncEngine,
+    create_tables: AsyncIterator[None],
+) -> AsyncIterator[AsyncSession]:
     """각 테스트마다 독립적인 세션 (롤백으로 데이터 격리)"""
     async_session = async_sessionmaker(engine, expire_on_commit=False)
     async with async_session() as session:
