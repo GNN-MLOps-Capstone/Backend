@@ -443,6 +443,71 @@ curl "http://localhost:8000/api/news/top-dwell-keywords" \
 
 ---
 
+### 최근 24시간 뉴스 상위 종목
+
+```http
+GET /api/news/trending-stocks
+```
+
+- 인증 필수 엔드포인트입니다.
+- 최근 24시간 내 발행된 뉴스(`naver_news.pub_date`) 중 `filtered_news`에 포함된 주식 뉴스만 집계합니다.
+- `news_stock_mapping` 기준으로 뉴스에 등장한 종목별 출현 뉴스 수를 계산해 상위 3개를 반환합니다.
+- 정렬 기준은 `news_count` 내림차순, `latest_pub_date` 내림차순입니다.
+
+예시:
+
+```bash
+curl "http://localhost:8000/api/news/trending-stocks" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+응답 예시:
+
+```json
+[
+  {
+    "stock_id": "005930",
+    "stock_name": "삼성전자",
+    "news_count": 5,
+    "latest_pub_date": "2026-04-08T08:30:00+00:00"
+  }
+]
+```
+
+---
+
+### 최근 24시간 뉴스 상위 키워드
+
+```http
+GET /api/news/trending-keywords
+```
+
+- 인증 필수 엔드포인트입니다.
+- 최근 24시간 내 발행된 뉴스(`naver_news.pub_date`) 중 `filtered_news`에 포함된 주식 뉴스만 집계합니다.
+- `news_keyword_mapping`과 `keywords` 기준으로 키워드별 출현 뉴스 수를 계산해 상위 3개를 반환합니다.
+- 정렬 기준은 `news_count` 내림차순, `latest_pub_date` 내림차순입니다.
+
+예시:
+
+```bash
+curl "http://localhost:8000/api/news/trending-keywords" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+응답 예시:
+
+```json
+[
+  {
+    "keyword": "반도체",
+    "news_count": 6,
+    "latest_pub_date": "2026-04-08T09:10:00+00:00"
+  }
+]
+```
+
+---
+
 ### 추천 로그 수집 (탭/뉴스 체류시간)
 
 ```http

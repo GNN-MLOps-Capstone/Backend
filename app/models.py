@@ -124,6 +124,17 @@ class NaverNews(Base):
         return f"<NaverNews(news_id={self.news_id}, title={self.title[:30] if self.title else 'None'}...)>"
 
 
+class NewsDomainMapping(Base):
+    """
+    뉴스 도메인과 언론사명 매핑 테이블
+    """
+
+    __tablename__ = "news_domain_mapping"
+
+    domain = Column(String(255), primary_key=True)
+    news_company_name = Column(String(255), nullable=False)
+
+
 class CrawledNews(Base):
     """
     크롤링된 뉴스 테이블

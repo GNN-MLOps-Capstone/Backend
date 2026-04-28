@@ -99,6 +99,7 @@ class NewsRecommendationItem(BaseModel):
     summary: Optional[str] = None
     pub_date: Optional[datetime] = None
     path: Optional[str] = None
+    news_company_name: Optional[str] = None
     stock_name: Optional[str] = None
     stock_change: Optional[str] = None
     stock_up: Optional[bool] = None
@@ -128,6 +129,19 @@ class TopDwellKeywordResponse(BaseModel):
     total_dwell_event_count: int
     news_count: int
     latest_bucket_end: Optional[datetime] = None
+
+
+class RecentTrendingStockResponse(BaseModel):
+    stock_id: str
+    stock_name: Optional[str] = None
+    news_count: int
+    latest_pub_date: Optional[datetime] = None
+
+
+class RecentTrendingKeywordResponse(BaseModel):
+    keyword: str
+    news_count: int
+    latest_pub_date: Optional[datetime] = None
 
 
 class StockSummaryResponse(BaseModel):
