@@ -28,6 +28,7 @@ from sqlalchemy import (
     Boolean,
     Time,
     UniqueConstraint,
+    Date
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
@@ -195,6 +196,8 @@ class User(Base):
     onesignal_id = Column(String(255), nullable=True, default=None)
     # 유저정보 생성시간
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # 마지막 로그인
+    last_login = Column(DateTime(timezone=True), server_default=func.now())
 
     settings = relationship("UserSettings",back_populates="user",uselist=False,cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
@@ -323,8 +326,13 @@ class Notification(Base):
     앱에서 보낸 알림 이력과 읽음 상태를 저장합니다.
     """
     __tablename__ = "notifications"
+    __table_args__ = (
+        UniqueConstraint("onesignal_notification_id", "user_id", name="uq_notification_onesignal_user"),
+        UniqueConstraint("user_id", "stock_name", "type", "date_kst", name="uq_notification_daily"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
+    onesignal_notification_id = Column(String(255), nullable=False, index=True)
     user_id = Column(String, ForeignKey("users.google_id", ondelete="CASCADE"), nullable=False, index=True)
     
     type = Column(String(50), nullable=False)
@@ -337,6 +345,7 @@ class Notification(Base):
 
     # 생성 시간 (자동 입력)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    date_kst = Column(Date, nullable=False, index=True)
 
     # 관계 설정: User 모델과 양방향 연결
     user = relationship("User", back_populates="notifications")

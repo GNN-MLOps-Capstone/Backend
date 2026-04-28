@@ -19,7 +19,7 @@ API 엔드포인트:
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -31,6 +31,7 @@ from sqlalchemy.orm import selectinload
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from jose import jwt, JWTError
+from datetime import datetime
 
 from app.database import get_db
 from app.models import User, UserSettings
@@ -148,6 +149,7 @@ async def _upsert_user_for_login(
     nickname: str,
     img_url: str | None,
     onesignal_id: str | None,
+    last_login: datetime,
 ) -> User:
     query = select(User).options(selectinload(User.settings)).where(User.google_id == google_id)
     result = await db.execute(query)
@@ -160,6 +162,7 @@ async def _upsert_user_for_login(
             nickname=nickname,
             img_url=img_url,
             onesignal_id=onesignal_id,
+            last_login=last_login,
         )
         user.settings = UserSettings()
         db.add(user)
@@ -179,6 +182,7 @@ async def _upsert_user_for_login(
             user.email = email
             user.nickname = nickname
             user.img_url = img_url
+            user.last_login = last_login
             if onesignal_id is not None:
                 user.onesignal_id = onesignal_id
             if user.settings is None:
@@ -194,6 +198,7 @@ async def _upsert_user_for_login(
     user.email = email
     user.nickname = nickname
     user.img_url = img_url
+    user.last_login = last_login
     if onesignal_id is not None:
         user.onesignal_id = onesignal_id
 
@@ -217,6 +222,7 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
     nickname = token_info.get("name") or req.nickname
     img_url = token_info.get("picture") or req.img_url
     onesignal_id = req.onesignal_id
+    last_login = datetime.now(timezone.utc)
 
     if not email:
         raise HTTPException(
@@ -233,6 +239,7 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
         nickname=nickname,
         img_url=img_url,
         onesignal_id=onesignal_id,
+        last_login=last_login
     )
 
     # Access Token 발급

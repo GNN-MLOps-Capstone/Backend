@@ -18,15 +18,19 @@ API 엔드포인트:
 
 import logging
 from typing import List
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, update, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
+from fastapi.responses import JSONResponse
 
 from app.database import get_db
 from app.models import Notification,User
 from app.schemas import NotificationCreateRequest, NotificationResponse, NotificationReadRequest, NotificationCountResponse
 from app.routers.users import get_current_user
+from app.kis.transformers import KST
 
 router = APIRouter(
     prefix="/api/notifications",
@@ -215,22 +219,47 @@ async def create_notification(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    existing = await db.execute(
+        select(Notification).where(
+            Notification.onesignal_notification_id == req.notification_id,
+            Notification.user_id == current_user.google_id  # 👈 이 조건 추가!
+        )
+    )
+
+    if existing.scalar_one_or_none():
+        # 이미 있다면 저장하지 않고 성공(200) 반환
+        return JSONResponse(
+            status_code=200,
+            content={"success": True, "message": "Already exists for this user"}
+        )
+    
     new_noti = Notification(
         user_id=current_user.google_id,
+        onesignal_notification_id=req.notification_id,
         type=req.type,
         title=req.title,
         stock_name=req.stock_name,
         sentiment_score=req.sentiment_score,
         body=req.body,
         is_read=False,
-        star=False
+        star=False,
+        date_kst=datetime.now(KST).date()
     )
     try:
         db.add(new_noti)
         await db.commit()
         await db.refresh(new_noti)
         return {"success": True, "id": new_noti.id}
+    except IntegrityError as e:
+        await db.rollback()
+        error_text = str(getattr(e, "orig", e)).lower()
+        if "uq_notification_onesignal_user" in error_text or "uq_notification_daily" in error_text:
+            return JSONResponse(
+                status_code=200,
+                content={"success": True, "message": "Already exists for this user"},
+            )
+        raise HTTPException(status_code=500, detail="알림 저장 실패") from e
     except Exception as e:
         await db.rollback()
-        logger.exception("알림 저장 실패: user_id=%s", current_user.id)
+        logger.exception("알림 저장 실패: user_id=%s", current_user.google_id)
         raise HTTPException(status_code=500, detail="알림 저장 실패") from e

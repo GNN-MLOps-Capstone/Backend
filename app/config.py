@@ -18,7 +18,7 @@
 ==============================================================================
 """
 
-from pydantic_settings import BaseSettings  # 설정 관리 라이브러리
+from pydantic_settings import BaseSettings, SettingsConfigDict  # 설정 관리 라이브러리
 from functools import lru_cache  # 캐싱 기능 (설정을 한 번만 읽어옴)
 from pydantic import Field, model_validator
 
@@ -115,15 +115,23 @@ class Settings(BaseSettings):
     # 제미나이 api키 설정
     # =========================================================================
     gemini_api: str = "" 
+    gemini_max_concurrency: int = 5
 
     # =============================================================================
     # 로그인 access token용
     # =============================================================================
-    secret_key: str = Field(..., env="SECRET_KEY")
-    algorithm: str = Field(..., env="ALGORITHM")
+    secret_key: str
+    algorithm: str
     access_token_expire_minutes: int = 43200
-    google_client_id: str = Field(..., env="GOOGLE_CLIENT_ID")
+    google_client_id: str
     dev_bypass_login: bool = False
+
+    # =============================================================================
+    #  onesignal 설정
+    # =============================================================================
+    onesignal_app_id: str = ""
+    onesignal_rest_api_key: str = ""
+    
 
     @model_validator(mode="after")
     def _validate_kis_fields(self) -> "Settings":
@@ -142,21 +150,20 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"recommender_timeout must be greater than 0, got {self.recommender_timeout}"
             )
+        if self.gemini_max_concurrency <= 0:
+            raise ValueError(
+                f"gemini_max_concurrency must be greater than 0, got {self.gemini_max_concurrency}"
+            )
         if not self.recommender_mock_mode and not self.recommender_base_url.strip():
             raise ValueError(
                 "recommender_base_url is required when recommender_mock_mode is false"
             )
         return self
 
-    class Config:
-        """
-        Pydantic 설정 클래스
-        
-        env_file: 환경변수를 읽어올 파일 경로
-        env_file_encoding: 파일 인코딩 (한글 지원을 위해 utf-8 사용)
-        """
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8"
+    )
 
 
 @lru_cache()  # 이 함수의 결과를 캐싱 (매번 파일을 읽지 않고 한 번만 읽음)

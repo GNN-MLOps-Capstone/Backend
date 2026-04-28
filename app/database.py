@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import (
 )
 import sqlalchemy as sa
 from sqlalchemy.orm import DeclarativeBase  # 모델의 기본 클래스
+import logging
 
 from app.config import get_settings  # 설정 가져오기
 
@@ -52,6 +53,7 @@ engine = create_async_engine(
     pool_recycle=1800,      # 장시간 idle 커넥션 재사용 방지(초)
 )
 
+logging.getLogger("sqlalchemy.engine.Engine").setLevel(logging.WARNING)
 
 # =============================================================================
 # 세션 팩토리 생성
