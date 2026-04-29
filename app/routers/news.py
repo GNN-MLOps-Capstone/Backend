@@ -26,6 +26,7 @@ import binascii
 import json
 import logging
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 from uuid import uuid4
 from collections import Counter
 
@@ -43,6 +44,7 @@ from app.models import (
     StockSummaryCache,
     NewsStockMapping,
     FilteredNews,
+    NewsDomainMapping,
     RecommendationServe,
     RecommendationNewsPathMetrics,
     User,
@@ -59,12 +61,15 @@ from app.schemas import (
     NewsRecommendationResponse,
     TopDwellStockResponse,
     TopDwellKeywordResponse,
+    RecentTrendingStockResponse,
+    RecentTrendingKeywordResponse,
 )
 from app.kis.errors import KISError
 from app.recommender.client import RecommendationCandidate
 from app.routers.users import get_current_user
 from app.services.stock_service import fetch_stock_overview
 from app.services.news_enrichment_service import analyze_article, generate_stock_summary
+from app.utils.keyword_filters import TRENDING_KEYWORD_EXCLUDES
 from app.utils.text import decode_html_entities, escape_sql_like_wildcards
 
 
@@ -162,6 +167,69 @@ def _default_recommendation_path(source: str) -> str:
         _RECENT_RECOMMENDATION_SOURCE: "A1",
     }
     return path_map.get(source, "A1")
+
+
+def _normalize_news_domain(url: str | None) -> str | None:
+    if not url:
+        return None
+
+    parsed = urlparse(url if "://" in url else f"//{url}")
+    hostname = (parsed.hostname or "").strip().lower().rstrip(".")
+    if not hostname:
+        return None
+    return hostname
+
+
+def _domain_candidates_for_lookup(domain: str | None) -> tuple[str, ...]:
+    if not domain:
+        return ()
+    if domain.startswith("www."):
+        stripped = domain[4:]
+        if stripped:
+            return (domain, stripped)
+    return (domain,)
+
+
+async def _select_news_company_name_map(
+    db: AsyncSession,
+    news_map: dict[int, NaverNews],
+) -> dict[int, str]:
+    if not news_map:
+        return {}
+
+    domains_by_news_id = {
+        news_id: _normalize_news_domain(news.url)
+        for news_id, news in news_map.items()
+    }
+    lookup_domains = list(
+        dict.fromkeys(
+            candidate
+            for domain in domains_by_news_id.values()
+            for candidate in _domain_candidates_for_lookup(domain)
+        )
+    )
+    if not lookup_domains:
+        return {}
+
+    stmt = select(
+        NewsDomainMapping.domain,
+        NewsDomainMapping.news_company_name,
+    ).where(NewsDomainMapping.domain.in_(lookup_domains))
+    rows = (await db.execute(stmt)).all()
+    company_name_by_domain = {
+        str(domain).strip().lower(): news_company_name
+        for domain, news_company_name in rows
+        if domain and news_company_name
+    }
+
+    news_company_name_map: dict[int, str] = {}
+    for news_id, domain in domains_by_news_id.items():
+        for candidate_domain in _domain_candidates_for_lookup(domain):
+            company_name = company_name_by_domain.get(candidate_domain)
+            if company_name:
+                news_company_name_map[news_id] = company_name
+                break
+    return news_company_name_map
 
 async def _fetch_change_rate_safe(stock_id: str) -> float | None:
     try:
@@ -411,6 +479,7 @@ async def _build_recommendation_items(
     news_map = {int(row.news_id): row for row in news_rows}
     crawled_map = {int(news_id): text for news_id, text in crawled_rows}
     filtered_map = {int(news_id): summary for news_id, summary in filtered_rows}
+    news_company_name_map = await _select_news_company_name_map(db, news_map)
 
     top_stock_map = await _select_top_stock_row_per_news(db, news_ids)
     change_rate_map = await _fetch_change_rates_for_stock_ids(
@@ -440,6 +509,7 @@ async def _build_recommendation_items(
                 summary=_preview_text(summary),
                 pub_date=news.pub_date,
                 path=candidate.path or _default_recommendation_path(source),
+                news_company_name=news_company_name_map.get(candidate.news_id),
                 stock_name=str(top_stock["stock_name"]) if top_stock and top_stock.get("stock_name") else None,
                 stock_change=_format_change_rate(change_rate),
                 stock_up=_stock_up_from_change_rate(change_rate),
@@ -779,6 +849,123 @@ async def get_top_dwell_keywords(
             total_dwell_event_count=int(row["total_dwell_event_count"] or 0),
             news_count=int(row["news_count"] or 0),
             latest_bucket_end=row["latest_bucket_end"],
+        )
+        for row in rows
+    ]
+
+
+@router.get("/trending-stocks", response_model=list[RecentTrendingStockResponse])
+async def get_recent_trending_stocks(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    최근 24시간 동안 발행된 뉴스에서 많이 등장한 종목 상위 3개를 반환합니다.
+    """
+    _ = current_user
+    window_start = datetime.utcnow() - timedelta(hours=24)
+    news_count_expr = func.count(func.distinct(NewsStockMapping.news_id))
+    latest_pub_date_expr = func.max(NaverNews.pub_date)
+
+    query = (
+        select(
+            NewsStockMapping.stock_id.label("stock_id"),
+            func.coalesce(
+                StockSummaryCache.stock_name,
+                Stock.stock_name,
+                NewsStockMapping.stock_id,
+            ).label("stock_name"),
+            news_count_expr.label("news_count"),
+            latest_pub_date_expr.label("latest_pub_date"),
+        )
+        .select_from(FilteredNews)
+        .join(NaverNews, FilteredNews.news_id == NaverNews.news_id)
+        .join(NewsStockMapping, NewsStockMapping.news_id == NaverNews.news_id)
+        .outerjoin(Stock, Stock.stock_id == NewsStockMapping.stock_id)
+        .outerjoin(StockSummaryCache, StockSummaryCache.stock_id == NewsStockMapping.stock_id)
+        .where(NaverNews.crawl_status == ProcessStatus.crawl_success)
+        .where(NaverNews.pub_date.is_not(None))
+        .where(NaverNews.pub_date >= window_start)
+        .group_by(
+            NewsStockMapping.stock_id,
+            StockSummaryCache.stock_name,
+            Stock.stock_name,
+        )
+        .order_by(
+            desc(news_count_expr),
+            desc(latest_pub_date_expr),
+            NewsStockMapping.stock_id.asc(),
+        )
+        .limit(3)
+    )
+
+    result = await db.execute(query)
+    rows = result.mappings().all()
+
+    return [
+        RecentTrendingStockResponse(
+            stock_id=row["stock_id"],
+            stock_name=decode_html_entities(row["stock_name"]),
+            news_count=int(row["news_count"] or 0),
+            latest_pub_date=row["latest_pub_date"],
+        )
+        for row in rows
+    ]
+
+
+@router.get("/trending-keywords", response_model=list[RecentTrendingKeywordResponse])
+async def get_recent_trending_keywords(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    최근 24시간 동안 발행된 뉴스에서 많이 등장한 키워드 상위 3개를 반환합니다.
+    """
+    _ = current_user
+    window_start = datetime.utcnow() - timedelta(hours=24)
+    news_count_expr = func.count(func.distinct(NewsKeywordMapping.news_id))
+    latest_pub_date_expr = func.max(NaverNews.pub_date)
+
+    query = (
+        select(
+            Keyword.word.label("keyword"),
+            news_count_expr.label("news_count"),
+            latest_pub_date_expr.label("latest_pub_date"),
+        )
+        .select_from(FilteredNews)
+        .join(NaverNews, FilteredNews.news_id == NaverNews.news_id)
+        .join(NewsKeywordMapping, NewsKeywordMapping.news_id == NaverNews.news_id)
+        .join(Keyword, Keyword.keyword_id == NewsKeywordMapping.keyword_id)
+        .where(NaverNews.crawl_status == ProcessStatus.crawl_success)
+        .where(NaverNews.pub_date.is_not(None))
+        .where(NaverNews.pub_date >= window_start)
+        .where(func.btrim(Keyword.word) != "")
+    )
+
+    if TRENDING_KEYWORD_EXCLUDES:
+        query = query.where(
+            func.lower(func.btrim(Keyword.word)).not_in(sorted(TRENDING_KEYWORD_EXCLUDES))
+        )
+
+    query = (
+        query
+        .group_by(Keyword.keyword_id, Keyword.word)
+        .order_by(
+            desc(news_count_expr),
+            desc(latest_pub_date_expr),
+            Keyword.word.asc(),
+        )
+        .limit(3)
+    )
+
+    result = await db.execute(query)
+    rows = result.mappings().all()
+
+    return [
+        RecentTrendingKeywordResponse(
+            keyword=decode_html_entities(row["keyword"]) or "",
+            news_count=int(row["news_count"] or 0),
+            latest_pub_date=row["latest_pub_date"],
         )
         for row in rows
     ]

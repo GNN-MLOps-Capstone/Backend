@@ -342,6 +342,7 @@ curl "http://localhost:8000/api/news/recommendations?page=1&screen_session_id=sc
 | items[].summary | string | 예 | 비어 있지 않은 요약/본문을 180자 미리보기로 정규화한 값 |
 | items[].pub_date | datetime | 예 | 발행 시각 |
 | items[].path | string | 예 | 추천 경로 코드 |
+| items[].news_company_name | string | 예 | 뉴스 URL 도메인을 `news_domain_mapping`으로 매핑한 언론사명 |
 | items[].stock_name | string | 예 | 대표 연관 종목명 |
 | items[].stock_change | string | 예 | 대표 종목 등락률 문자열 예: `-1.4%` |
 | items[].stock_up | bool | 예 | 대표 종목 상승 여부 |
@@ -364,6 +365,7 @@ curl "http://localhost:8000/api/news/recommendations?page=1&screen_session_id=sc
       "summary": "기사 요약",
       "pub_date": "2026-02-25T12:34:56",
       "path": "A1",
+      "news_company_name": "연합뉴스",
       "stock_name": "삼성전자",
       "stock_change": "-1.4%",
       "stock_up": false
@@ -437,6 +439,72 @@ curl "http://localhost:8000/api/news/top-dwell-keywords" \
     "total_dwell_event_count": 128,
     "news_count": 7,
     "latest_bucket_end": "2026-03-31T08:00:00+00:00"
+  }
+]
+```
+
+---
+
+### 최근 24시간 뉴스 상위 종목
+
+```http
+GET /api/news/trending-stocks
+```
+
+- 인증 필수 엔드포인트입니다.
+- 최근 24시간 내 발행된 뉴스(`naver_news.pub_date`) 중 `filtered_news`에 포함된 주식 뉴스만 집계합니다.
+- `news_stock_mapping` 기준으로 뉴스에 등장한 종목별 출현 뉴스 수를 계산해 상위 3개를 반환합니다.
+- 정렬 기준은 `news_count` 내림차순, `latest_pub_date` 내림차순입니다.
+
+예시:
+
+```bash
+curl "http://localhost:8000/api/news/trending-stocks" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+응답 예시:
+
+```json
+[
+  {
+    "stock_id": "005930",
+    "stock_name": "삼성전자",
+    "news_count": 5,
+    "latest_pub_date": "2026-04-08T08:30:00+00:00"
+  }
+]
+```
+
+---
+
+### 최근 24시간 뉴스 상위 키워드
+
+```http
+GET /api/news/trending-keywords
+```
+
+- 인증 필수 엔드포인트입니다.
+- 최근 24시간 내 발행된 뉴스(`naver_news.pub_date`) 중 `filtered_news`에 포함된 주식 뉴스만 집계합니다.
+- `news_keyword_mapping`과 `keywords` 기준으로 키워드별 출현 뉴스 수를 계산해 상위 3개를 반환합니다.
+- 공백 키워드와 `TRENDING_KEYWORD_EXCLUDES`에 정의된 제외 키워드는 집계하지 않습니다.
+- 정렬 기준은 `news_count` 내림차순, `latest_pub_date` 내림차순입니다.
+
+예시:
+
+```bash
+curl "http://localhost:8000/api/news/trending-keywords" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+응답 예시:
+
+```json
+[
+  {
+    "keyword": "반도체",
+    "news_count": 6,
+    "latest_pub_date": "2026-04-08T09:10:00+00:00"
   }
 ]
 ```
