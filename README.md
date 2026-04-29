@@ -342,6 +342,7 @@ curl "http://localhost:8000/api/news/recommendations?page=1&screen_session_id=sc
 | items[].summary | string | 예 | 비어 있지 않은 요약/본문을 180자 미리보기로 정규화한 값 |
 | items[].pub_date | datetime | 예 | 발행 시각 |
 | items[].path | string | 예 | 추천 경로 코드 |
+| items[].news_company_name | string | 예 | 뉴스 URL 도메인을 `news_domain_mapping`으로 매핑한 언론사명 |
 | items[].stock_name | string | 예 | 대표 연관 종목명 |
 | items[].stock_change | string | 예 | 대표 종목 등락률 문자열 예: `-1.4%` |
 | items[].stock_up | bool | 예 | 대표 종목 상승 여부 |
@@ -364,6 +365,7 @@ curl "http://localhost:8000/api/news/recommendations?page=1&screen_session_id=sc
       "summary": "기사 요약",
       "pub_date": "2026-02-25T12:34:56",
       "path": "A1",
+      "news_company_name": "연합뉴스",
       "stock_name": "삼성전자",
       "stock_change": "-1.4%",
       "stock_up": false
@@ -485,6 +487,7 @@ GET /api/news/trending-keywords
 - 인증 필수 엔드포인트입니다.
 - 최근 24시간 내 발행된 뉴스(`naver_news.pub_date`) 중 `filtered_news`에 포함된 주식 뉴스만 집계합니다.
 - `news_keyword_mapping`과 `keywords` 기준으로 키워드별 출현 뉴스 수를 계산해 상위 3개를 반환합니다.
+- 공백 키워드와 `TRENDING_KEYWORD_EXCLUDES`에 정의된 제외 키워드는 집계하지 않습니다.
 - 정렬 기준은 `news_count` 내림차순, `latest_pub_date` 내림차순입니다.
 
 예시:
