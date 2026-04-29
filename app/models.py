@@ -125,6 +125,17 @@ class NaverNews(Base):
         return f"<NaverNews(news_id={self.news_id}, title={self.title[:30] if self.title else 'None'}...)>"
 
 
+class NewsDomainMapping(Base):
+    """
+    뉴스 도메인과 언론사명 매핑 테이블
+    """
+
+    __tablename__ = "news_domain_mapping"
+
+    domain = Column(String(255), primary_key=True)
+    news_company_name = Column(String(255), nullable=False)
+
+
 class CrawledNews(Base):
     """
     크롤링된 뉴스 테이블
@@ -185,6 +196,8 @@ class User(Base):
     onesignal_id = Column(String(255), nullable=True, default=None)
     # 유저정보 생성시간
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # 마지막 로그인
+    last_login = Column(DateTime(timezone=True), server_default=func.now())
 
     settings = relationship("UserSettings",back_populates="user",uselist=False,cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")

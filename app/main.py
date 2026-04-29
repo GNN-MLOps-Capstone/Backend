@@ -31,6 +31,7 @@ import logging
 from contextlib import asynccontextmanager  # 비동기 컨텍스트 매니저
 from hashlib import sha256
 from pathlib import Path
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI, Header, HTTPException, status  # 웹 프레임워크
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어
@@ -41,6 +42,7 @@ from app.database import ensure_interaction_tables, init_db  # DB 초기화 함�
 from app.routers import interactions, news, notifications, stocks, users, watchlist
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.tasks.volatility_monitor import run_volatility_check
+from app.tasks.news_tasks import run_news_keyword_check
 
 # 설정 객체 가져오기
 settings = get_settings()
@@ -110,10 +112,23 @@ async def lifespan(app: FastAPI):
         id='volatility_monitoring_job',
         replace_existing=True,
         max_instances=1,
-        misfire_grace_time=60
+        misfire_grace_time=60,
+        next_run_time=datetime.now() + timedelta(minutes=5)
     )
+
+    scheduler.add_job(
+        run_news_keyword_check,
+        'interval',
+        minutes=30,
+        id='news_keyword_job',
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=60,
+        next_run_time=datetime.now() + timedelta(minutes=30)
+    )   
     scheduler.start()
     logger.info("주가 감시 스케줄러 가동 (5분 주기)")
+    logger.info("뉴스 키워드 감시 스케줄러 가동 (30분 주기)")
     
     # yield: 여기서 서버가 실행되고 요청을 처리함
     yield
