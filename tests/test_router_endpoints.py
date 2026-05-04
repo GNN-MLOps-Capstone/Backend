@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import sys
 import types
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import AsyncIterator
 from unittest.mock import AsyncMock
@@ -73,11 +73,19 @@ from app.models import (
     RecommendationServe,
     Stock,
     StockSummaryCache,
+    User,
+    UserSettings,
 )
 from app.routers import news as news_router
 from app.routers import stocks as stocks_router
 from app.routers import users as users_router
 from app.routers import watchlist as watchlist_router
+from app.services import onesignal_service
+
+
+# =============================================================================
+# 테스트 공통 fixture / seed helper
+# =============================================================================
 
 
 @pytest_asyncio.fixture
@@ -226,6 +234,11 @@ async def _count_rows(session_factory: async_sessionmaker[AsyncSession], model: 
         return int(await session.scalar(select(func.count()).select_from(model)))
 
 
+# =============================================================================
+# 주식 라우터 테스트 — 시세, 연관 종목, 테마 키워드
+# =============================================================================
+
+
 class TestStockRouterEndpoints:
     async def test_stock_overview_uses_mocked_kis_quote(
         self,
@@ -307,12 +320,15 @@ class TestStockRouterEndpoints:
         assert related[0]["stock_name"] == "SK하이닉스"
         assert related[0]["logo_url"].startswith("data:image/svg+xml;utf8,")
 
-    async def test_related_stocks_returns_404_when_related_data_missing(
+    async def test_related_stocks_returns_404_when_embedding_replacement_data_missing(
         self,
         client: httpx.AsyncClient,
         authenticated_user: dict,
         session_factory: async_sessionmaker[AsyncSession],
     ):
+        # 4/16~17 계획의 "임베딩 데이터 없는 종목 404"는 현재 라우터가
+        # 임베딩 대신 동일 뉴스 공등장 데이터로 연관 종목을 계산하므로,
+        # 공등장 대체 데이터가 없는 종목의 404 계약으로 검증한다.
         await _seed_stock(session_factory)
 
         response = await client.get(
@@ -414,6 +430,11 @@ class TestStockRouterEndpoints:
         assert "키워드 데이터" in response.json()["detail"]
 
 
+# =============================================================================
+# 뉴스 라우터 테스트 — 목록 조회, 추천 응답 및 노출 로그
+# =============================================================================
+
+
 class TestNewsRouterEndpoints:
     async def test_news_simple_list_returns_recent_filtered_news(
         self,
@@ -488,7 +509,62 @@ class TestNewsRouterEndpoints:
         assert await _count_rows(session_factory, RecommendationServe) == 1
 
 
+# =============================================================================
+# 사용자 / 관심종목 / 알림 / 인터랙션 라우터 테스트
+# =============================================================================
+
+
 class TestUserWatchlistNotificationInteractionEndpoints:
+    async def test_user_login_creates_token_user_and_persists_onesignal_id(
+        self,
+        client: httpx.AsyncClient,
+        session_factory: async_sessionmaker[AsyncSession],
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        verify_mock = AsyncMock(
+            return_value={
+                "sub": "google-direct-login",
+                "email": "direct-login@example.com",
+                "name": "직접로그인",
+                "picture": "https://example.com/direct-login.png",
+                "email_verified": True,
+                "iss": "accounts.google.com",
+            }
+        )
+        monkeypatch.setattr(users_router, "verify_google_login_token", verify_mock)
+
+        response = await client.post(
+            "/api/users/login",
+            json={
+                "id_token": "direct-google-token",
+                "nickname": "fallback-name",
+                "img_url": "https://example.com/fallback.png",
+                "onesignal_id": "player-direct-login",
+            },
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["token_type"] == "Bearer"
+        assert users_router.decode_access_token(body["access_token"]) == "google-direct-login"
+        assert body["user"]["google_id"] == "google-direct-login"
+        assert body["user"]["email"] == "direct-login@example.com"
+        assert body["user"]["nickname"] == "직접로그인"
+        assert body["user"]["img_url"] == "https://example.com/direct-login.png"
+        verify_mock.assert_awaited_once_with("direct-google-token")
+
+        async with session_factory() as session:
+            user = await session.scalar(
+                select(User).where(User.google_id == "google-direct-login")
+            )
+            assert user is not None
+            assert user.onesignal_id == "player-direct-login"
+            settings = await session.scalar(
+                select(UserSettings).where(UserSettings.user_id == user.id)
+            )
+            assert settings is not None
+            assert settings.push is True
+
     async def test_user_login_profile_and_settings_flow(
         self,
         client: httpx.AsyncClient,
@@ -630,6 +706,76 @@ class TestUserWatchlistNotificationInteractionEndpoints:
         assert delete_response.status_code == 200
         assert delete_response.json() == {"success": True, "id": notification_id}
         assert await _count_rows(session_factory, Notification) == 0
+
+    async def test_send_volatility_push_calls_onesignal_and_saves_notification(
+        self,
+        authenticated_user: dict,
+        session_factory: async_sessionmaker[AsyncSession],
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+        calls: list[dict] = []
+
+        class FakeOneSignalResponse:
+            status_code = 200
+
+            def json(self) -> dict:
+                return {"id": "onesignal-week3-id"}
+
+        class FakeAsyncClient:
+            def __init__(self, *, timeout: float):
+                self.timeout = timeout
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, url: str, *, json: dict, headers: dict):
+                calls.append({"url": url, "json": json, "headers": headers})
+                return FakeOneSignalResponse()
+
+        monkeypatch.setattr(onesignal_service.settings, "onesignal_app_id", "app-week3")
+        monkeypatch.setattr(
+            onesignal_service.settings,
+            "onesignal_rest_api_key",
+            "rest-key-week3",
+        )
+        monkeypatch.setattr(onesignal_service.httpx, "AsyncClient", FakeAsyncClient)
+        monkeypatch.setattr(onesignal_service, "AsyncSessionLocal", session_factory)
+        monkeypatch.setattr(onesignal_service, "pg_insert", sqlite_insert)
+
+        push_sent, db_saved = await onesignal_service.send_volatility_push_and_save(
+            [authenticated_user["user"]["google_id"]],
+            "삼성전자",
+            date(2026, 4, 21),
+            rate=12.3,
+            alert_type="high_risk",
+        )
+
+        assert push_sent is True
+        assert db_saved is True
+        assert len(calls) == 1
+        call = calls[0]
+        assert call["url"] == "https://api.onesignal.com/notifications"
+        assert call["headers"]["Authorization"] == "Key rest-key-week3"
+        assert call["json"]["app_id"] == "app-week3"
+        assert call["json"]["include_aliases"] == {
+            "external_id": [authenticated_user["user"]["google_id"]]
+        }
+        assert call["json"]["target_channel"] == "push"
+        assert call["json"]["data"] == {"type": "high_risk", "stock_name": "삼성전자"}
+
+        async with session_factory() as session:
+            notification = await session.scalar(select(Notification))
+            assert notification is not None
+            assert notification.user_id == authenticated_user["user"]["google_id"]
+            assert notification.onesignal_notification_id == "onesignal-week3-id"
+            assert notification.type == "high_risk"
+            assert notification.stock_name == "삼성전자"
+            assert notification.sentiment_score == 12.3
 
     async def test_interactions_ingest_and_duplicate_detection(
         self,
