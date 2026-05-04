@@ -145,9 +145,7 @@ class TestGetStockWeather:
 
         with patch("app.routers.stocks._fetch_stock_overview", new_callable=AsyncMock) as mock_overview:
             mock_overview.return_value = {"change_rate": 0.0}
-            result = await get_stock_weather(
-                db, stock_id="005930", current_user=MagicMock()
-            )
+            result = await get_stock_weather(db, stock_id="005930")
 
         assert result == "CLOUDY"
 
@@ -162,9 +160,7 @@ class TestGetStockWeather:
 
         with patch("app.routers.stocks._fetch_stock_overview", new_callable=AsyncMock) as mock_overview:
             mock_overview.return_value = {"change_rate": 6.0}  # 급등
-            result = await get_stock_weather(
-                db, stock_id="005930", current_user=MagicMock()
-            )
+            result = await get_stock_weather(db, stock_id="005930")
 
         assert result == "SUNNY"
 
@@ -176,16 +172,14 @@ class TestGetStockWeather:
         db.execute.side_effect = [exist_mock]
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_stock_weather(
-                db, stock_id="999999", current_user=MagicMock()
-            )
+            await get_stock_weather(db, stock_id="999999")
 
         assert exc_info.value.status_code == 404
 
     async def test_stock_id_stock_name_둘다_없으면_ValueError(self):
         db = AsyncMock()
         with pytest.raises(ValueError):
-            await get_stock_weather(db, current_user=MagicMock())
+            await get_stock_weather(db)
 
     async def test_stock_name으로_조회_성공(self):
         db = AsyncMock()
@@ -200,9 +194,7 @@ class TestGetStockWeather:
 
         with patch("app.routers.stocks._fetch_stock_overview", new_callable=AsyncMock) as mock_overview:
             mock_overview.return_value = {"change_rate": 2.0}
-            result = await get_stock_weather(
-                db, stock_name="삼성전자", current_user=MagicMock()
-            )
+            result = await get_stock_weather(db, stock_name="삼성전자")
 
         assert result == "PARTLY_CLOUDY"
 
@@ -214,9 +206,7 @@ class TestGetStockWeather:
         db.execute.side_effect = [name_mock]
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_stock_weather(
-                db, stock_name="삼성", current_user=MagicMock()
-            )
+            await get_stock_weather(db, stock_name="삼성")
 
         assert exc_info.value.status_code == 400
 
@@ -232,9 +222,7 @@ class TestGetStockWeather:
 
         with patch("app.routers.stocks._fetch_stock_overview", new_callable=AsyncMock) as mock_overview:
             mock_overview.return_value = {"change_rate": None}
-            result = await get_stock_weather(
-                db, stock_id="005930", current_user=MagicMock()
-            )
+            result = await get_stock_weather(db, stock_id="005930")
 
         # price_score=0, sentiment_score=+1 → PARTLY_CLOUDY
         assert result == "PARTLY_CLOUDY"
