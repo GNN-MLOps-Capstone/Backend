@@ -104,7 +104,7 @@ python-jose[cryptography]==3.5.0
 # HTTP 클라이언트 (KIS API)
 httpx==0.28.1
 
-apscheduler==3.10.1
+apscheduler==3.11.0
 
 # WebSocket 클라이언트 (KIS 실시간)
 websockets>=13.0.0,<15.1.0

@@ -254,30 +254,6 @@ async def login(req: UserLoginRequest, db: AsyncSession = Depends(get_db)):
         "user": user
     }
 
-
-@router.post("/dev-login", response_model=AuthResponse)
-async def dev_login(req: DevLoginRequest, db: AsyncSession = Depends(get_db)):
-    if not settings.debug or not settings.dev_bypass_login:
-        raise HTTPException(status_code=404, detail="Not found")
-
-    nickname = req.nickname or req.email.split("@")[0]
-    user = await _upsert_user_for_login(
-        db=db,
-        google_id=req.google_id,
-        email=req.email,
-        nickname=nickname,
-        img_url=req.img_url,
-        onesignal_id=req.onesignal_id,
-    )
-    access_token = create_access_token(data={"sub": user.google_id})
-
-    return {
-        "access_token": access_token,
-        "token_type": "Bearer",
-        "user": user,
-    }
-
-
 @router.get(
     "/google-login-config",
     response_model=GoogleLoginConfigResponse,
