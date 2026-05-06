@@ -13,9 +13,9 @@ API 문서: https://apiportal.koreainvestment.com/
 import httpx
 from datetime import datetime, timedelta
 from typing import Optional
-import asyncio
 
 from app.config import get_settings
+from app.kis import rest_rate_limiter
 
 
 class KISService:
@@ -25,11 +25,11 @@ class KISService:
     CACHE_TTL = 30
 
     def __init__(self):
-        settings = get_settings()
-        self.BASE_URL = settings.kis_base_url
-        self.app_key = settings.kis_app_key
-        self.app_secret = settings.kis_app_secret
-        self.timeout = settings.kis_timeout
+        self._settings = get_settings()
+        self.BASE_URL = self._settings.kis_base_url
+        self.app_key = self._settings.kis_app_key
+        self.app_secret = self._settings.kis_app_secret
+        self.timeout = self._settings.kis_timeout
         self._access_token: Optional[str] = None
         self._token_expires_at: Optional[datetime] = None
         # 가격 캐시: {종목코드: {"data": 가격정보, "expires_at": 만료시간}}
@@ -101,6 +101,7 @@ class KISService:
             }
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
+                await rest_rate_limiter.acquire_kis_rest_rate_limit_slot(self._settings)
                 response = await client.get(url, headers=headers, params=params)
                 data = response.json()
 
@@ -160,9 +161,6 @@ class KISService:
         for code in codes_to_fetch:
             price = await self.get_stock_price(code, use_cache=False)
             results[code] = price
-            # 각 요청 사이에 0.5초 대기 (초당 2건 이하로 안전하게)
-            if code != codes_to_fetch[-1]:  # 마지막이 아니면
-                await asyncio.sleep(0.5)
 
         return results
 

@@ -39,6 +39,7 @@ def fake_settings():
         kis_app_secret="app-secret",
         kis_timeout=1.0,
         kis_max_requests_per_second=0,
+        resolved_kis_rest_max_requests_per_second=0,
     )
 
 

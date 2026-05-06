@@ -1,9 +1,10 @@
 """
-4/14~15 — KIS 실시간 시세 조회 기능 단위 테스트
+4/14~15, 4/20 - KIS 실시간 시세 및 주식 서비스 인증/개요 조회 단위 테스트
 """
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -12,12 +13,27 @@ import httpx
 import pytest
 import pytest_asyncio
 import respx
+from fastapi.security import HTTPAuthorizationCredentials
 
-import app.services.stock_service as stock_service
+from app.routers.users import create_access_token, get_current_subject
+from app.services import stock_service
 from app.kis.cache import TTLCache
 from app.kis.client import KISClient
 from app.kis.errors import KISError
 from app.services.kis_service import KISService
+
+
+async def _reset_stock_service_state() -> None:
+    stock_service.cache._store.clear()
+    for state in list(stock_service._overview_states_by_loop.values()):
+        state.inflight.clear()
+    stock_service._overview_states_by_loop.clear()
+
+
+@pytest.fixture
+def bearer_credentials() -> HTTPAuthorizationCredentials:
+    token = create_access_token({"sub": "google-user-123"})
+    return HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
 
 
 @pytest.fixture
@@ -28,7 +44,15 @@ def fake_settings():
         kis_app_secret="app-secret",
         kis_timeout=1.0,
         kis_max_requests_per_second=0,
+        resolved_kis_rest_max_requests_per_second=0,
     )
+
+
+@pytest_asyncio.fixture
+async def isolated_stock_service_state():
+    await _reset_stock_service_state()
+    yield
+    await _reset_stock_service_state()
 
 
 @pytest_asyncio.fixture
@@ -37,12 +61,15 @@ async def isolated_stock_service(monkeypatch, fake_settings):
     test_cache = TTLCache()
     monkeypatch.setattr(stock_service, "client", test_client)
     monkeypatch.setattr(stock_service, "cache", test_cache)
+    await _reset_stock_service_state()
     yield fake_settings, test_client, test_cache
+    await _reset_stock_service_state()
     await test_client.aclose()
 
 
 def _build_kis_service(fake_settings) -> KISService:
     service = KISService.__new__(KISService)
+    service._settings = fake_settings
     service.BASE_URL = fake_settings.kis_base_url
     service.app_key = fake_settings.kis_app_key
     service.app_secret = fake_settings.kis_app_secret
@@ -54,8 +81,22 @@ def _build_kis_service(fake_settings) -> KISService:
 
 
 # =============================================================================
+# 인증 의존성 테스트
+# =============================================================================
+
+
+@pytest.mark.asyncio
+class TestAuthDependency:
+    async def test_jwt_sub를_db조회없이_현재_주체로_반환한다(self, bearer_credentials):
+        subject = await get_current_subject(bearer_credentials)
+
+        assert subject == "google-user-123"
+
+
+# =============================================================================
 # 실시간 시세 조회 테스트
 # =============================================================================
+
 
 class TestKISRealtimeService:
     @respx.mock
@@ -102,12 +143,21 @@ class TestKISRealtimeService:
         service._access_token = "cached-token"
         service._token_expires_at = datetime.now() + timedelta(hours=1)
         service._price_cache["005930"] = {
-            "data": {"price": 70000, "change": -500, "change_rate": -0.71, "volume": 999, "high": 71000, "low": 69500},
+            "data": {
+                "price": 70000,
+                "change": -500,
+                "change_rate": -0.71,
+                "volume": 999,
+                "high": 71000,
+                "low": 69500,
+            },
             "expires_at": datetime.now() - timedelta(seconds=1),
         }
 
         url = f"{fake_settings.kis_base_url}/uapi/domestic-stock/v1/quotations/inquire-price"
-        respx.get(url).mock(return_value=httpx.Response(200, json={"rt_cd": "1", "msg1": "failure"}))
+        respx.get(url).mock(
+            return_value=httpx.Response(200, json={"rt_cd": "1", "msg1": "failure"})
+        )
 
         result = await service.get_stock_price("005930")
 
@@ -119,10 +169,13 @@ class TestKISRealtimeService:
 # 주식 개요 조회 테스트
 # =============================================================================
 
+
 class TestStockOverviewService:
     def test_비정상_rt_cd는_KISError(self):
         with pytest.raises(KISError) as exc_info:
-            stock_service.ensure_kis_ok({"rt_cd": "1", "msg1": "bad request", "msg_cd": "ERR001"})
+            stock_service.ensure_kis_ok(
+                {"rt_cd": "1", "msg1": "bad request", "msg_cd": "ERR001"}
+            )
 
         assert exc_info.value.status_code == 200
         assert exc_info.value.code == "ERR001"
@@ -270,3 +323,63 @@ class TestStockOverviewService:
 
         assert first == second
         assert route.call_count == 1
+
+
+@pytest.mark.asyncio
+class TestFetchStockOverview:
+    async def test_동일한_종목_요청은_inflight_작업을_공유한다(
+        self,
+        isolated_stock_service_state,
+    ):
+        started = asyncio.Event()
+        release = asyncio.Event()
+        call_count = 0
+        expected = {"code": "005930", "last_price": 70000}
+
+        async def fake_request(code: str) -> dict:
+            nonlocal call_count
+            call_count += 1
+            started.set()
+            await release.wait()
+            return {**expected, "code": code}
+
+        with patch.object(
+            stock_service,
+            "_load_stock_overview_from_kis",
+            side_effect=fake_request,
+        ):
+            first_task = asyncio.create_task(stock_service.fetch_stock_overview("005930"))
+            await started.wait()
+
+            second_task = asyncio.create_task(stock_service.fetch_stock_overview("005930"))
+            await asyncio.sleep(0)
+
+            assert call_count == 1
+
+            release.set()
+            first_result, second_result = await asyncio.gather(first_task, second_task)
+            await asyncio.sleep(0)
+
+        assert first_result == expected
+        assert second_result == expected
+        assert call_count == 1
+        assert await stock_service.cache.get("overview:005930") == expected
+        assert stock_service._get_overview_state().inflight == {}
+
+    async def test_성공한_개요조회는_캐시를_재사용한다(
+        self,
+        isolated_stock_service_state,
+    ):
+        expected = {"code": "000660", "last_price": 120000}
+
+        with patch.object(
+            stock_service,
+            "_load_stock_overview_from_kis",
+            new=AsyncMock(return_value=expected),
+        ) as request_mock:
+            first_result = await stock_service.fetch_stock_overview("000660")
+            second_result = await stock_service.fetch_stock_overview("000660")
+
+        assert first_result == expected
+        assert second_result == expected
+        assert request_mock.await_count == 1
