@@ -5,10 +5,7 @@
 from __future__ import annotations
 
 import asyncio
-import os
-import sys
 from datetime import datetime, timedelta
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -17,21 +14,6 @@ import pytest
 import pytest_asyncio
 import respx
 from fastapi.security import HTTPAuthorizationCredentials
-
-
-def _bootstrap_test_env() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
-
-    os.environ.setdefault("SECRET_KEY", "test-secret-key")
-    os.environ.setdefault("ALGORITHM", "HS256")
-    os.environ.setdefault("GOOGLE_CLIENT_ID", "test-google-client-id")
-    os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./test.db")
-    os.environ["DEBUG"] = "true"
-
-
-_bootstrap_test_env()
 
 from app.routers.users import create_access_token, get_current_subject
 from app.services import stock_service

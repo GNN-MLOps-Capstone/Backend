@@ -1174,8 +1174,11 @@ async def read_ai_trends(
         async def _fetch_overview_safe(code: str) -> dict | None:
             try:
                 return await _fetch_stock_overview(code)
-            except (HTTPException, KISError):
+            except HTTPException:
                 raise
+            except KISError as e:
+                logger.warning("overview fetch failed for %s: %s", code, e)
+                return None
             except Exception as e:
                 logger.warning("overview fetch failed for %s: %s", code, e)
                 return None
