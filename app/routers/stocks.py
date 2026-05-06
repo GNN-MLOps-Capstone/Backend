@@ -1518,9 +1518,12 @@ async def get_stock_weather_endpoint(
     if stock_id is None and stock_name is None:
         raise HTTPException(status_code=400, detail="stock_id 또는 stock_name 중 하나는 필수입니다.")
 
-    weather = await get_stock_weather(
-        db,
-        stock_id=stock_id,
-        stock_name=stock_name,
-    )
+    try:
+        weather = await get_stock_weather(
+            db,
+            stock_id=stock_id,
+            stock_name=stock_name,
+        )
+    except KISError as exc:
+        _raise_kis_http_error(exc)
     return {"weather": weather}

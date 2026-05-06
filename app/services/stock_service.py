@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import weakref
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from app.config import get_settings
@@ -18,9 +20,30 @@ logger = logging.getLogger(__name__)
 _KIS_REQUEST_TIMEOUT = 8.0
 _OVERVIEW_CACHE_TTL_SECONDS = 15.0
 _OVERVIEW_MAX_CONCURRENCY = 5
-_overview_semaphore = asyncio.Semaphore(_OVERVIEW_MAX_CONCURRENCY)
-_overview_inflight: dict[str, asyncio.Task[dict]] = {}
-_overview_inflight_lock = asyncio.Lock()
+
+
+@dataclass
+class _LoopState:
+    semaphore: asyncio.Semaphore = field(
+        default_factory=lambda: asyncio.Semaphore(_OVERVIEW_MAX_CONCURRENCY)
+    )
+    inflight: dict[str, asyncio.Task[dict]] = field(default_factory=dict)
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+
+
+_overview_states_by_loop: weakref.WeakKeyDictionary[
+    asyncio.AbstractEventLoop,
+    _LoopState,
+] = weakref.WeakKeyDictionary()
+
+
+def _get_overview_state() -> _LoopState:
+    loop = asyncio.get_running_loop()
+    state = _overview_states_by_loop.get(loop)
+    if state is None:
+        state = _LoopState()
+        _overview_states_by_loop[loop] = state
+    return state
 
 
 async def shutdown_stock_service_resources() -> None:
@@ -81,23 +104,25 @@ async def fetch_stock_overview(code: str) -> dict:
     if cached is not None:
         return cached
 
-    async with _overview_inflight_lock:
-        task = _overview_inflight.get(code)
+    state = _get_overview_state()
+    async with state.lock:
+        task = state.inflight.get(code)
         if task is None:
             task = asyncio.create_task(_request_stock_overview_from_kis(code))
             task.add_done_callback(
-                lambda done_task, stock_code=code: asyncio.create_task(
-                    _clear_overview_inflight(stock_code, done_task)
+                lambda done_task, stock_code=code, loop_state=state: asyncio.create_task(
+                    _clear_overview_inflight(loop_state, stock_code, done_task)
                 )
             )
-            _overview_inflight[code] = task
+            state.inflight[code] = task
 
     return await asyncio.shield(task)
 
 
 async def _request_stock_overview_from_kis(code: str) -> dict:
     cache_key = f"overview:{code}"
-    async with _overview_semaphore:
+    state = _get_overview_state()
+    async with state.semaphore:
         overview = await _load_stock_overview_from_kis(code)
         await cache.set(cache_key, overview, ttl_seconds=_OVERVIEW_CACHE_TTL_SECONDS)
         return overview
@@ -141,7 +166,11 @@ async def _load_stock_overview_from_kis(code: str) -> dict:
     return overview
 
 
-async def _clear_overview_inflight(code: str, task: asyncio.Task[dict]) -> None:
-    async with _overview_inflight_lock:
-        if _overview_inflight.get(code) is task:
-            _overview_inflight.pop(code, None)
+async def _clear_overview_inflight(
+    state: _LoopState,
+    code: str,
+    task: asyncio.Task[dict],
+) -> None:
+    async with state.lock:
+        if state.inflight.get(code) is task:
+            state.inflight.pop(code, None)

@@ -43,8 +43,9 @@ from app.services.kis_service import KISService
 
 async def _reset_stock_service_state() -> None:
     stock_service.cache._store.clear()
-    async with stock_service._overview_inflight_lock:
-        stock_service._overview_inflight.clear()
+    for state in list(stock_service._overview_states_by_loop.values()):
+        state.inflight.clear()
+    stock_service._overview_states_by_loop.clear()
 
 
 @pytest.fixture
@@ -381,7 +382,7 @@ class TestFetchStockOverview:
         assert second_result == expected
         assert call_count == 1
         assert await stock_service.cache.get("overview:005930") == expected
-        assert stock_service._overview_inflight == {}
+        assert stock_service._get_overview_state().inflight == {}
 
     async def test_성공한_개요조회는_캐시를_재사용한다(
         self,

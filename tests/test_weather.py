@@ -7,7 +7,13 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
 
-from app.routers.stocks import get_weather, get_stock_weather, get_ai_trends
+from app.kis.errors import KISError
+from app.routers.stocks import (
+    get_ai_trends,
+    get_stock_weather,
+    get_stock_weather_endpoint,
+    get_weather,
+)
 
 
 # =============================================================================
@@ -226,6 +232,33 @@ class TestGetStockWeather:
 
         # price_score=0, sentiment_score=+1 → PARTLY_CLOUDY
         assert result == "PARTLY_CLOUDY"
+
+    async def test_weather_endpoint는_KIS_error를_HTTPException으로_변환(self):
+        db = AsyncMock()
+
+        with patch(
+            "app.routers.stocks.get_stock_weather",
+            new_callable=AsyncMock,
+        ) as mock_weather:
+            mock_weather.side_effect = KISError(
+                "KIS unavailable",
+                status_code=503,
+                code="KIS_DOWN",
+            )
+            with pytest.raises(HTTPException) as exc_info:
+                await get_stock_weather_endpoint(
+                    db=db,
+                    stock_id="005930",
+                    stock_name=None,
+                    _="google-user-123",
+                )
+
+        assert exc_info.value.status_code == 503
+        assert exc_info.value.detail == {
+            "status_code": 503,
+            "code": "KIS_DOWN",
+            "message": "KIS unavailable",
+        }
 
 
 # =============================================================================
