@@ -5,8 +5,7 @@ from pathlib import Path
 import pytest
 
 
-@pytest.fixture(scope="session", autouse=True)
-def test_env_bootstrap() -> None:
+def _bootstrap_test_env() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
@@ -16,3 +15,12 @@ def test_env_bootstrap() -> None:
     os.environ.setdefault("GOOGLE_CLIENT_ID", "test-google-client-id")
     os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./test.db")
     os.environ.setdefault("DEBUG", "true")
+
+
+def pytest_configure() -> None:
+    _bootstrap_test_env()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def test_env_bootstrap() -> None:
+    _bootstrap_test_env()

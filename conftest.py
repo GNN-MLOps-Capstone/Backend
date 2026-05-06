@@ -2,9 +2,7 @@
 import pytest
 import pytest_asyncio
 from sqlalchemy import Text
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import StaticPool
-from sqlalchemy.dialects.postgresql import JSONB
 import json
 from typing import Any
 from sqlalchemy.types import TypeDecorator
@@ -37,10 +35,6 @@ class _SQLiteJSONB(TypeDecorator):
 import sqlalchemy.dialects.postgresql as pg_dialect
 pg_dialect.JSONB = _SQLiteJSONB
 
-# 모델 import는 패치 이후에 해야 적용됨
-from app.database import Base
-from app import models  # noqa: F401 — 모든 모델 등록용
-
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -58,6 +52,10 @@ def engine() -> AsyncEngine:
 @pytest_asyncio.fixture(scope="session")
 async def create_tables(engine: AsyncEngine) -> AsyncIterator[None]:
     """세션 시작 시 테이블 생성, 종료 시 삭제"""
+    # 모델 import는 JSONB 패치 이후에 해야 적용됨
+    from app.database import Base
+    from app import models  # noqa: F401 — 모든 모델 등록용
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
