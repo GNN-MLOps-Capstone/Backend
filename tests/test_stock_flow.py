@@ -19,6 +19,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import insert
+from contextlib import asynccontextmanager
 
 from app.main import app
 from app.database import get_db
@@ -29,10 +30,17 @@ from app.models import Stock, Watchlist, StockSummaryCache, NewsStockMapping, Fi
 # 헬퍼: test_auth_flow.py와 동일한 패턴
 # =============================================================================
 
-def make_client(db_session: AsyncSession) -> AsyncClient:
-    app.dependency_overrides[get_db] = lambda: db_session
-    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+@asynccontextmanager
+async def make_client(db_session: AsyncSession):
+    async def _override_get_db():
+        yield db_session
 
+    app.dependency_overrides[get_db] = _override_get_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            yield client
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 def make_fake_token_info(
     google_id: str = "stock_test_google_id",

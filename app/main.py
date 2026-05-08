@@ -96,13 +96,13 @@ async def lifespan(app: FastAPI):
     # 서버 시작 시 실행
     # =========================================================================
     scheduler = AsyncIOScheduler()
-    print("Starting up News API server...")
-    print(f"Database: {settings.database_url}")
+    logger.info("Starting up News API server...")
+    logger.info("Database: %s", settings.database_url)
     
     # DB 테이블 초기화 (없는 테이블만 생성)
     await init_db()
     await ensure_interaction_tables()
-    print("Database initialized")
+    logger.info("Database initialized")
 
     scheduler.add_job(
         run_volatility_check, 
@@ -138,11 +138,11 @@ async def lifespan(app: FastAPI):
         # =====================================================================
         try:
             scheduler.shutdown(wait=True)
-            print("Scheduler shut down.")
+            logger.info("Scheduler shut down.")
         except Exception:
             logger.exception("scheduler shutdown 실패")
         await stocks.shutdown_stocks_resources()
-        print("Shutting down...")
+        logger.info("Shutting down...")
 
 
 # =============================================================================

@@ -19,8 +19,9 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from jose import jwt
+from contextlib import asynccontextmanager
 
 from app.main import app
 from app.database import get_db
@@ -53,12 +54,13 @@ def make_fake_token_info(
 # 헬퍼: FastAPI 테스트 클라이언트 생성
 # ===========================================================================
 
-from contextlib import asynccontextmanager
-
 @asynccontextmanager
 async def make_client(db_session: AsyncSession):
     """테스트 종료 시 dependency_overrides를 자동으로 정리하는 클라이언트."""
-    app.dependency_overrides[get_db] = lambda: db_session
+    async def _override_get_db():
+        yield db_session
+    
+    app.dependency_overrides[get_db] = _override_get_db
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             yield client
@@ -223,7 +225,6 @@ async def test_expired_token_returns_401(db_session: AsyncSession):
         - 401 응답 확인
     """
     # 만료된 토큰 직접 생성
-    from datetime import datetime, timezone
     expired_payload = {
         "sub": "test_google_id_123",
         "exp": datetime.now(timezone.utc) - timedelta(minutes=1),  # 1분 전에 이미 만료
