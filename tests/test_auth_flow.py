@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 from contextlib import asynccontextmanager
+from typing import Any
 
 from app.main import app
 from app.database import get_db
@@ -38,7 +39,7 @@ def make_fake_token_info(
     email: str = "testuser@gmail.com",
     name: str = "테스트유저",
     picture: str = "https://example.com/photo.jpg",
-) -> dict:
+) -> dict[str, Any]:
     """Google OAuth 검증 결과를 흉내 내는 가짜 token_info"""
     return {
         "sub": google_id,
@@ -72,7 +73,7 @@ async def make_client(db_session: AsyncSession):
 # ===========================================================================
 
 @pytest.mark.asyncio
-async def test_login_success(db_session: AsyncSession):
+async def test_login_success(db_session: AsyncSession) -> None:
     """
     시나리오:
         - Google 토큰 검증을 mock 처리
@@ -105,7 +106,7 @@ async def test_login_success(db_session: AsyncSession):
 # ===========================================================================
 
 @pytest.mark.asyncio
-async def test_login_then_get_profile(db_session: AsyncSession):
+async def test_login_then_get_profile(db_session: AsyncSession) -> None:
     """
     시나리오:
         - 로그인해서 access_token 발급
@@ -145,7 +146,7 @@ async def test_login_then_get_profile(db_session: AsyncSession):
 # ===========================================================================
 
 @pytest.mark.asyncio
-async def test_invalid_token_returns_401(db_session: AsyncSession):
+async def test_invalid_token_returns_401(db_session: AsyncSession) -> None:
     """
     시나리오:
         - 유효하지 않은 토큰을 Authorization 헤더에 담아 /profile 호출
@@ -165,7 +166,7 @@ async def test_invalid_token_returns_401(db_session: AsyncSession):
 # ===========================================================================
 
 @pytest.mark.asyncio
-async def test_no_token_returns_403(db_session: AsyncSession):
+async def test_no_token_returns_403(db_session: AsyncSession) -> None:
     """
     시나리오:
         - Authorization 헤더 없이 /profile 호출
@@ -183,7 +184,7 @@ async def test_no_token_returns_403(db_session: AsyncSession):
 # ===========================================================================
 
 @pytest.mark.asyncio
-async def test_login_twice_same_account(db_session: AsyncSession):
+async def test_login_twice_same_account(db_session: AsyncSession) -> None:
     """
     시나리오:
         - 같은 google_id로 두 번 로그인
@@ -217,16 +218,29 @@ async def test_login_twice_same_account(db_session: AsyncSession):
 # 테스트 6: 만료된 토큰으로 /profile 호출 → 401
 # ===========================================================================
 @pytest.mark.asyncio
-async def test_expired_token_returns_401(db_session: AsyncSession):
+async def test_expired_token_returns_401(db_session: AsyncSession) -> None:
     """
     시나리오:
         - 만료 시간이 0분인 토큰 생성 (즉시 만료)
         - 만료된 토큰으로 /profile 호출
         - 401 응답 확인
     """
-    # 만료된 토큰 직접 생성
+    # 선행 로그인으로 사용자 생성
+    fake_token_info = make_fake_token_info(google_id="expired_case_user")
+    with patch(
+        "app.routers.users.verify_google_login_token",
+        new=AsyncMock(return_value=fake_token_info),
+    ):
+        async with make_client(db_session) as client:
+            login_response = await client.post(
+                "/api/users/login",
+                json={"id_token": "fake_google_id_token"},
+            )
+            assert login_response.status_code == 200
+
+    # 만료된 토큰 직접 생성 (동일 sub)
     expired_payload = {
-        "sub": "test_google_id_123",
+        "sub": "expired_case_user",
         "exp": datetime.now(timezone.utc) - timedelta(minutes=1),  # 1분 전에 이미 만료
     }
     expired_token = jwt.encode(
@@ -249,7 +263,7 @@ async def test_expired_token_returns_401(db_session: AsyncSession):
 # ===========================================================================
  
 @pytest.mark.asyncio
-async def test_login_then_get_settings(db_session: AsyncSession):
+async def test_login_then_get_settings(db_session: AsyncSession) -> None:
     """
     시나리오:
         - 로그인해서 access_token 발급
@@ -289,7 +303,7 @@ async def test_login_then_get_settings(db_session: AsyncSession):
 # ===========================================================================
  
 @pytest.mark.asyncio
-async def test_login_then_update_settings(db_session: AsyncSession):
+async def test_login_then_update_settings(db_session: AsyncSession) -> None:
     """
     시나리오:
         - 로그인해서 access_token 발급
@@ -335,7 +349,7 @@ async def test_login_then_update_settings(db_session: AsyncSession):
 # ===========================================================================
  
 @pytest.mark.asyncio
-async def test_login_then_delete_account(db_session: AsyncSession):
+async def test_login_then_delete_account(db_session: AsyncSession) -> None:
     """
     시나리오:
         - 로그인해서 access_token 발급
