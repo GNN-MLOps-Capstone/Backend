@@ -335,6 +335,14 @@ class TestWatchlistCRUD:
                 headers={"Authorization": f"Bearer {token_a}"},
             )
 
+            # user A의 관심종목이 그대로 남아있어야 한다(권한 우회 방어).
+            list_a = await client.get(
+                "/api/watchlist",
+                headers={"Authorization": f"Bearer {token_a}"},
+            )
+            codes_a = [item["code"] for item in list_a.json()]
+            assert "005930" in codes_a, "user B 호출이 user A의 관심종목을 삭제했습니다."
+
             # user B가 삭제 시도
             token_b = await get_access_token(client, google_id="user_b_watchlist")
             res = await client.delete(

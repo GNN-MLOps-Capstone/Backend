@@ -1,9 +1,7 @@
-
-from sqlalchemy.pool import NullPool# conftest.py (프로젝트 루트)
+# conftest.py (프로젝트 루트)
 import pytest
 import pytest_asyncio
 from sqlalchemy import Text
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.dialects.postgresql import JSONB
 import json
@@ -92,5 +90,7 @@ async def patch_async_session_local(db_session: AsyncSession):
 
     with patch("app.database.AsyncSessionLocal", return_value=mock_cm), \
          patch("app.services.onesignal_service.AsyncSessionLocal", return_value=mock_cm), \
-         patch("app.tasks.news_tasks.AsyncSessionLocal", return_value=mock_cm):
+         patch("app.tasks.news_tasks.AsyncSessionLocal", return_value=mock_cm), \
+         patch("app.tasks.volatility_monitor.AsyncSessionLocal", return_value=mock_cm), \
+         patch("app.routers.stocks.AsyncSessionLocal", return_value=mock_cm): 
         yield

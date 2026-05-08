@@ -26,8 +26,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
 from unittest.mock import AsyncMock, patch
 import uuid
-from sqlalchemy.ext.asyncio import AsyncSession
-from unittest.mock import patch, AsyncMock
 
 from app.main import app
 from app.database import get_db, Base
@@ -139,7 +137,7 @@ async def seed_user(db_session: AsyncSession) -> User:
         night_push_prohibit=False,
     )
     db_session.add(user)
-    await db_session.flush() #[cite: 1]
+    await db_session.flush()
     return user
 
 @pytest_asyncio.fixture
@@ -464,7 +462,7 @@ class TestSendVolatilityPushAndSave:
 
         with patch("app.services.onesignal_service.AsyncSessionLocal") as mock_factory:
             mock_factory.return_value.__aenter__.return_value = db_session
-            mock_factory.return_value.__aexit__.return_value = AsyncMock(return_value=False)
+            mock_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
             push_ok, db_ok = await send_volatility_push_and_save(
                 user_ids=[seed_user.google_id],
@@ -526,7 +524,7 @@ class TestSendVolatilityPushAndSave:
 
         with patch("app.services.onesignal_service.AsyncSessionLocal") as mock_factory:
             mock_factory.return_value.__aenter__.return_value = db_session
-            mock_factory.return_value.__aexit__.return_value = AsyncMock(return_value=False)
+            mock_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
             push_ok, db_ok = await send_volatility_push_and_save(
                 user_ids=[seed_user.google_id],
@@ -639,7 +637,7 @@ class TestNewsKeywordScheduler:
 
         with patch("app.tasks.news_tasks.AsyncSessionLocal") as mock_factory:
             mock_factory.return_value.__aenter__.return_value = db_session
-            mock_factory.return_value.__aexit__.return_value = AsyncMock(return_value=False)
+            mock_factory.return_value.__aexit__ = AsyncMock(return_value=False)
             fake_stats = {  
                 "count": 5,
                 "keywords": ["반도체", "실적", "수출"],

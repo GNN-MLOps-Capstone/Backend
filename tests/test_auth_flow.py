@@ -53,14 +53,17 @@ def make_fake_token_info(
 # 헬퍼: FastAPI 테스트 클라이언트 생성
 # ===========================================================================
 
-def make_client(db_session: AsyncSession) -> AsyncClient:
-    """
-    실제 DB 대신 테스트용 db_session을 주입한 AsyncClient 반환.
-    conftest.py의 db_session fixture를 활용합니다.
-    """
-    app.dependency_overrides[get_db] = lambda: db_session
-    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+from contextlib import asynccontextmanager
 
+@asynccontextmanager
+async def make_client(db_session: AsyncSession):
+    """테스트 종료 시 dependency_overrides를 자동으로 정리하는 클라이언트."""
+    app.dependency_overrides[get_db] = lambda: db_session
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            yield client
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 # ===========================================================================
 # 테스트 1: 로그인 성공 → access_token 반환 + 유저 DB 저장 확인
@@ -220,10 +223,10 @@ async def test_expired_token_returns_401(db_session: AsyncSession):
         - 401 응답 확인
     """
     # 만료된 토큰 직접 생성
-    from datetime import datetime
+    from datetime import datetime, timezone
     expired_payload = {
         "sub": "test_google_id_123",
-        "exp": datetime.utcnow() - timedelta(minutes=1),  # 1분 전에 이미 만료
+        "exp": datetime.now(timezone.utc) - timedelta(minutes=1),  # 1분 전에 이미 만료
     }
     expired_token = jwt.encode(
         expired_payload,
@@ -323,7 +326,7 @@ async def test_login_then_update_settings(db_session: AsyncSession):
             )
  
     assert settings_response.status_code == 200
-    assert settings_response.json()["push"] == True, "push 설정이 변경되지 않았습니다"
+    assert settings_response.json()["push"] is True, "push 설정이 변경되지 않았습니다"
  
  
 # ===========================================================================
