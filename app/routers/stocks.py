@@ -1454,7 +1454,7 @@ async def get_stock_theme_keywords(
         SELECT
             k.word AS keyword,
             ROUND(
-                COUNT(DISTINCT nkm.news_id)::numeric
+                CAST(COUNT(DISTINCT nkm.news_id) AS NUMERIC)
                 / NULLIF((SELECT COUNT(*) FROM source_news), 0),
                 2
             ) AS cooccurrence_score
@@ -1464,7 +1464,7 @@ async def get_stock_theme_keywords(
          AND nkm.created_at >= :cutoff
         JOIN keywords AS k
           ON k.keyword_id = nkm.keyword_id
-        WHERE BTRIM(k.word) <> BTRIM(:stock_name)
+        WHERE TRIM(k.word) <> TRIM(:stock_name)
         GROUP BY k.keyword_id, k.word
         ORDER BY COUNT(DISTINCT nkm.news_id) DESC, MAX(nkm.created_at) DESC, k.word ASC
         LIMIT :limit
