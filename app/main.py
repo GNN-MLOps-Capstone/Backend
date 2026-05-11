@@ -31,23 +31,21 @@ import logging
 from contextlib import asynccontextmanager  # 비동기 컨텍스트 매니저
 from hashlib import sha256
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, Header, HTTPException, status  # 웹 프레임워크
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어
 from fastapi.staticfiles import StaticFiles
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.config import get_settings  # 설정 가져오기
 from app.database import ensure_interaction_tables, init_db  # DB 초기화 함수
 from app.routers import interactions, news, notifications, stocks, users, watchlist
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.tasks.volatility_monitor import run_volatility_check
 from app.tasks.news_tasks import run_news_keyword_check
 
 # 설정 객체 가져오기
 settings = get_settings()
-scheduler = AsyncIOScheduler()
-
 
 logging.basicConfig(
     level=logging.INFO,
@@ -97,13 +95,14 @@ async def lifespan(app: FastAPI):
     # =========================================================================
     # 서버 시작 시 실행
     # =========================================================================
-    print("Starting up News API server...")
-    print(f"Database: {settings.database_url}")
+    scheduler = AsyncIOScheduler()
+    logger.info("Starting up News API server...")
+    logger.info("Database: %s", settings.database_url)
     
     # DB 테이블 초기화 (없는 테이블만 생성)
     await init_db()
     await ensure_interaction_tables()
-    print("Database initialized")
+    logger.info("Database initialized")
 
     scheduler.add_job(
         run_volatility_check, 
@@ -113,7 +112,7 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
         max_instances=1,
         misfire_grace_time=60,
-        next_run_time=datetime.now() + timedelta(minutes=5)
+        next_run_time=datetime.now(timezone.utc) + timedelta(minutes=5)
     )
 
     scheduler.add_job(
@@ -124,22 +123,26 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
         max_instances=1,
         misfire_grace_time=60,
-        next_run_time=datetime.now() + timedelta(minutes=30)
+        next_run_time=datetime.now(timezone.utc) + timedelta(minutes=30)
     )   
     scheduler.start()
     logger.info("주가 감시 스케줄러 가동 (5분 주기)")
     logger.info("뉴스 키워드 감시 스케줄러 가동 (30분 주기)")
-    
-    # yield: 여기서 서버가 실행되고 요청을 처리함
-    yield
-    
-    # =========================================================================
-    # 서버 종료 시 실행
-    # =========================================================================
-    scheduler.shutdown(wait=True)
-    print("Scheduler shut down.")
-    await stocks.shutdown_stocks_resources()
-    print("Shutting down...")
+
+    try:
+        # yield: 여기서 서버가 실행되고 요청을 처리함
+        yield
+    finally:
+        # =====================================================================
+        # 서버 종료 시 실행 (예외 발생 여부와 무관하게 자원 정리)
+        # =====================================================================
+        try:
+            scheduler.shutdown(wait=True)
+            logger.info("Scheduler shut down.")
+        except Exception:
+            logger.exception("scheduler shutdown 실패")
+        await stocks.shutdown_stocks_resources()
+        logger.info("Shutting down...")
 
 
 # =============================================================================

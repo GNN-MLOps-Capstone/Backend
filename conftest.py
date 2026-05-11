@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy.types import TypeDecorator
 from collections.abc import AsyncIterator
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, async_sessionmaker, AsyncSession
+from unittest.mock import patch, AsyncMock
 
 # =============================================================================
 # SQLite 호환 처리: JSONB → Text 교체
@@ -38,7 +39,6 @@ pg_dialect.JSONB = _SQLiteJSONB
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-
 @pytest_asyncio.fixture(scope="session")
 def engine() -> AsyncEngine:
     """테스트 세션 동안 재사용하는 SQLite 인메모리 엔진"""
@@ -61,16 +61,35 @@ async def create_tables(engine: AsyncEngine) -> AsyncIterator[None]:
     yield
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
-
-
+        
 @pytest_asyncio.fixture
-async def db_session(
-    engine: AsyncEngine,
-    create_tables: AsyncIterator[None],
-) -> AsyncIterator[AsyncSession]:
-    """각 테스트마다 독립적인 세션 (롤백으로 데이터 격리)"""
-    async_session = async_sessionmaker(engine, expire_on_commit=False)
-    async with async_session() as session:
-        async with session.begin():
-            yield session
-            await session.rollback()  # 테스트 후 롤백 → 다음 테스트에 영향 없음
+async def db_session(engine: AsyncEngine, create_tables):
+    async with engine.connect() as conn:
+        trans = await conn.begin()
+        # join_transaction_mode가 핵심입니다.
+        session = AsyncSession(bind=conn, expire_on_commit=False, join_transaction_mode="create_savepoint")
+        
+        yield session
+        
+        await session.close()   # 1. 세션 먼저 닫기
+        await trans.rollback()  # 2. 트랜잭션 롤백[cite: 1]
+        await conn.close()      # 3. 연결 완전히 종료[cite: 1]
+
+@pytest_asyncio.fixture(autouse=True)
+async def patch_async_session_local(db_session: AsyncSession):
+    """
+    모든 테스트에서 AsyncSessionLocal이 테스트용 db_session을 반환하도록 패치.
+    실제 PostgreSQL 연결을 차단합니다.
+    """
+    from unittest.mock import MagicMock
+
+    mock_cm = MagicMock()
+    mock_cm.__aenter__ = AsyncMock(return_value=db_session)
+    mock_cm.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("app.database.AsyncSessionLocal", return_value=mock_cm), \
+         patch("app.services.onesignal_service.AsyncSessionLocal", return_value=mock_cm), \
+         patch("app.tasks.news_tasks.AsyncSessionLocal", return_value=mock_cm), \
+         patch("app.tasks.volatility_monitor.AsyncSessionLocal", return_value=mock_cm), \
+         patch("app.routers.stocks.AsyncSessionLocal", return_value=mock_cm): 
+        yield
