@@ -305,8 +305,7 @@ async def _get_top_issues(
         .join(Stock, StockSummaryCache.stock_id == Stock.stock_id)
         .where(
             Stock.stock_id.in_(watchlist_ids),
-            FilteredNews.created_at >= past_7_days,
-            FilteredNews.created_at <= now
+            FilteredNews.created_at >= past_7_days
         )
         .group_by(Stock.stock_id, Stock.stock_name)
     )
