@@ -55,8 +55,35 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     conn = op.get_bind()
-    conn.execute(
+
+    # upgrade()가 삽입한 행만 삭제: display_order=8이고 categories가
+    # 이 마이그레이션에서 삽입한 목록과 정확히 일치하는 경우에만 제거한다.
+    row = conn.execute(
         sa.text(
-            "DELETE FROM onboarding_themes WHERE name = '기타'"
+            "SELECT id FROM onboarding_themes "
+            "WHERE name = '기타' AND display_order = 8"
         )
+    ).fetchone()
+    if row is None:
+        return
+
+    theme_id = row[0]
+
+    actual_cats = set(
+        r[0]
+        for r in conn.execute(
+            sa.text(
+                "SELECT category_name FROM onboarding_theme_categories "
+                "WHERE theme_id = :tid"
+            ),
+            {"tid": theme_id},
+        ).fetchall()
+    )
+    if actual_cats != set(_ETC_CATEGORIES):
+        # 카테고리가 외부에서 변경된 경우 데이터 손실 방지를 위해 no-op
+        return
+
+    conn.execute(
+        sa.text("DELETE FROM onboarding_themes WHERE id = :tid"),
+        {"tid": theme_id},
     )

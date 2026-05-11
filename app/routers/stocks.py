@@ -1522,7 +1522,7 @@ async def get_stocks_by_category(
     result = await db.execute(
         select(Stock.stock_id, Stock.stock_name, Stock.market_cap)
         .where(Stock.industry.in_(category_list))
-        .order_by(Stock.market_cap.desc().nulls_last())
+        .order_by(Stock.market_cap.desc().nulls_last(), Stock.stock_id.asc())
         .limit(limit)
     )
     rows = result.all()

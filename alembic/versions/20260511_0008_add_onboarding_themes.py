@@ -121,11 +121,20 @@ def upgrade() -> None:
             )
 
 
+def _has_index(table_name: str, index_name: str) -> bool:
+    inspector = _get_inspector()
+    return any(
+        idx["name"] == index_name
+        for idx in inspector.get_indexes(table_name)
+    )
+
+
 def downgrade() -> None:
     if _has_table("onboarding_theme_categories"):
         op.drop_table("onboarding_theme_categories")
     if _has_table("onboarding_themes"):
         op.drop_table("onboarding_themes")
     if _has_table("stocks") and _has_column("stocks", "market_cap"):
-        op.drop_index("ix_stocks_market_cap", table_name="stocks")
+        if _has_index("stocks", "ix_stocks_market_cap"):
+            op.drop_index("ix_stocks_market_cap", table_name="stocks")
         op.drop_column("stocks", "market_cap")
