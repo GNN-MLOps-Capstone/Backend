@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 _gemini_client: genai.Client | None = None
 
-_GEMINI_MODEL_NAME = "gemini-2.0-flash-lite"
+_GEMINI_MODEL_NAME = "gemini-2.5-flash-lite"
 _GEMINI_TEMPERATURE = 0.3
 _GEMINI_MAX_RETRIES = 4
 _GEMINI_VALIDATION_RETRIES = 2
