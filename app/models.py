@@ -304,6 +304,7 @@ class Stock(Base):
     stock_name = Column(String(200), nullable=True)
     industry = Column(String(200), nullable=True)
     summary_text = Column(Text, nullable=True)
+    market_cap = Column(BigInteger, nullable=True, index=True)
 
     watchlist_items = relationship("Watchlist", back_populates="stock")
 
@@ -420,6 +421,38 @@ class RecommendationServe(Base):
     is_mock = Column(Boolean, nullable=False, default=False)
     served_items = Column(JSONB, nullable=False, default=list)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class OnboardingTheme(Base):
+    """온보딩 투자 테마"""
+    __tablename__ = "onboarding_themes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True)
+    display_order = Column(Integer, nullable=False, default=0)
+
+    categories = relationship(
+        "OnboardingThemeCategory",
+        back_populates="theme",
+        cascade="all, delete-orphan",
+        order_by="OnboardingThemeCategory.id",
+    )
+
+
+class OnboardingThemeCategory(Base):
+    """온보딩 테마별 DB 카테고리 매핑"""
+    __tablename__ = "onboarding_theme_categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    theme_id = Column(
+        Integer,
+        ForeignKey("onboarding_themes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    category_name = Column(String(200), nullable=False)  # stocks.industry 값과 매핑
+
+    theme = relationship("OnboardingTheme", back_populates="categories")
 
 
 class RecommendationNewsPathMetrics(Base):

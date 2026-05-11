@@ -188,7 +188,8 @@ def upgrade() -> None:
             )
 
     if _has_table("filtered_news"):
-        if _has_column("filtered_news", "news_id"):
+        col = _get_column("filtered_news", "news_id")
+        if col is not None and not isinstance(col["type"], sa.BigInteger):
             op.alter_column(
                 "filtered_news",
                 "news_id",

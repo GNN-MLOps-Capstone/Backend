@@ -40,7 +40,8 @@ from fastapi.staticfiles import StaticFiles
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.config import get_settings  # 설정 가져오기
 from app.database import ensure_interaction_tables, init_db  # DB 초기화 함수
-from app.routers import interactions, news, notifications, stocks, users, watchlist
+from app.routers import interactions, news, notifications, onboarding, stocks, users, watchlist
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.tasks.volatility_monitor import run_volatility_check
 from app.tasks.news_tasks import run_news_keyword_check
 
@@ -245,6 +246,7 @@ app.include_router(notifications.router)
 app.include_router(stocks.router)
 app.include_router(watchlist.router)
 app.include_router(interactions.router)
+app.include_router(onboarding.router)
 
 
 # =============================================================================

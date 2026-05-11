@@ -445,3 +445,24 @@ class StockThemeKeywordsResponse(BaseModel):
     core_message: str
     core_keyword: str
     theme_keywords: List[ThemeKeywordItem]
+
+
+# =============================================================================
+# 온보딩 API 스키마
+# =============================================================================
+
+class OnboardingThemeResponse(BaseModel):
+    id: int
+    name: str
+    display_order: int
+    categories: List[str]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OnboardingStockResponse(BaseModel):
+    code: str
+    name: str
+    market_cap: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)

@@ -30,6 +30,7 @@ from app.schemas import (
     StockWeatherResponse,
     RelatedStocksResponse,
     StockThemeKeywordsResponse,
+    OnboardingStockResponse,
 )
 from app.services.stock_service import (
     cache,
@@ -1505,6 +1506,31 @@ async def get_stock_theme_keywords(
         "core_keyword": core_keyword,
         "theme_keywords": theme_keywords,
     }
+
+@router.get("/by-category", response_model=list[OnboardingStockResponse])
+async def get_stocks_by_category(
+    categories: str = Query(..., description="카테고리명 (쉼표 구분)"),
+    limit: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_subject),
+):
+    """카테고리별 시가총액 상위 종목 조회 (온보딩용)"""
+    category_list = [c.strip() for c in categories.split(",") if c.strip()]
+    if not category_list:
+        raise HTTPException(status_code=400, detail="categories는 필수입니다.")
+
+    result = await db.execute(
+        select(Stock.stock_id, Stock.stock_name, Stock.market_cap)
+        .where(Stock.industry.in_(category_list))
+        .order_by(Stock.market_cap.desc().nulls_last(), Stock.stock_id.asc())
+        .limit(limit)
+    )
+    rows = result.all()
+    return [
+        OnboardingStockResponse(code=r.stock_id, name=r.stock_name or r.stock_id, market_cap=r.market_cap)
+        for r in rows
+    ]
+
 
 @router.get("/weather", response_model=StockWeatherResponse)
 async def get_stock_weather_endpoint(
