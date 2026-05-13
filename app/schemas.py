@@ -474,3 +474,10 @@ class OnboardingKeywordResponse(BaseModel):
     count: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class StockNewsResponse(BaseModel):
+    isUp: Optional[bool] = None
+    title: str
+    source: str
+    sentiment: Optional[str] = None
