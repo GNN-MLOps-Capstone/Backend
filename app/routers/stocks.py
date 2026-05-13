@@ -1559,11 +1559,26 @@ async def get_stock_weather_endpoint(
     return {"weather": weather}
 
 async def get_latest_stock_news(
-    db: AsyncSession, 
-    stock_id: str | None = None, 
-    stock_name: str | None = None
+    db: AsyncSession,
+    stock_id: str | None = None,
+    stock_name: str | None = None,
 ):
-    # 1. 기본 쿼리 작성 (naver_news -> news_stock_mapping -> stocks 순으로 조인)
+    # 종목명으로 들어온 경우 stock_id로 해석 (동명이인 종목 방지)
+    if stock_id is None and stock_name is not None:
+        stock_ids = (
+            await db.execute(
+                select(Stock.stock_id).where(Stock.stock_name == stock_name).limit(2)
+            )
+        ).scalars().all()
+        if not stock_ids:
+            raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다.")
+        if len(stock_ids) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail="동일한 종목명이 여러 개 존재합니다. stock_id를 사용해주세요.",
+            )
+        stock_id = stock_ids[0]
+    # 기본 쿼리 작성 (naver_news -> news_stock_mapping -> stocks 순으로 조인)
     # stocks 테이블에 stock_id와 stock_name이 있다고 가정합니다.
     query = (
         select(
@@ -1582,13 +1597,9 @@ async def get_latest_stock_news(
         )
     )
 
-    # 2. 필터 조건 추가
-    if stock_id:
-        query = query.where(Stock.stock_id == stock_id)
-    elif stock_name:
-        query = query.where(Stock.stock_name == stock_name)
+    query = query.where(Stock.stock_id == stock_id)
 
-    # 3. 최신순 정렬 및 1건만 가져오기
+    # 최신순 정렬 및 1건만 가져오기
     query = query.order_by(desc(NaverNews.pub_date)).limit(1)
     
     result = await db.execute(query)
@@ -1616,6 +1627,7 @@ async def get_stock_latest_news_endpoint(
 
     company = news.news_company_name or "기타"
 
+    # 긍정 뉴스만 True, 부정/중립/None은 False 처리
     is_up = True if news.sentiment == "긍정" else False
 
     return {
