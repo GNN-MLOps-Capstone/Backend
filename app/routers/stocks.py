@@ -1599,8 +1599,7 @@ async def get_stock_latest_news_endpoint(
     db: AsyncSession = Depends(get_db),
     stock_id: str | None = Query(None, description="종목코드"),
     stock_name: str | None = Query(None, description="종목명"),
-    # _: str = Depends(get_current_subject),
-    _ = None,
+    _: str = Depends(get_current_subject),
 ):
     """
     종목명 또는 코드를 받아 해당 종목의 최신 뉴스 1건을 반환합니다.
