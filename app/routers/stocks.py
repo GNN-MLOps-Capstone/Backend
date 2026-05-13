@@ -12,7 +12,7 @@ import re
 import asyncio
 import contextlib
 import logging
-from sqlalchemy import select, func, case, text, desc
+from sqlalchemy import select, func, case, text, desc, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 from urllib.parse import urlparse
 from typing import Any
@@ -1608,27 +1608,26 @@ async def get_latest_stock_news(
 
     if not news:
         return None
-
-    # 3. 도메인 매핑 최적화 (가져온 URL에서 도메인만 추출하여 매핑 테이블 조회)
-    domain = urlparse(news.url).netloc.replace('www.', '')
     
-    # 도메인 일치 여부 확인 (contains 대신 효율적인 조회 방식 사용 가능)
-    mapping_result = await db.execute(
-        select(NewsDomainMapping.news_company_name)
-        .where(NewsDomainMapping.domain.contains(domain)) # 혹은 정확히 일치하는 로직
-    )
-    mapping = mapping_result.first()
-
-    # 4. 결과 조립 (sentiment에 따른 isUp 로직 포함)
     sentiment_map = {"긍정": True, "부정": False, "중립": None}
     is_up = sentiment_map.get(news.sentiment)
 
+    current_netloc = urlparse(news.url).netloc.replace('www.', '')
+    stmt = select(NewsDomainMapping).where(
+        literal(current_netloc).contains(NewsDomainMapping.domain)
+    )
+
+    result = await db.execute(stmt)
+
+    domain_mapping = result.scalars().first()
+
     return {
-        "isUp": is_up,
         "title": news.title,
         "pub_date": news.pub_date,
-        "news_company_name": mapping.news_company_name if mapping else "기타",
-        "sentiment": news.sentiment or "분석중"
+        "news_company_name": domain_mapping.news_company_name if domain_mapping else "기타",
+        "sentiment": news.sentiment,
+        "isUp": is_up,  # 계산된 결과를 포함하여 반환
+        "url": news.url
     }
 
 @router.get("/news/latest", response_model=StockNewsResponse)
@@ -1636,29 +1635,29 @@ async def get_stock_latest_news_endpoint(
     db: AsyncSession = Depends(get_db),
     stock_id: str | None = Query(None, description="종목코드"),
     stock_name: str | None = Query(None, description="종목명"),
-    _: str = Depends(get_current_subject),
+    #_: str = Depends(get_current_subject),
 ):
     """
     종목명 또는 코드를 받아 해당 종목의 최신 뉴스 1건을 반환합니다.
     """
-    if not stock_id and not stock_name:
-        raise HTTPException(status_code=400, detail="stock_id 또는 stock_name이 필요합니다.")
+    if stock_id:
+        stock_exists = db.query(Stock).filter(Stock.stock_id == stock_id).first()
+        if not stock_exists:
+            raise HTTPException(status_code=404, detail="존재하지 않는 종목 코드입니다.")
 
     news = await get_latest_stock_news(db, stock_id=stock_id, stock_name=stock_name)
     
     if not news:
         raise HTTPException(status_code=404, detail="관련 뉴스를 찾을 수 없습니다.")
     
-    formatted_date = news.pub_date.strftime("%Y.%m.%d") if news.pub_date else "날짜 불명"
-
-    company = news.news_company_name or "기타"
-
-    # 긍정 뉴스만 True, 부정/중립/None은 False 처리
-    is_up = True if news.sentiment == "긍정" else False
+    formatted_date = "날짜 불명"
+    if news["pub_date"]:
+        formatted_date = news["pub_date"].strftime("%Y.%m.%d")
 
     return {
-        "isUp": is_up,
-        "title": news.title,
-        "source": f"({formatted_date}, {company})",
-        "sentiment": news.sentiment
+        "isUp": news["isUp"],
+        "title": news["title"],
+        "source": f"({formatted_date}, {news['news_company_name']})",
+        "sentiment": news["sentiment"],
+        "url": news["url"]
     }
