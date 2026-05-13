@@ -469,7 +469,7 @@ class OnboardingStockResponse(BaseModel):
 
 
 class StockNewsResponse(BaseModel):
-    isUp: bool
+    isUp: bool | None  # 감성 분석 미완료 시 None
     title: str
     source: str
-    sentiment: str | None = None
+    sentiment: str | None
