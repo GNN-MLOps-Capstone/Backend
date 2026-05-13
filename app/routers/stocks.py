@@ -12,7 +12,7 @@ import re
 import asyncio
 import contextlib
 import logging
-from sqlalchemy import select, func, case, text
+from sqlalchemy import select, func, case, text, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -20,7 +20,7 @@ from app.database import AsyncSessionLocal, get_db
 from app.kis.errors import KISError
 from app.kis.transformers import transform_series_time, transform_series_daily, KST
 from app.kis.ws_client import KISWSClient
-from app.models import User, Stock, StockSummaryCache, FilteredNews, NewsStockMapping
+from app.models import User, Stock, StockSummaryCache, FilteredNews, NewsStockMapping, NaverNews, NewsDomainMapping
 from app.routers.users import decode_access_token, get_current_subject
 from app.schemas import (
     StockOverviewResponse,
@@ -31,6 +31,7 @@ from app.schemas import (
     RelatedStocksResponse,
     StockThemeKeywordsResponse,
     OnboardingStockResponse,
+    StockNewsResponse,
 )
 from app.services.stock_service import (
     cache,
@@ -1556,3 +1557,71 @@ async def get_stock_weather_endpoint(
     except KISError as exc:
         _raise_kis_http_error(exc)
     return {"weather": weather}
+
+async def get_latest_stock_news(
+    db: AsyncSession, 
+    stock_id: str | None = None, 
+    stock_name: str | None = None
+):
+    # 1. 기본 쿼리 작성 (naver_news -> news_stock_mapping -> stocks 순으로 조인)
+    # stocks 테이블에 stock_id와 stock_name이 있다고 가정합니다.
+    query = (
+        select(
+            NaverNews.title,
+            NaverNews.pub_date,
+            NewsDomainMapping.news_company_name,
+            FilteredNews.sentiment
+        )
+        .join(NewsStockMapping, NaverNews.news_id == NewsStockMapping.news_id)
+        .join(Stock, NewsStockMapping.stock_id == Stock.stock_id)
+        .join(FilteredNews, NaverNews.news_id == FilteredNews.news_id)
+        # URL에서 도메인을 추출하여 매핑 테이블과 조인 (예: %newsis.com% 패턴 매칭)
+        .outerjoin(
+            NewsDomainMapping, 
+            NaverNews.url.contains(NewsDomainMapping.domain)
+        )
+    )
+
+    # 2. 필터 조건 추가
+    if stock_id:
+        query = query.where(Stock.stock_id == stock_id)
+    elif stock_name:
+        query = query.where(Stock.stock_name == stock_name)
+
+    # 3. 최신순 정렬 및 1건만 가져오기
+    query = query.order_by(desc(NaverNews.pub_date)).limit(1)
+    
+    result = await db.execute(query)
+    return result.first()
+
+@router.get("/news/latest", response_model=StockNewsResponse)
+async def get_stock_latest_news_endpoint(
+    db: AsyncSession = Depends(get_db),
+    stock_id: str | None = Query(None, description="종목코드"),
+    stock_name: str | None = Query(None, description="종목명"),
+    # _: str = Depends(get_current_subject),
+    _ = None,
+):
+    """
+    종목명 또는 코드를 받아 해당 종목의 최신 뉴스 1건을 반환합니다.
+    """
+    if not stock_id and not stock_name:
+        raise HTTPException(status_code=400, detail="stock_id 또는 stock_name이 필요합니다.")
+
+    news = await get_latest_stock_news(db, stock_id=stock_id, stock_name=stock_name)
+    
+    if not news:
+        raise HTTPException(status_code=404, detail="관련 뉴스를 찾을 수 없습니다.")
+    
+    formatted_date = news.pub_date.strftime("%Y.%m.%d") if news.pub_date else "날짜 불명"
+
+    company = news.news_company_name or "기타"
+
+    is_up = True if news.sentiment == "긍정" else False
+
+    return {
+        "isUp": is_up,
+        "title": news.title,
+        "source": f"({formatted_date}, {company})",
+        "sentiment": news.sentiment
+    }

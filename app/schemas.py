@@ -466,3 +466,10 @@ class OnboardingStockResponse(BaseModel):
     market_cap: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class StockNewsResponse(BaseModel):
+    isUp: bool
+    title: str
+    source: str
+    sentiment: str | None = None
