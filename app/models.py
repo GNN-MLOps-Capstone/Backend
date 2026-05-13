@@ -28,7 +28,8 @@ from sqlalchemy import (
     Boolean,
     Time,
     UniqueConstraint,
-    Date
+    Date,
+    Index,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
@@ -453,6 +454,24 @@ class OnboardingThemeCategory(Base):
     category_name = Column(String(200), nullable=False)  # stocks.industry 값과 매핑
 
     theme = relationship("OnboardingTheme", back_populates="categories")
+
+
+class UserOnboardingKeyword(Base):
+    """사용자 온보딩 관심 키워드"""
+    __tablename__ = "user_onboarding_keywords"
+    __table_args__ = (
+        UniqueConstraint("user_id", "keyword_id", name="uk_user_onboarding_keyword"),
+        Index("idx_uok_user_id", "user_id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    keyword_id = Column(Integer, ForeignKey("keywords.keyword_id", ondelete="CASCADE"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    original_keyword = Column(String(50), nullable=False)
+
+    user = relationship("User")
+    keyword = relationship("Keyword")
 
 
 class RecommendationNewsPathMetrics(Base):

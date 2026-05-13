@@ -743,6 +743,47 @@ GET ws://localhost:8000/api/stocks/ws/current?code=005930
 
 ---
 
+## 온보딩 관심 키워드
+
+```http
+POST /api/onboarding/keywords
+```
+
+- 인증 필수 엔드포인트입니다.
+- `user_id`는 토큰의 인증 사용자로 처리하며 요청 본문에서 받지 않습니다.
+- 각 항목은 `original_keyword`만 전달합니다.
+- 백엔드는 `original_keyword`를 대소문자/문장부호 제거 기준으로 정규화해 `keywords.word`와 먼저 매칭합니다.
+- 정규화 매칭이 없으면 Ollama `bge-m3` 임베딩을 생성하고 `keywords.embedding_vector`와 cosine distance로 가장 유사한 키워드를 등록합니다.
+
+요청 예시:
+
+```json
+{
+  "keywords": [
+    {"original_keyword": "AI"},
+    {"original_keyword": "반도체!"}
+  ]
+}
+```
+
+응답 예시:
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "keyword_id": 12,
+      "original_keyword": "AI",
+      "matched_by": "keyword_id",
+      "created": true
+    }
+  ]
+}
+```
+
+---
+
 ## 환경 설정
 
 ### 환경 변수 (.env)
@@ -769,6 +810,11 @@ KIS_APP_KEY=발급받은_APP_KEY
 KIS_APP_SECRET=발급받은_APP_SECRET
 KIS_WS_BASE_URL=ws://ops.koreainvestment.com:21000
 KIS_WS_PATH=/tryitout
+
+# Ollama Embedding API
+OLLAMA_BASE_URL=http://ollama:11434
+OLLAMA_EMBEDDING_MODEL=bge-m3
+OLLAMA_TIMEOUT=10.0
 ```
 
 > KIS APP_KEY/APP_SECRET은 반드시 backend/.env에서만 관리하세요. (클라이언트 노출 금지)
