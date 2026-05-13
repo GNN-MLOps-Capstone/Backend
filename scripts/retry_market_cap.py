@@ -26,7 +26,7 @@ _CHUNK_SIZE = 100
 async def main() -> None:
     async with AsyncSessionLocal() as db:
         result = await db.execute(
-            select(Stock.stock_id).where(Stock.market_cap == None)
+            select(Stock.stock_id).where(Stock.market_cap.is_(None))
         )
         null_ids = [row[0] for row in result.all()]
 
