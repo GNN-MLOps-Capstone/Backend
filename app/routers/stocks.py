@@ -1574,7 +1574,7 @@ async def get_latest_stock_news(
         )
         .join(NewsStockMapping, NaverNews.news_id == NewsStockMapping.news_id)
         .join(Stock, NewsStockMapping.stock_id == Stock.stock_id)
-        .join(FilteredNews, NaverNews.news_id == FilteredNews.news_id)
+        .outerjoin(FilteredNews, NaverNews.news_id == FilteredNews.news_id)
         # URL에서 도메인을 추출하여 매핑 테이블과 조인 (예: %newsis.com% 패턴 매칭)
         .outerjoin(
             NewsDomainMapping, 
