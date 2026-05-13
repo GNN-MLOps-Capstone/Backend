@@ -55,7 +55,8 @@ async def get_top_keywords(
         .limit(limit)
     )
     if q and q.strip():
-        stmt = stmt.where(Keyword.word.ilike(f"%{q.strip()}%"))
+        escaped = q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        stmt = stmt.where(Keyword.word.ilike(f"%{escaped}%", escape="\\"))
 
     result = await db.execute(stmt)
     return [

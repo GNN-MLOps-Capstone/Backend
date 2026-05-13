@@ -287,7 +287,7 @@ class NewsKeywordMapping(Base):
 
     mapping_id = Column(Integer, primary_key=True, index=True)
     news_id = Column(BigInteger, ForeignKey("naver_news.news_id", ondelete="CASCADE"), nullable=False, index=True)
-    keyword_id = Column(Integer, ForeignKey("keywords.keyword_id", ondelete="CASCADE"), nullable=False)
+    keyword_id = Column(Integer, ForeignKey("keywords.keyword_id", ondelete="CASCADE"), nullable=False, index=True)
     extractor_version = Column(String(50), nullable=True)
     weight = Column(Float, nullable=True, default=1.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
