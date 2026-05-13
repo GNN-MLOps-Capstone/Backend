@@ -67,7 +67,7 @@ Backend는 아래 형식도 처리합니다.
 
 - 성공: `200`
 - 실패: `4xx` 또는 `5xx`
-- Backend는 실패 시 내부 fallback(mock)로 전환할 수 있습니다.
+- Backend는 실패, 빈 응답, 또는 DB에 매핑되는 추천 후보가 없는 경우 `recent_news` fallback으로 전환합니다.
 
 ## 7) 구현 체크리스트
 

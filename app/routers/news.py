@@ -64,8 +64,9 @@ from app.schemas import (
     RecentTrendingStockResponse,
     RecentTrendingKeywordResponse,
 )
+from app.config import get_settings
 from app.kis.errors import KISError
-from app.recommender.client import RecommendationCandidate
+from app.recommender.client import RecommendationCandidate, RecommendationClient, RecommendationResult
 from app.routers.users import get_current_user
 from app.services.stock_service import fetch_stock_overview
 from app.services.news_enrichment_service import analyze_article, generate_stock_summary
@@ -79,9 +80,12 @@ router = APIRouter(
 )
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
+recommendation_client = RecommendationClient(settings)
 
 _CURSOR_VERSION = 1
 _RECOMMENDATION_PAGE_SIZE = 20
+_RECOMMENDER_RECOMMENDATION_SOURCE = "recommender"
 _RECENT_RECOMMENDATION_SOURCE = "recent_news"
 _ON_DEMAND_EXTRACTOR_VERSION = "backend_gemini_v1"
 
@@ -161,12 +165,32 @@ def _decode_recommendation_cursor(cursor: str) -> tuple[int, int, int | None]:
 
 def _default_recommendation_path(source: str) -> str:
     path_map = {
-        "recommender": "A1",
-        "mock": "M1",
-        "mock_fallback": "M2",
+        _RECOMMENDER_RECOMMENDATION_SOURCE: "A1",
         _RECENT_RECOMMENDATION_SOURCE: "A1",
     }
     return path_map.get(source, "A1")
+
+
+def _resolve_recent_recommendation_position(
+    *,
+    page: int,
+    cursor: str | None,
+    limit: int,
+) -> tuple[int, int]:
+    resolved_page = page
+    offset = (resolved_page - 1) * limit
+    if not cursor:
+        return resolved_page, offset
+
+    try:
+        resolved_page, offset, cursor_limit = _decode_recommendation_cursor(cursor)
+    except HTTPException:
+        logger.info("recent_news fallback ignores non-local recommendation cursor")
+        return resolved_page, offset
+
+    if cursor_limit is not None and cursor_limit != limit:
+        raise HTTPException(status_code=400, detail="Unsupported cursor limit")
+    return resolved_page, offset
 
 
 def _normalize_news_domain(url: str | None) -> str | None:
@@ -570,7 +594,7 @@ async def _log_recommendation_serve(
         page=page,
         limit=limit,
         served_count=len(candidates),
-        is_mock=source.startswith("mock"),
+        is_mock=False,
         served_items=served_items,
     )
     db.add(serve)
@@ -669,15 +693,61 @@ async def get_news_recommendations(
     effective_limit = _RECOMMENDATION_PAGE_SIZE
     resolved_page = page
     offset = (resolved_page - 1) * effective_limit
-    if cursor:
-        resolved_page, offset, cursor_limit = _decode_recommendation_cursor(cursor)
-        if cursor_limit is not None and cursor_limit != effective_limit:
-            raise HTTPException(status_code=400, detail="Unsupported cursor limit")
+    source = _RECOMMENDER_RECOMMENDATION_SOURCE
+    next_cursor: str | None = None
+    resolved_request_id = request_id
 
-    candidates = await _recent_candidates_from_db_with_offset(db, limit=effective_limit, offset=offset)
-    items = await _build_recommendation_items(db, candidates, _RECENT_RECOMMENDATION_SOURCE)
+    try:
+        result: RecommendationResult = await recommendation_client.get_news_candidates(
+            user_id=current_user.id,
+            limit=effective_limit,
+            cursor=cursor,
+        )
+        candidates = result.items
+        next_cursor = result.next_cursor
+        if not resolved_request_id and result.request_id:
+            resolved_request_id = result.request_id
+        if not candidates:
+            source = _RECENT_RECOMMENDATION_SOURCE
+    except KISError as exc:
+        logger.warning("recommendation server request failed: %s", exc)
+        candidates = []
+        source = _RECENT_RECOMMENDATION_SOURCE
+    except Exception as exc:
+        logger.warning(
+            "recommendation server response handling failed (%s): %s",
+            type(exc).__name__,
+            exc,
+            exc_info=True,
+        )
+        candidates = []
+        source = _RECENT_RECOMMENDATION_SOURCE
 
-    resolved_request_id = request_id or f"req-{uuid4().hex}"
+    if source == _RECENT_RECOMMENDATION_SOURCE:
+        resolved_page, offset = _resolve_recent_recommendation_position(
+            page=page,
+            cursor=cursor,
+            limit=effective_limit,
+        )
+        candidates = await _recent_candidates_from_db_with_offset(db, limit=effective_limit, offset=offset)
+        next_cursor = None
+
+    items = await _build_recommendation_items(db, candidates, source)
+
+    if source == _RECOMMENDER_RECOMMENDATION_SOURCE and not items:
+        source = _RECENT_RECOMMENDATION_SOURCE
+        resolved_page, offset = _resolve_recent_recommendation_position(
+            page=page,
+            cursor=cursor,
+            limit=effective_limit,
+        )
+        candidates = await _recent_candidates_from_db_with_offset(db, limit=effective_limit, offset=offset)
+        items = await _build_recommendation_items(db, candidates, source)
+        next_cursor = None
+
+    if not resolved_request_id:
+        resolved_request_id = f"req-{uuid4().hex}"
+
     logged = False
     served_candidates = [
         RecommendationCandidate(news_id=item.news_id, path=item.path)
@@ -693,7 +763,7 @@ async def get_news_recommendations(
                 limit=effective_limit,
                 screen_session_id=screen_session_id,
                 app_session_id=app_session_id,
-                source=_RECENT_RECOMMENDATION_SOURCE,
+                source=source,
                 candidates=served_candidates,
             )
         except Exception as exc:
@@ -705,8 +775,7 @@ async def get_news_recommendations(
                 exc_info=True,
             )
 
-    next_cursor: str | None = None
-    if len(items) == effective_limit:
+    if source == _RECENT_RECOMMENDATION_SOURCE and len(items) == effective_limit:
         next_cursor = _encode_recommendation_cursor(
             page=resolved_page + 1,
             offset=offset + len(items),
@@ -716,7 +785,7 @@ async def get_news_recommendations(
     return NewsRecommendationResponse(
         user_id=current_user.id,
         request_id=resolved_request_id,
-        source=_RECENT_RECOMMENDATION_SOURCE,
+        source=source,
         page=resolved_page,
         next_cursor=next_cursor,
         served_count=len(items),

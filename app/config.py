@@ -53,6 +53,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         populate_by_name=True,
+        extra="ignore",
     )
     
     # =========================================================================
@@ -131,7 +132,6 @@ class Settings(BaseSettings):
     recommender_news_path: str = "/recommend/news"
     recommender_timeout: float = 5.0
     recommender_api_key: str = ""
-    recommender_mock_mode: bool = True
     
     #=========================================================================
     # 제미나이 api키 설정
@@ -187,10 +187,6 @@ class Settings(BaseSettings):
         if self.gemini_max_concurrency <= 0:
             raise ValueError(
                 f"gemini_max_concurrency must be greater than 0, got {self.gemini_max_concurrency}"
-            )
-        if not self.recommender_mock_mode and not self.recommender_base_url.strip():
-            raise ValueError(
-                "recommender_base_url is required when recommender_mock_mode is false"
             )
         return self
 
