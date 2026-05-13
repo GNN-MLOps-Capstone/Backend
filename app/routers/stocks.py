@@ -1610,7 +1610,7 @@ async def get_latest_stock_news(
         return None
     
     sentiment_map = {"긍정": True, "부정": False, "중립": None}
-    is_up = sentiment_map.get(news.sentiment)
+    is_up = sentiment_map.get(news.sentiment, None)
 
     current_netloc = urlparse(news.url).netloc.replace('www.', '')
     stmt = select(NewsDomainMapping).where(
@@ -1640,6 +1640,13 @@ async def get_stock_latest_news_endpoint(
     """
     종목명 또는 코드를 받아 해당 종목의 최신 뉴스 1건을 반환합니다.
     """
+
+    if stock_id is None and stock_name is None:
+        raise HTTPException(
+            status_code=400, 
+            detail="stock_id 또는 stock_name 중 하나는 필수 파라미터입니다."
+        )
+    
     if stock_id:
         stmt = select(Stock).where(Stock.stock_id == stock_id)
         result = await db.execute(stmt)
