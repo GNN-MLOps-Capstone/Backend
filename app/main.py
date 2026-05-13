@@ -44,6 +44,8 @@ from app.routers import interactions, news, notifications, onboarding, stocks, u
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.tasks.volatility_monitor import run_volatility_check
 from app.tasks.news_tasks import run_news_keyword_check
+from app.tasks.market_cap_updater import run_market_cap_update
+from app.kis.transformers import KST
 
 # 설정 객체 가져오기
 settings = get_settings()
@@ -126,9 +128,22 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=60,
         next_run_time=datetime.now(timezone.utc) + timedelta(minutes=30)
     )   
+    scheduler.add_job(
+        run_market_cap_update,
+        'cron',
+        hour=8,
+        minute=0,
+        timezone=KST,
+        id='market_cap_update_job',
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=3600,
+    )
+
     scheduler.start()
     logger.info("주가 감시 스케줄러 가동 (5분 주기)")
     logger.info("뉴스 키워드 감시 스케줄러 가동 (30분 주기)")
+    logger.info("시가총액 업데이트 스케줄러 가동 (매일 08:00 KST)")
 
     try:
         # yield: 여기서 서버가 실행되고 요청을 처리함

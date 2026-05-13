@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import OnboardingTheme, OnboardingThemeCategory
-from app.schemas import OnboardingThemeResponse
+from app.models import OnboardingTheme, OnboardingThemeCategory, Keyword, NewsKeywordMapping
+from app.routers.users import get_current_subject
+from app.schemas import OnboardingThemeResponse, OnboardingKeywordResponse
 
 router = APIRouter(
     prefix="/api/onboarding",
@@ -34,6 +35,32 @@ async def get_themes(db: AsyncSession = Depends(get_db)):
             categories=[c.category_name for c in t.categories],
         )
         for t in themes
+    ]
+
+
+@router.get("/keywords", response_model=list[OnboardingKeywordResponse])
+async def get_top_keywords(
+    q: str | None = Query(None, description="키워드 검색어"),
+    limit: int = Query(20, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_subject),
+):
+    """뉴스 집계 기준 상위 키워드 조회 (온보딩용)"""
+    count_col = func.count(NewsKeywordMapping.mapping_id).label("count")
+    stmt = (
+        select(Keyword.keyword_id.label("id"), Keyword.word, count_col)
+        .join(NewsKeywordMapping, Keyword.keyword_id == NewsKeywordMapping.keyword_id)
+        .group_by(Keyword.keyword_id, Keyword.word)
+        .order_by(count_col.desc())
+        .limit(limit)
+    )
+    if q and q.strip():
+        stmt = stmt.where(Keyword.word.ilike(f"%{q.strip()}%"))
+
+    result = await db.execute(stmt)
+    return [
+        OnboardingKeywordResponse(id=row.id, word=row.word, count=row.count)
+        for row in result.all()
     ]
 
 
