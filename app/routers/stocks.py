@@ -1562,7 +1562,8 @@ async def get_latest_stock_news(
     db: AsyncSession,
     stock_id: str | None = None,
     stock_name: str | None = None,
-):
+) -> Any:
+    """종목의 최신 뉴스 1건을 조회합니다."""
     # 종목명으로 들어온 경우 stock_id로 해석 (동명이인 종목 방지)
     if stock_id is None and stock_name is not None:
         stock_ids = (
