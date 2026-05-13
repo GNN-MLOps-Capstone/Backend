@@ -132,6 +132,13 @@ class Settings(BaseSettings):
     recommender_news_path: str = "/recommend/news"
     recommender_timeout: float = 5.0
     recommender_api_key: str = ""
+
+    # =========================================================================
+    # Ollama Embedding API 설정
+    # =========================================================================
+    ollama_base_url: str = "http://ollama:11434"
+    ollama_embedding_model: str = "bge-m3"
+    ollama_timeout: float = 10.0
     
     #=========================================================================
     # 제미나이 api키 설정
@@ -183,6 +190,10 @@ class Settings(BaseSettings):
         if self.recommender_timeout <= 0:
             raise ValueError(
                 f"recommender_timeout must be greater than 0, got {self.recommender_timeout}"
+            )
+        if self.ollama_timeout <= 0:
+            raise ValueError(
+                f"ollama_timeout must be greater than 0, got {self.ollama_timeout}"
             )
         if self.gemini_max_concurrency <= 0:
             raise ValueError(

@@ -205,6 +205,35 @@ class AuthResponse(BaseModel):
     token_type: str = "Bearer"
     user: UserResponse
 
+
+class UserOnboardingKeywordItemRequest(BaseModel):
+    original_keyword: str = Field(..., min_length=1, max_length=50)
+
+    @field_validator("original_keyword")
+    @classmethod
+    def strip_original_keyword(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("original_keyword is required")
+        return stripped
+
+
+class UserOnboardingKeywordCreateRequest(BaseModel):
+    keywords: List[UserOnboardingKeywordItemRequest] = Field(..., min_length=1, max_length=50)
+
+
+class UserOnboardingKeywordResponse(BaseModel):
+    id: int
+    keyword_id: int
+    original_keyword: str
+    matched_by: str
+    created: bool
+
+
+class UserOnboardingKeywordCreateResponse(BaseModel):
+    items: List[UserOnboardingKeywordResponse]
+
+
 class SettingResponse(BaseModel):
     """
     설정 정보 응답 스키마
