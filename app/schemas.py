@@ -466,3 +466,10 @@ class OnboardingStockResponse(BaseModel):
     market_cap: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class StockNewsResponse(BaseModel):
+    isUp: Optional[bool] = None  # 감성 분석 미완료 시 None
+    title: str
+    source: str
+    sentiment: Optional[str] = None
