@@ -12,15 +12,17 @@ import re
 import asyncio
 import contextlib
 import logging
-from sqlalchemy import select, func, case, text
+from sqlalchemy import select, func, case, text, desc, literal
 from sqlalchemy.ext.asyncio import AsyncSession
+from urllib.parse import urlparse
+from typing import Any, List
 
 from app.config import get_settings
 from app.database import AsyncSessionLocal, get_db
 from app.kis.errors import KISError
 from app.kis.transformers import transform_series_time, transform_series_daily, KST
 from app.kis.ws_client import KISWSClient
-from app.models import User, Stock, StockSummaryCache, FilteredNews, NewsStockMapping
+from app.models import User, Stock, StockSummaryCache, FilteredNews, NewsStockMapping, NaverNews, NewsDomainMapping
 from app.routers.users import decode_access_token, get_current_subject
 from app.schemas import (
     StockOverviewResponse,
@@ -31,6 +33,7 @@ from app.schemas import (
     RelatedStocksResponse,
     StockThemeKeywordsResponse,
     OnboardingStockResponse,
+    StockNewsResponse,
 )
 from app.services.stock_service import (
     cache,
@@ -1556,3 +1559,120 @@ async def get_stock_weather_endpoint(
     except KISError as exc:
         _raise_kis_http_error(exc)
     return {"weather": weather}
+
+async def get_latest_stock_news(
+    db: AsyncSession,
+    stock_id: str | None = None,
+    stock_name: str | None = None,
+) -> List[dict]:
+    """종목의 최신 뉴스 최대 3건을 조회합니다."""
+    if stock_id is None and stock_name is not None:
+        # 1. 종목명으로 요청된 경우 동명이인 여부 확인 및 stock_id 확정
+        stock_ids = (
+            await db.execute(
+                select(Stock.stock_id).where(Stock.stock_name == stock_name).limit(2)
+            )
+        ).scalars().all()
+
+        if not stock_ids:
+            raise HTTPException(status_code=404, detail=f"'{stock_name}' 종목을 찾을 수 없습니다.")
+        
+        if len(stock_ids) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{stock_name}'(으)로 등록된 종목이 여러 개 존재합니다. 정확한 조회를 위해 종목 코드(stock_id)를 사용해주세요.",
+            )
+        
+        stock_id = stock_ids[0]
+
+    # 2. 메인 쿼리: 성능 최적화를 위해 NewsDomainMapping 조인은 제외하고 먼저 조회
+    # (CodeRabbit이 지적한 contains 패턴 매칭 성능 문제를 해결하기 위해 2단계로 분리)
+    query = (
+        select(
+            NaverNews.news_id,
+            NaverNews.title,
+            NaverNews.pub_date,
+            NaverNews.url,
+            FilteredNews.sentiment
+        )
+        .join(NewsStockMapping, NaverNews.news_id == NewsStockMapping.news_id)
+        .join(Stock, NewsStockMapping.stock_id == Stock.stock_id)
+        .outerjoin(FilteredNews, NaverNews.news_id == FilteredNews.news_id)
+        .where(Stock.stock_id == stock_id)
+        .order_by(desc(NaverNews.pub_date))
+        .limit(3)
+    )
+
+    result = await db.execute(query)
+    news_rows = result.all()
+
+    if not news_rows:
+        return []
+    
+    sentiment_map = {"긍정": True, "부정": False, "중립": None}
+    final_results = []
+
+    for row in news_rows:
+        # 감성 분석 결과 매핑
+        is_up = sentiment_map.get(row.sentiment, None)
+
+        # 도메인 매핑 조회 (각 뉴스 건별로 수행)
+        current_netloc = urlparse(row.url).netloc.replace('www.', '')
+        stmt = select(NewsDomainMapping).where(
+            literal(current_netloc).contains(NewsDomainMapping.domain)
+        )
+        domain_result = await db.execute(stmt)
+        domain_mapping = domain_result.scalars().first()
+
+        final_results.append({
+            "title": row.title,
+            "pub_date": row.pub_date,
+            "news_company_name": domain_mapping.news_company_name if domain_mapping else "기타",
+            "sentiment": row.sentiment,
+            "isUp": is_up,
+        })
+
+    return final_results
+
+@router.get("/news/latest", response_model=List[StockNewsResponse])
+async def get_stock_latest_news_endpoint(
+    db: AsyncSession = Depends(get_db),
+    stock_id: str | None = Query(None, description="종목코드"),
+    stock_name: str | None = Query(None, description="종목명"),
+    _: str = Depends(get_current_subject),
+):
+    """
+    종목명 또는 코드를 받아 해당 종목의 최신 뉴스를 최대 3건 반환합니다.
+    """
+
+    if stock_id is None and stock_name is None:
+        raise HTTPException(
+            status_code=400, 
+            detail="stock_id 또는 stock_name 중 하나는 필수 파라미터입니다."
+        )
+    
+    if stock_id:
+        stmt = select(Stock).where(Stock.stock_id == stock_id)
+        result = await db.execute(stmt)
+        stock_exists = result.scalars().first()
+        if not stock_exists:
+            raise HTTPException(status_code=404, detail="존재하지 않는 종목 코드입니다.")
+
+    news_list = await get_latest_stock_news(db, stock_id=stock_id, stock_name=stock_name)
+    
+    if not news_list:
+        raise HTTPException(status_code=404, detail="관련 뉴스를 찾을 수 없습니다.")
+    
+    results = []
+    for news in news_list:
+        formatted_date = "날짜 불명"
+        if news["pub_date"]:
+            formatted_date = news["pub_date"].strftime("%Y.%m.%d")
+        results.append({
+            "isUp": news["isUp"],
+            "title": news["title"],
+            "source": f"({formatted_date}, {news['news_company_name']})",
+            "sentiment": news["sentiment"],
+        })
+
+    return results
