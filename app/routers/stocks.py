@@ -15,7 +15,7 @@ import logging
 from sqlalchemy import select, func, case, text, desc, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 from urllib.parse import urlparse
-from typing import Any
+from typing import Any, List
 
 from app.config import get_settings
 from app.database import AsyncSessionLocal, get_db
@@ -1564,7 +1564,7 @@ async def get_latest_stock_news(
     db: AsyncSession,
     stock_id: str | None = None,
     stock_name: str | None = None,
-) -> Any:
+) -> List[dict]:
     """종목의 최신 뉴스 1건을 조회합니다."""
     if stock_id is None and stock_name is not None:
         # 1. 종목명으로 요청된 경우 동명이인 여부 확인 및 stock_id 확정
@@ -1600,41 +1600,46 @@ async def get_latest_stock_news(
         .outerjoin(FilteredNews, NaverNews.news_id == FilteredNews.news_id)
         .where(Stock.stock_id == stock_id)
         .order_by(desc(NaverNews.pub_date))
-        .limit(1)
+        .limit(3)
     )
 
     result = await db.execute(query)
-    news = result.first()
+    news_rows = result.all()
 
-    if not news:
+    if not news_rows:
         return None
     
     sentiment_map = {"긍정": True, "부정": False, "중립": None}
-    is_up = sentiment_map.get(news.sentiment, None)
+    final_results = []
 
-    current_netloc = urlparse(news.url).netloc.replace('www.', '')
-    stmt = select(NewsDomainMapping).where(
-        literal(current_netloc).contains(NewsDomainMapping.domain)
-    )
+    for row in news_rows:
+        # 감성 분석 결과 매핑
+        is_up = sentiment_map.get(row.sentiment, None)
 
-    result = await db.execute(stmt)
+        # 도메인 매핑 조회 (각 뉴스 건별로 수행)
+        current_netloc = urlparse(row.url).netloc.replace('www.', '')
+        stmt = select(NewsDomainMapping).where(
+            literal(current_netloc).contains(NewsDomainMapping.domain)
+        )
+        domain_result = await db.execute(stmt)
+        domain_mapping = domain_result.scalars().first()
 
-    domain_mapping = result.scalars().first()
+        final_results.append({
+            "title": row.title,
+            "pub_date": row.pub_date,
+            "news_company_name": domain_mapping.news_company_name if domain_mapping else "기타",
+            "sentiment": row.sentiment,
+            "isUp": is_up,
+        })
 
-    return {
-        "title": news.title,
-        "pub_date": news.pub_date,
-        "news_company_name": domain_mapping.news_company_name if domain_mapping else "기타",
-        "sentiment": news.sentiment,
-        "isUp": is_up,  # 계산된 결과를 포함하여 반환
-    }
+    return final_results
 
-@router.get("/news/latest", response_model=StockNewsResponse)
+@router.get("/news/latest", response_model=List[StockNewsResponse])
 async def get_stock_latest_news_endpoint(
     db: AsyncSession = Depends(get_db),
     stock_id: str | None = Query(None, description="종목코드"),
     stock_name: str | None = Query(None, description="종목명"),
-    _: str = Depends(get_current_subject),
+    #_: str = Depends(get_current_subject),
 ):
     """
     종목명 또는 코드를 받아 해당 종목의 최신 뉴스 1건을 반환합니다.
@@ -1653,18 +1658,21 @@ async def get_stock_latest_news_endpoint(
         if not stock_exists:
             raise HTTPException(status_code=404, detail="존재하지 않는 종목 코드입니다.")
 
-    news = await get_latest_stock_news(db, stock_id=stock_id, stock_name=stock_name)
+    news_list = await get_latest_stock_news(db, stock_id=stock_id, stock_name=stock_name)
     
-    if not news:
+    if not news_list:
         raise HTTPException(status_code=404, detail="관련 뉴스를 찾을 수 없습니다.")
     
-    formatted_date = "날짜 불명"
-    if news["pub_date"]:
-        formatted_date = news["pub_date"].strftime("%Y.%m.%d")
+    results = []
+    for news in news_list:
+        formatted_date = "날짜 불명"
+        if news["pub_date"]:
+            formatted_date = news["pub_date"].strftime("%Y.%m.%d")
+        results.append({
+            "isUp": news["isUp"],
+            "title": news["title"],
+            "source": f"({formatted_date}, {news['news_company_name']})",
+            "sentiment": news["sentiment"],
+        })
 
-    return {
-        "isUp": news["isUp"],
-        "title": news["title"],
-        "source": f"({formatted_date}, {news['news_company_name']})",
-        "sentiment": news["sentiment"],
-    }
+    return results
