@@ -1627,7 +1627,6 @@ async def get_latest_stock_news(
         "news_company_name": domain_mapping.news_company_name if domain_mapping else "기타",
         "sentiment": news.sentiment,
         "isUp": is_up,  # 계산된 결과를 포함하여 반환
-        "url": news.url
     }
 
 @router.get("/news/latest", response_model=StockNewsResponse)
@@ -1668,5 +1667,4 @@ async def get_stock_latest_news_endpoint(
         "title": news["title"],
         "source": f"({formatted_date}, {news['news_company_name']})",
         "sentiment": news["sentiment"],
-        "url": news["url"]
     }
