@@ -76,5 +76,6 @@ async def run_market_cap_update() -> None:
 
     except Exception:
         logger.exception("시가총액 업데이트 중 치명적 오류 발생")
+        raise
     finally:
         await client.aclose()
