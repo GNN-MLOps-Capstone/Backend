@@ -14,6 +14,8 @@ import contextlib
 import logging
 from sqlalchemy import select, func, case, text, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+from urllib.parse import urlparse
+from typing import Any
 
 from app.config import get_settings
 from app.database import AsyncSessionLocal, get_db
@@ -1564,47 +1566,70 @@ async def get_latest_stock_news(
     stock_name: str | None = None,
 ) -> Any:
     """종목의 최신 뉴스 1건을 조회합니다."""
-    # 종목명으로 들어온 경우 stock_id로 해석 (동명이인 종목 방지)
     if stock_id is None and stock_name is not None:
+        # 1. 종목명으로 요청된 경우 동명이인 여부 확인 및 stock_id 확정
         stock_ids = (
             await db.execute(
                 select(Stock.stock_id).where(Stock.stock_name == stock_name).limit(2)
             )
         ).scalars().all()
+
         if not stock_ids:
-            raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다.")
+            raise HTTPException(status_code=404, detail=f"'{stock_name}' 종목을 찾을 수 없습니다.")
+        
         if len(stock_ids) > 1:
             raise HTTPException(
                 status_code=400,
-                detail="동일한 종목명이 여러 개 존재합니다. stock_id를 사용해주세요.",
+                detail=f"'{stock_name}'(으)로 등록된 종목이 여러 개 존재합니다. 정확한 조회를 위해 종목 코드(stock_id)를 사용해주세요.",
             )
+        
         stock_id = stock_ids[0]
-    # 기본 쿼리 작성 (naver_news -> news_stock_mapping -> stocks 순으로 조인)
-    # stocks 테이블에 stock_id와 stock_name이 있다고 가정합니다.
+
+    # 2. 메인 쿼리: 성능 최적화를 위해 NewsDomainMapping 조인은 제외하고 먼저 조회
+    # (CodeRabbit이 지적한 contains 패턴 매칭 성능 문제를 해결하기 위해 2단계로 분리)
     query = (
         select(
+            NaverNews.news_id,
             NaverNews.title,
             NaverNews.pub_date,
-            NewsDomainMapping.news_company_name,
+            NaverNews.url,
             FilteredNews.sentiment
         )
         .join(NewsStockMapping, NaverNews.news_id == NewsStockMapping.news_id)
         .join(Stock, NewsStockMapping.stock_id == Stock.stock_id)
         .outerjoin(FilteredNews, NaverNews.news_id == FilteredNews.news_id)
-        # URL에서 도메인을 추출하여 매핑 테이블과 조인 (예: %newsis.com% 패턴 매칭)
-        .outerjoin(
-            NewsDomainMapping, 
-            NaverNews.url.contains(NewsDomainMapping.domain)
-        )
+        .where(Stock.stock_id == stock_id)
+        .order_by(desc(NaverNews.pub_date))
+        .limit(1)
     )
 
-    query = query.where(Stock.stock_id == stock_id)
-
-    # 최신순 정렬 및 1건만 가져오기
-    query = query.order_by(desc(NaverNews.pub_date)).limit(1)
-    
     result = await db.execute(query)
-    return result.first()
+    news = result.first()
+
+    if not news:
+        return None
+
+    # 3. 도메인 매핑 최적화 (가져온 URL에서 도메인만 추출하여 매핑 테이블 조회)
+    domain = urlparse(news.url).netloc.replace('www.', '')
+    
+    # 도메인 일치 여부 확인 (contains 대신 효율적인 조회 방식 사용 가능)
+    mapping_result = await db.execute(
+        select(NewsDomainMapping.news_company_name)
+        .where(NewsDomainMapping.domain.contains(domain)) # 혹은 정확히 일치하는 로직
+    )
+    mapping = mapping_result.first()
+
+    # 4. 결과 조립 (sentiment에 따른 isUp 로직 포함)
+    sentiment_map = {"긍정": True, "부정": False, "중립": None}
+    is_up = sentiment_map.get(news.sentiment)
+
+    return {
+        "isUp": is_up,
+        "title": news.title,
+        "pub_date": news.pub_date,
+        "news_company_name": mapping.news_company_name if mapping else "기타",
+        "sentiment": news.sentiment or "분석중"
+    }
 
 @router.get("/news/latest", response_model=StockNewsResponse)
 async def get_stock_latest_news_endpoint(
