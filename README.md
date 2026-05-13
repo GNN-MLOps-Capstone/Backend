@@ -322,7 +322,9 @@ curl "http://localhost:8000/api/news/recommendations?page=1&screen_session_id=sc
 ```
 
 - 인증 필수 엔드포인트입니다.
-- `RECOMMENDER_MOCK_MODE=false`에서 2페이지 이상 조회할 때는 반드시 직전 응답의 `next_cursor`를 전달해야 합니다.
+- 기본적으로 외부 추천 서버(`RECOMMENDER_BASE_URL` + `RECOMMENDER_NEWS_PATH`)를 호출합니다.
+- 추천 서버 호출 실패, 빈 응답, 또는 응답 후보가 DB 뉴스로 매핑되지 않는 경우 `recent_news`로 fallback합니다.
+- 추천 서버의 2페이지 이상 조회는 직전 응답의 `next_cursor`를 전달해야 합니다.
 - 현재 추천 응답은 `body`, `sentiment`, `keywords`를 포함하지 않습니다. 이 필드들은 상세 조회(`GET /api/news/{news_id}`)에서만 반환됩니다.
 
 응답 스키마:
