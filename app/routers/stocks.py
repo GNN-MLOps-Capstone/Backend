@@ -1565,7 +1565,7 @@ async def get_latest_stock_news(
     stock_id: str | None = None,
     stock_name: str | None = None,
 ) -> List[dict]:
-    """종목의 최신 뉴스 1건을 조회합니다."""
+    """종목의 최신 뉴스 최대 3건을 조회합니다."""
     if stock_id is None and stock_name is not None:
         # 1. 종목명으로 요청된 경우 동명이인 여부 확인 및 stock_id 확정
         stock_ids = (
@@ -1607,7 +1607,7 @@ async def get_latest_stock_news(
     news_rows = result.all()
 
     if not news_rows:
-        return None
+        return []
     
     sentiment_map = {"긍정": True, "부정": False, "중립": None}
     final_results = []
@@ -1639,10 +1639,10 @@ async def get_stock_latest_news_endpoint(
     db: AsyncSession = Depends(get_db),
     stock_id: str | None = Query(None, description="종목코드"),
     stock_name: str | None = Query(None, description="종목명"),
-    #_: str = Depends(get_current_subject),
+    _: str = Depends(get_current_subject),
 ):
     """
-    종목명 또는 코드를 받아 해당 종목의 최신 뉴스 1건을 반환합니다.
+    종목명 또는 코드를 받아 해당 종목의 최신 뉴스를 최대 3건 반환합니다.
     """
 
     if stock_id is None and stock_name is None:
