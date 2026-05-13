@@ -1635,13 +1635,15 @@ async def get_stock_latest_news_endpoint(
     db: AsyncSession = Depends(get_db),
     stock_id: str | None = Query(None, description="종목코드"),
     stock_name: str | None = Query(None, description="종목명"),
-    #_: str = Depends(get_current_subject),
+    _: str = Depends(get_current_subject),
 ):
     """
     종목명 또는 코드를 받아 해당 종목의 최신 뉴스 1건을 반환합니다.
     """
     if stock_id:
-        stock_exists = db.query(Stock).filter(Stock.stock_id == stock_id).first()
+        stmt = select(Stock).where(Stock.stock_id == stock_id)
+        result = await db.execute(stmt)
+        stock_exists = result.scalars().first()
         if not stock_exists:
             raise HTTPException(status_code=404, detail="존재하지 않는 종목 코드입니다.")
 
