@@ -263,3 +263,31 @@ async def create_notification(
         await db.rollback()
         logger.exception("알림 저장 실패: user_id=%s", current_user.google_id)
         raise HTTPException(status_code=500, detail="알림 저장 실패") from e
+
+# =============================================================================
+# 읽지 않은 알림 개수 API
+# =============================================================================
+#
+# URL: GET /api/notifications/unread-count
+# 용도: 사용자의 읽지 않은 알림 개수 보여주기
+#
+@router.get("/unread-count")
+async def get_unread_notifications_count(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # 1. 읽지 않은(is_read == False) 알림 개수 쿼리 생성
+    unread_query = (
+        select(func.count(Notification.id))
+        .where(
+            Notification.user_id == current_user.google_id,
+            Notification.is_read == False  # 혹은 == 0 (DB 설정에 따라)
+        )
+    )
+    
+    # 2. 쿼리 실행
+    result = await db.execute(unread_query)
+    count = result.scalar()  # 단일 숫자 결과값 추출
+    
+    # 3. 결과 반환
+    return {"unread_count": count}
