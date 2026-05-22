@@ -60,6 +60,7 @@ if "apscheduler.schedulers.asyncio" not in sys.modules:
 
 from app.database import Base, get_db
 from app.main import app
+from app.recommender.client import RecommendationCandidate, RecommendationResult
 from app.models import (
     CrawledNews,
     FilteredNews,
@@ -232,6 +233,18 @@ async def _seed_news(
 async def _count_rows(session_factory: async_sessionmaker[AsyncSession], model: type) -> int:
     async with session_factory() as session:
         return int(await session.scalar(select(func.count()).select_from(model)))
+
+
+async def _get_recommendation_serve(
+    session_factory: async_sessionmaker[AsyncSession],
+    request_id: str,
+) -> RecommendationServe:
+    async with session_factory() as session:
+        serve = await session.scalar(
+            select(RecommendationServe).where(RecommendationServe.request_id == request_id)
+        )
+    assert serve is not None
+    return serve
 
 
 # =============================================================================
@@ -507,6 +520,74 @@ class TestNewsRouterEndpoints:
         assert body["items"][0]["stock_name"] == "삼성전자"
         assert body["items"][0]["stock_change"] == "+2.4%"
         assert await _count_rows(session_factory, RecommendationServe) == 1
+        serve = await _get_recommendation_serve(session_factory, "req-week3")
+        assert serve.experiment_id == "control"
+        assert serve.variant == "recommend"
+
+    async def test_recommendation_client_normalize_parses_meta(self):
+        result = news_router.recommendation_client._normalize(
+            {
+                "items": [{"news_id": 402, "path": "B2"}],
+                "request_id": "req-meta",
+                "meta": {"experiment_id": "exp-42", "variant": "ranker-b"},
+            }
+        )
+
+        assert result.request_id == "req-meta"
+        assert result.experiment_id == "exp-42"
+        assert result.variant == "ranker-b"
+        assert result.items == [RecommendationCandidate(news_id=402, path="B2")]
+
+    async def test_news_recommendations_logs_recommender_experiment_meta(
+        self,
+        client: httpx.AsyncClient,
+        authenticated_user: dict,
+        session_factory: async_sessionmaker[AsyncSession],
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        await _seed_stock(session_factory, code="005930", name="삼성전자")
+        await _seed_news(
+            session_factory,
+            news_id=402,
+            title="삼성전자 온디바이스 AI 확대",
+            summary="온디바이스 AI 투자 확대",
+            pub_date=datetime(2026, 4, 20, 10, 0),
+            stock_id="005930",
+        )
+        monkeypatch.setattr(
+            news_router.recommendation_client,
+            "get_news_candidates",
+            AsyncMock(
+                return_value=RecommendationResult(
+                    items=[RecommendationCandidate(news_id=402, path="B2")],
+                    request_id="req-meta",
+                    experiment_id="exp-42",
+                    variant="ranker-b",
+                )
+            ),
+        )
+        monkeypatch.setattr(
+            news_router,
+            "_fetch_change_rates_for_stock_ids",
+            AsyncMock(return_value={"005930": 1.1}),
+        )
+
+        response = await client.get(
+            "/api/news/recommendations?page=1&log_served=true",
+            headers=authenticated_user["headers"],
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["request_id"] == "req-meta"
+        assert body["source"] == "recommender"
+        assert body["items"][0]["news_id"] == 402
+        assert body["items"][0]["path"] == "B2"
+        serve = await _get_recommendation_serve(session_factory, "req-meta")
+        assert serve.experiment_id == "exp-42"
+        assert serve.variant == "ranker-b"
+        assert "experiment_id" not in serve.served_items[0]
+        assert "variant" not in serve.served_items[0]
 
 
 # =============================================================================

@@ -87,6 +87,8 @@ _CURSOR_VERSION = 1
 _RECOMMENDATION_PAGE_SIZE = 20
 _RECOMMENDER_RECOMMENDATION_SOURCE = "recommender"
 _RECENT_RECOMMENDATION_SOURCE = "recent_news"
+_DEFAULT_RECOMMENDATION_EXPERIMENT_ID = "control"
+_DEFAULT_RECOMMENDATION_VARIANT = "recommend"
 _ON_DEMAND_EXTRACTOR_VERSION = "backend_gemini_v1"
 
 def _normalize_whitespace(text: str | None) -> str:
@@ -572,6 +574,8 @@ async def _log_recommendation_serve(
     screen_session_id: str | None,
     app_session_id: str | None,
     source: str,
+    experiment_id: str | None,
+    variant: str | None,
     candidates: list[RecommendationCandidate],
 ) -> bool:
     base_position = (page - 1) * limit
@@ -591,6 +595,8 @@ async def _log_recommendation_serve(
         screen_session_id=screen_session_id,
         app_session_id=app_session_id,
         source=source,
+        experiment_id=experiment_id,
+        variant=variant,
         page=page,
         limit=limit,
         served_count=len(candidates),
@@ -696,6 +702,8 @@ async def get_news_recommendations(
     source = _RECOMMENDER_RECOMMENDATION_SOURCE
     next_cursor: str | None = None
     resolved_request_id = request_id
+    experiment_id: str | None = None
+    variant: str | None = None
 
     try:
         result: RecommendationResult = await recommendation_client.get_news_candidates(
@@ -707,6 +715,8 @@ async def get_news_recommendations(
         next_cursor = result.next_cursor
         if not resolved_request_id and result.request_id:
             resolved_request_id = result.request_id
+        experiment_id = result.experiment_id
+        variant = result.variant
         if not candidates:
             source = _RECENT_RECOMMENDATION_SOURCE
     except KISError as exc:
@@ -724,6 +734,8 @@ async def get_news_recommendations(
         source = _RECENT_RECOMMENDATION_SOURCE
 
     if source == _RECENT_RECOMMENDATION_SOURCE:
+        experiment_id = _DEFAULT_RECOMMENDATION_EXPERIMENT_ID
+        variant = _DEFAULT_RECOMMENDATION_VARIANT
         resolved_page, offset = _resolve_recent_recommendation_position(
             page=page,
             cursor=cursor,
@@ -736,6 +748,8 @@ async def get_news_recommendations(
 
     if source == _RECOMMENDER_RECOMMENDATION_SOURCE and not items:
         source = _RECENT_RECOMMENDATION_SOURCE
+        experiment_id = _DEFAULT_RECOMMENDATION_EXPERIMENT_ID
+        variant = _DEFAULT_RECOMMENDATION_VARIANT
         resolved_page, offset = _resolve_recent_recommendation_position(
             page=page,
             cursor=cursor,
@@ -764,6 +778,8 @@ async def get_news_recommendations(
                 screen_session_id=screen_session_id,
                 app_session_id=app_session_id,
                 source=source,
+                experiment_id=experiment_id,
+                variant=variant,
                 candidates=served_candidates,
             )
         except Exception as exc:
