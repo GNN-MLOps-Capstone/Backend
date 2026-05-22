@@ -1,6 +1,6 @@
 # tests/test_models.py
 """
-4/3~4 — 유저 인증 및 관심종목 데이터 모델(DB/Schema) 검증
+4/3~4 — 유저/관심종목/알림/상호작용 이벤트 데이터 모델(DB/Schema) 검증
 """
 
 import pytest
@@ -145,7 +145,7 @@ class TestUserModel:
         await db_session.flush()
         assert user.onesignal_id is None
 
-    async def test_user_repr(self, sample_user):
+    async def test_user_repr(self, sample_user: User) -> None:
         """__repr__ 형식 확인"""
         assert "test@example.com" in repr(sample_user)
 
@@ -277,7 +277,7 @@ class TestWatchlistModel:
         await db_session.flush()
         assert stock.market_cap == 40_000_000_000_000
  
-    async def test_repr(self, db_session, sample_stock):
+    async def test_stock_repr(self, db_session, sample_stock):
         assert "005930" in repr(sample_stock)
         assert "삼성전자" in repr(sample_stock)
 
