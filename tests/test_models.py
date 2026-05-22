@@ -145,7 +145,7 @@ class TestUserModel:
         await db_session.flush()
         assert user.onesignal_id is None
 
-    async def test_stock_repr(self, db_session, sample_stock):
+    async def test_user_repr(self, sample_user):
         """__repr__ 형식 확인"""
         assert "test@example.com" in repr(sample_user)
 
