@@ -408,6 +408,12 @@ class RecommendationServe(Base):
     __tablename__ = "recommendation_serves"
     __table_args__ = (
         UniqueConstraint("request_id", "page", name="uq_recommendation_serves_request_page"),
+        Index(
+            "ix_recommendation_serves_experiment_variant_created_at",
+            "experiment_id",
+            "variant",
+            "created_at",
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -416,6 +422,8 @@ class RecommendationServe(Base):
     screen_session_id = Column(String(64), nullable=True, index=True)
     app_session_id = Column(String(255), nullable=True, index=True)
     source = Column(String(50), nullable=False)
+    experiment_id = Column(String(128), nullable=True, index=True)
+    variant = Column(String(32), nullable=True, index=True)
     page = Column(Integer, nullable=False, default=1)
     limit = Column(Integer, nullable=False)
     served_count = Column(Integer, nullable=False, default=0)

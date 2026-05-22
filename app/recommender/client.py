@@ -20,6 +20,8 @@ class RecommendationResult:
     items: list[RecommendationCandidate]
     next_cursor: str | None = None
     request_id: str | None = None
+    experiment_id: str | None = None
+    variant: str | None = None
 
 
 class RecommendationClient:
@@ -81,6 +83,8 @@ class RecommendationClient:
     def _normalize(self, data: Any) -> RecommendationResult:
         next_cursor: str | None = None
         request_id: str | None = None
+        experiment_id: str | None = None
+        variant: str | None = None
         if isinstance(data, dict):
             if isinstance(data.get("items"), list):
                 rows = data["items"]
@@ -92,6 +96,12 @@ class RecommendationClient:
                 next_cursor = str(data["next_cursor"])
             if data.get("request_id") is not None:
                 request_id = str(data["request_id"])
+            meta = data.get("meta")
+            if isinstance(meta, dict):
+                if meta.get("experiment_id") is not None:
+                    experiment_id = str(meta["experiment_id"])
+                if meta.get("variant") is not None:
+                    variant = str(meta["variant"])
         elif isinstance(data, list):
             rows = data
         else:
@@ -130,4 +140,6 @@ class RecommendationClient:
             items=normalized,
             next_cursor=next_cursor,
             request_id=request_id,
+            experiment_id=experiment_id,
+            variant=variant,
         )
