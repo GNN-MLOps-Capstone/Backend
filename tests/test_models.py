@@ -5,11 +5,11 @@
 
 import pytest
 import pytest_asyncio
-from datetime import time
+from datetime import date, datetime, time
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.models import User, UserSettings, Watchlist, Stock
+from app.models import User, UserSettings, Watchlist, Stock, Notification, InteractionEvent, InteractionEventType
 
 
 # =============================================================================
@@ -65,6 +65,49 @@ class TestUserModel:
     async def test_유저_created_at_자동설정(self, db_session, sample_user):
         """created_at 서버 기본값 확인"""
         assert sample_user.created_at is not None
+
+    async def test_유저_last_login_자동설정(self, db_session, sample_user):
+        """last_login 서버 기본값 확인 — 가입 시 자동으로 현재 시각이 입력됨"""
+        result = await db_session.execute(
+            select(User).where(User.id == sample_user.id)
+        )
+        user = result.scalar_one()
+        assert user.last_login is not None
+ 
+    async def test_유저_last_login_갱신(self, db_session, sample_user):
+        """last_login 직접 갱신 후 반영 확인"""
+        new_login_time = datetime(2026, 4, 22, 9, 0, 0)
+        sample_user.last_login = new_login_time
+        await db_session.flush()
+ 
+        result = await db_session.execute(
+            select(User).where(User.id == sample_user.id)
+        )
+        user = result.scalar_one()
+        assert user.last_login.replace(tzinfo=None) == new_login_time
+        
+    async def test_유저_role_nullable(self, db_session):
+        """role 컬럼은 null 허용"""
+        user = User(
+            google_id="google-role-test",
+            email="role@test.com",
+            nickname="역할없음",
+        )
+        db_session.add(user)
+        await db_session.flush()
+        assert user.role is None
+ 
+    async def test_유저_role_저장(self, db_session):
+        """role 값이 정상 저장되는지 확인"""
+        user = User(
+            google_id="google-admin-001",
+            email="admin@test.com",
+            nickname="관리자",
+            role="admin",
+        )
+        db_session.add(user)
+        await db_session.flush()
+        assert user.role == "admin"
 
     async def test_google_id_unique_제약(self, db_session, sample_user):
         """같은 google_id로 유저 중복 생성 시 IntegrityError"""
@@ -216,6 +259,28 @@ class TestWatchlistModel:
         await db_session.flush()
         assert "005930" in repr(item)
 
+    async def test_market_cap_nullable(self, db_session):
+        """market_cap은 null 허용"""
+        stock = Stock(stock_id="888888", stock_name="테스트종목")
+        db_session.add(stock)
+        await db_session.flush()
+        assert stock.market_cap is None
+ 
+    async def test_market_cap_저장(self, db_session):
+        """market_cap 값이 정상 저장되는지 확인"""
+        stock = Stock(
+            stock_id="005380",
+            stock_name="현대차",
+            market_cap=40_000_000_000_000,
+        )
+        db_session.add(stock)
+        await db_session.flush()
+        assert stock.market_cap == 40_000_000_000_000
+ 
+    async def test_repr(self, db_session, sample_stock):
+        assert "005930" in repr(sample_stock)
+        assert "삼성전자" in repr(sample_stock)
+
 
 # =============================================================================
 # Stock 모델 테스트
@@ -238,3 +303,237 @@ class TestStockModel:
         await db_session.flush()
         assert stock.stock_name is None
         assert stock.industry is None
+
+
+# =============================================================================
+# Notification 모델 테스트
+# =============================================================================
+ 
+class TestNotificationModel:
+ 
+    @pytest_asyncio.fixture
+    async def sample_notification(self, db_session, sample_user):
+        notif = Notification(
+            onesignal_notification_id="onesignal-notif-001",
+            user_id=sample_user.google_id,
+            type="RISK",
+            title="급락 경보",
+            date_kst=date(2026, 4, 22),
+        )
+        db_session.add(notif)
+        await db_session.flush()
+        return notif
+ 
+    async def test_알림_생성_성공(self, db_session, sample_notification):
+        """기본 알림 생성 및 DB 저장 확인"""
+        result = await db_session.execute(
+            select(Notification).where(Notification.id == sample_notification.id)
+        )
+        notif = result.scalar_one_or_none()
+        assert notif is not None
+        assert notif.type == "RISK"
+        assert notif.title == "급락 경보"
+ 
+    async def test_is_read_기본값_False(self, db_session, sample_notification):
+        """is_read 기본값이 False인지 확인"""
+        assert sample_notification.is_read is False
+ 
+    async def test_star_기본값_False(self, db_session, sample_notification):
+        """star 기본값이 False인지 확인"""
+        assert sample_notification.star is False
+ 
+    async def test_created_at_자동설정(self, db_session, sample_notification):
+        """created_at 자동 설정 확인"""
+        assert sample_notification.created_at is not None
+ 
+    async def test_is_read_갱신(self, db_session, sample_notification):
+        """읽음 처리 후 is_read 반영 확인"""
+        sample_notification.is_read = True
+        await db_session.flush()
+ 
+        result = await db_session.execute(
+            select(Notification).where(Notification.id == sample_notification.id)
+        )
+        notif = result.scalar_one()
+        assert notif.is_read is True
+ 
+    async def test_전체_필드_저장(self, db_session, sample_user):
+        """선택 필드 포함 전체 저장 확인"""
+        notif = Notification(
+            onesignal_notification_id="onesignal-notif-full",
+            user_id=sample_user.google_id,
+            type="NEWS",
+            title="삼성전자 호재",
+            body="삼성전자가 어닝서프라이즈를 기록했습니다.",
+            stock_name="삼성전자",
+            sentiment_score=0.85,
+            date_kst=date(2026, 4, 22),
+        )
+        db_session.add(notif)
+        await db_session.flush()
+        assert notif.stock_name == "삼성전자"
+        assert notif.sentiment_score == 0.85
+        assert notif.body is not None
+ 
+    async def test_onesignal_user_unique_제약(self, db_session, sample_user):
+        """동일한 onesignal_notification_id + user_id 조합은 중복 불가"""
+        n1 = Notification(
+            onesignal_notification_id="onesignal-dup",
+            user_id=sample_user.google_id,
+            type="RISK",
+            title="알림1",
+            date_kst=date(2026, 4, 22),
+        )
+        n2 = Notification(
+            onesignal_notification_id="onesignal-dup",  # 동일
+            user_id=sample_user.google_id,
+            type="RISK",
+            title="알림2",
+            date_kst=date(2026, 4, 22),
+        )
+        db_session.add(n1)
+        db_session.add(n2)
+        with pytest.raises(IntegrityError):
+            await db_session.flush()
+ 
+    async def test_daily_unique_제약(self, db_session, sample_user):
+        """user_id + stock_name + type + date_kst 조합 중복 불가"""
+        n1 = Notification(
+            onesignal_notification_id="onesignal-daily-001",
+            user_id=sample_user.google_id,
+            type="RISK",
+            title="급락 경보",
+            stock_name="삼성전자",
+            date_kst=date(2026, 4, 22),
+        )
+        n2 = Notification(
+            onesignal_notification_id="onesignal-daily-002",
+            user_id=sample_user.google_id,
+            type="RISK",
+            title="급락 경보 2",
+            stock_name="삼성전자",  # 동일 stock_name + type + date_kst
+            date_kst=date(2026, 4, 22),
+        )
+        db_session.add(n1)
+        db_session.add(n2)
+        with pytest.raises(IntegrityError):
+            await db_session.flush()
+ 
+    async def test_repr(self, db_session, sample_notification):
+        assert "RISK" in repr(sample_notification)
+        assert "급락 경보" in repr(sample_notification)
+ 
+ 
+# =============================================================================
+# InteractionEvent 모델 테스트
+# =============================================================================
+ 
+class TestInteractionEventModel:
+ 
+    async def test_이벤트_생성_성공(self, db_session, sample_user):
+        """기본 이벤트 생성 및 DB 저장 확인"""
+        event = InteractionEvent(
+            id=1,
+            event_id="evt-001",
+            user_id=sample_user.id,
+            event_type=InteractionEventType.content_open,
+        )
+        db_session.add(event)
+        await db_session.flush()
+ 
+        result = await db_session.execute(
+            select(InteractionEvent).where(InteractionEvent.event_id == "evt-001")
+        )
+        saved = result.scalar_one_or_none()
+        assert saved is not None
+        assert saved.event_type == InteractionEventType.content_open
+ 
+    async def test_event_ts_server_자동설정(self, db_session, sample_user):
+        """event_ts_server 서버 기본값 자동 설정 확인"""
+        event = InteractionEvent(
+            id=2,
+            event_id="evt-002",
+            user_id=sample_user.id,
+            event_type=InteractionEventType.screen_view,
+        )
+        db_session.add(event)
+        await db_session.flush()
+        assert event.event_ts_server is not None
+ 
+    async def test_event_id_unique_제약(self, db_session, sample_user):
+        """동일한 event_id 중복 저장 시 IntegrityError"""
+        e1 = InteractionEvent(
+            id=3,
+            event_id="evt-dup",
+            user_id=sample_user.id,
+            event_type=InteractionEventType.scroll_depth,
+        )
+        e2 = InteractionEvent(
+            id=4,
+            event_id="evt-dup",  # 동일 event_id
+            user_id=sample_user.id,
+            event_type=InteractionEventType.scroll_depth,
+        )
+        db_session.add(e1)
+        db_session.add(e2)
+        with pytest.raises(IntegrityError):
+            await db_session.flush()
+ 
+    async def test_선택_필드_저장(self, db_session, sample_user):
+        """선택 필드 포함 전체 저장 확인"""
+        event = InteractionEvent(
+            id=5,
+            event_id="evt-full-001",
+            user_id=sample_user.id,
+            event_type=InteractionEventType.content_heartbeat,
+            device_id="device-abc",
+            app_session_id="app-session-xyz",
+            screen_session_id="screen-001",
+            content_session_id="content-001",
+            news_id=12345,
+            request_id="req-abc",
+            position=2,
+            page=1,
+            scroll_depth=0.75,
+            event_ts_client=datetime(2026, 4, 22, 10, 0, 0),
+        )
+        db_session.add(event)
+        await db_session.flush()
+        assert event.news_id == 12345
+        assert event.scroll_depth == 0.75
+        assert event.position == 2
+ 
+    async def test_모든_event_type_저장(self, db_session, sample_user):
+        """InteractionEventType 전체 값 저장 가능 확인"""
+        for i, event_type in enumerate(InteractionEventType):
+            event = InteractionEvent(
+                id=100+i,
+                event_id=f"evt-type-{i:03d}",
+                user_id=sample_user.id,
+                event_type=event_type,
+            )
+            db_session.add(event)
+        await db_session.flush()
+ 
+        result = await db_session.execute(
+            select(InteractionEvent).where(
+                InteractionEvent.event_id.like("evt-type-%")
+            )
+        )
+        saved = result.scalars().all()
+        assert len(saved) == len(list(InteractionEventType))
+ 
+    async def test_optional_필드_null_허용(self, db_session, sample_user):
+        """선택 필드는 모두 null 저장 가능"""
+        event = InteractionEvent(
+            id=6,
+            event_id="evt-null-fields",
+            user_id=sample_user.id,
+            event_type=InteractionEventType.screen_leave,
+        )
+        db_session.add(event)
+        await db_session.flush()
+        assert event.news_id is None
+        assert event.scroll_depth is None
+        assert event.device_id is None
+        assert event.event_ts_client is None
