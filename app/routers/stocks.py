@@ -1189,7 +1189,8 @@ async def read_ai_trends(
  
         async def _fetch_weather_safe(code: str) -> str:
             try:
-                return await get_stock_weather(db, stock_id=code)
+                async with AsyncSessionLocal() as session:
+                    return await get_stock_weather(session, stock_id=code)
             except HTTPException:
                 return "CLOUDY"
             except Exception as e:
