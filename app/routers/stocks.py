@@ -1187,10 +1187,22 @@ async def read_ai_trends(
                 logger.warning("overview fetch failed for %s: %s", code, e)
                 return None
  
-        overviews = await asyncio.gather(*[_fetch_overview_safe(t["code"]) for t in trends])
+        async def _fetch_weather_safe(code: str) -> str:
+            try:
+                return await get_stock_weather(db, stock_id=code)
+            except HTTPException:
+                return "CLOUDY"
+            except Exception as e:
+                logger.warning("weather fetch failed for %s: %s", code, e)
+                return "CLOUDY"
+
+        overviews, weathers = await asyncio.gather(
+            asyncio.gather(*[_fetch_overview_safe(t["code"]) for t in trends]),
+            asyncio.gather(*[_fetch_weather_safe(t["code"]) for t in trends]),
+        )
  
         results = []
-        for trend, overview in zip(trends, overviews, strict=True):
+        for trend, overview, weather in zip(trends, overviews, weathers, strict=True):
             change_rate = overview.get("change_rate") if overview else None
             avg_sentiment = trend.get("avg_sentiment")
             results.append({
@@ -1198,7 +1210,7 @@ async def read_ai_trends(
                 "code": trend["code"],
                 "name": trend["name"],
                 "score": trend["score"],
-                "weather": get_weather(change_rate, avg_sentiment),
+                "weather": weather,
                 "last_price": overview.get("last_price") if overview else None,
                 "change_rate": change_rate,
                 "news_count": trend["news_count"],
