@@ -75,6 +75,7 @@ async def get_notifications(
             title=noti.title,
             body=noti.body,
             read=noti.is_read,
+            star=noti.star,
             created_at=noti.created_at
         ))
         
