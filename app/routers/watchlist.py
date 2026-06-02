@@ -394,7 +394,7 @@ async def _call_gemini_briefing(combined_summaries: str) -> str:
     try:
         # ※ gemini_client 초기화 코드가 외부에 있다고 가정합니다.
         response = await gemini_client.aio.models.generate_content(
-            model="gemini-2.0-flash-lite",
+            model="gemini-2.5-flash-lite",
             contents=combined_summaries,
             config=types.GenerateContentConfig(
             system_instruction=system_prompt,
