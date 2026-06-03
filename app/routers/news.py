@@ -1000,6 +1000,7 @@ async def get_recent_trending_stocks(
 
 @router.get("/trending-keywords", response_model=list[RecentTrendingKeywordResponse])
 async def get_recent_trending_keywords(
+    limit: int = Query(default=3, ge=1, le=50, description="반환할 트렌딩 키워드의 개수"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1040,7 +1041,7 @@ async def get_recent_trending_keywords(
             desc(latest_pub_date_expr),
             Keyword.word.asc(),
         )
-        .limit(3)
+        .limit(limit)
     )
 
     result = await db.execute(query)
