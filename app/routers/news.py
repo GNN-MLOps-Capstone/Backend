@@ -1005,7 +1005,8 @@ async def get_recent_trending_keywords(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    최근 24시간 동안 발행된 뉴스에서 많이 등장한 키워드 상위 3개를 반환합니다.
+    최근 24시간 동안 발행된 뉴스에서 많이 등장한 키워드를 반환합니다.
+    limit 파라미터로 반환할 키워드 개수를 제어할 수 있습니다 (기본값: 3, 범위: 1~50).
     """
     _ = current_user
     window_start = datetime.utcnow() - timedelta(hours=24)
