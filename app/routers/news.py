@@ -1000,11 +1000,13 @@ async def get_recent_trending_stocks(
 
 @router.get("/trending-keywords", response_model=list[RecentTrendingKeywordResponse])
 async def get_recent_trending_keywords(
+    limit: int = Query(default=3, ge=1, le=50, description="반환할 트렌딩 키워드의 개수"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    최근 24시간 동안 발행된 뉴스에서 많이 등장한 키워드 상위 3개를 반환합니다.
+    최근 24시간 동안 발행된 뉴스에서 많이 등장한 키워드를 반환합니다.
+    limit 파라미터로 반환할 키워드 개수를 제어할 수 있습니다 (기본값: 3, 범위: 1~50).
     """
     _ = current_user
     window_start = datetime.utcnow() - timedelta(hours=24)
@@ -1040,7 +1042,7 @@ async def get_recent_trending_keywords(
             desc(latest_pub_date_expr),
             Keyword.word.asc(),
         )
-        .limit(3)
+        .limit(limit)
     )
 
     result = await db.execute(query)
