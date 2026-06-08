@@ -6,17 +6,18 @@ import unicodedata
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, text
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select, func, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db
-from app.models import Keyword, OnboardingTheme, User, UserOnboardingKeyword
-from app.routers.users import get_current_user
+from app.models import Keyword, NewsKeywordMapping, OnboardingTheme, User, UserOnboardingKeyword
+from app.routers.users import get_current_subject, get_current_user
 from app.schemas import (
+    OnboardingKeywordResponse,
     OnboardingThemeResponse,
     UserOnboardingKeywordCreateRequest,
     UserOnboardingKeywordCreateResponse,
@@ -205,6 +206,33 @@ async def get_themes(db: AsyncSession = Depends(get_db)):
             categories=[c.category_name for c in t.categories],
         )
         for t in themes
+    ]
+
+
+@router.get("/keywords", response_model=list[OnboardingKeywordResponse])
+async def get_top_keywords(
+    q: str | None = Query(None, description="키워드 검색어"),
+    limit: int = Query(20, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_subject),
+):
+    """뉴스 집계 기준 상위 키워드 조회. q 파라미터로 실시간 검색 지원."""
+    count_col = func.count(NewsKeywordMapping.mapping_id).label("count")
+    stmt = (
+        select(Keyword.keyword_id.label("id"), Keyword.word, count_col)
+        .join(NewsKeywordMapping, Keyword.keyword_id == NewsKeywordMapping.keyword_id)
+        .group_by(Keyword.keyword_id, Keyword.word)
+        .order_by(count_col.desc())
+        .limit(limit)
+    )
+    if q and q.strip():
+        escaped = q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        stmt = stmt.where(Keyword.word.ilike(f"%{escaped}%", escape="\\"))
+
+    result = await db.execute(stmt)
+    return [
+        OnboardingKeywordResponse(id=row.id, word=row.word, count=row.count)
+        for row in result.all()
     ]
 
 

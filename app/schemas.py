@@ -234,6 +234,12 @@ class UserOnboardingKeywordCreateResponse(BaseModel):
     items: List[UserOnboardingKeywordResponse]
 
 
+class OnboardingKeywordResponse(BaseModel):
+    id: int
+    word: str
+    count: int
+
+
 class SettingResponse(BaseModel):
     """
     설정 정보 응답 스키마
